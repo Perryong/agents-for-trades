@@ -4,6 +4,18 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Invoke-Git {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Args
+    )
+
+    & git @Args
+    if ($LASTEXITCODE -ne 0) {
+        throw "git $($Args -join ' ') failed with exit code $LASTEXITCODE"
+    }
+}
+
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $repoRoot
 
@@ -20,15 +32,15 @@ if (-not [string]::IsNullOrWhiteSpace($Ticker)) {
 
 Set-Content -Path $triggerFile -Value $lines -Encoding utf8
 
-git add $triggerFile .github/workflows/daily-analysis.yml scripts/run-daily-analysis-now.ps1
+Invoke-Git -Args @("add", $triggerFile, ".github/workflows/daily-analysis.yml", "scripts/run-daily-analysis-now.ps1")
 
 $commitMessage = "chore: trigger daily analysis now"
 if (-not [string]::IsNullOrWhiteSpace($Ticker)) {
     $commitMessage = "$commitMessage ($($Ticker.Trim().ToUpperInvariant()))"
 }
 
-git commit -m $commitMessage
+Invoke-Git -Args @("commit", "-m", $commitMessage)
 
-git push origin HEAD
+Invoke-Git -Args @("push", "origin", "HEAD")
 
 Write-Host "Pushed trigger commit. GitHub Actions should start shortly."
