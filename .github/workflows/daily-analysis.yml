@@ -1,6 +1,9 @@
 name: Daily Trading Analysis
 
 on:
+  push:
+    paths:
+      - ".github/daily-analysis-trigger.txt"
   schedule:
     # 21:30 Asia/Singapore = 13:30 UTC
     - cron: "30 13 * * *"
@@ -68,7 +71,7 @@ jobs:
           from tradingagents.graph.trading_graph import TradingAgentsGraph
 
 
-          load_dotenv()
+          load_dotenv(dotenv_path=".env")
 
           singapore_date = datetime.now(ZoneInfo("Asia/Singapore")).strftime("%Y-%m-%d")
           ticker = os.getenv("TICKER", "NVDA").strip().upper()
@@ -109,13 +112,13 @@ jobs:
               "decision": decision,
           }
 
-              history_dir = Path("analysis_history") / ticker / singapore_date
-              history_dir.mkdir(parents=True, exist_ok=True)
+          history_dir = Path("analysis_history") / ticker / singapore_date
+          history_dir.mkdir(parents=True, exist_ok=True)
 
-              with open(history_dir / "summary.json", "w", encoding="utf-8") as f:
-              json.dump(summary, f, indent=2)
+          with open(history_dir / "summary.json", "w", encoding="utf-8") as f:
+                json.dump(summary, f, indent=2)
 
-              with open(history_dir / "summary.md", "w", encoding="utf-8") as f:
+          with open(history_dir / "summary.md", "w", encoding="utf-8") as f:
               f.write("# Daily Trading Analysis Summary\n\n")
               f.write(f"- Timestamp (SGT): {summary['timestamp_singapore']}\n")
               f.write(f"- Trade date: {summary['trade_date']}\n")
