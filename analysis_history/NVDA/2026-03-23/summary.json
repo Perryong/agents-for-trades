@@ -1,0 +1,16 @@
+{
+  "timestamp_singapore": "2026-03-23T16:55:03.204805+08:00",
+  "trade_date": "2026-03-23",
+  "ticker": "NVDA",
+  "llm_provider": "openai",
+  "quick_model": "gpt-5-mini",
+  "deep_model": "gpt-5.2",
+  "selected_analysts": [
+    "market",
+    "technical",
+    "social",
+    "news",
+    "fundamentals"
+  ],
+  "decision": "SELL"
+}
