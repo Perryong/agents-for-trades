@@ -1,5 +1,5 @@
 {
-  "timestamp_singapore": "2026-03-23T16:55:03.204805+08:00",
+  "timestamp_singapore": "2026-03-23T17:27:14.645954+08:00",
   "trade_date": "2026-03-23",
   "ticker": "NVDA",
   "llm_provider": "openai",
@@ -12,5 +12,7 @@
     "news",
     "fundamentals"
   ],
-  "decision": "SELL"
+  "decision": "SELL",
+  "full_states_log_source": "eval_results/NVDA/TradingAgentsStrategy_logs/full_states_log_2026-03-23.json",
+  "full_states_log_file": "analysis_history/NVDA/2026-03-23/full_states_log.json"
 }
