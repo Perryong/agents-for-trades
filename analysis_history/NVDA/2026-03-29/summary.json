@@ -1,0 +1,18 @@
+{
+  "timestamp_singapore": "2026-03-29T22:13:40.570142+08:00",
+  "trade_date": "2026-03-29",
+  "ticker": "NVDA",
+  "llm_provider": "openai",
+  "quick_model": "gpt-5-mini",
+  "deep_model": "gpt-5.2",
+  "selected_analysts": [
+    "market",
+    "technical",
+    "social",
+    "news",
+    "fundamentals"
+  ],
+  "decision": "SELL",
+  "full_states_log_source": "eval_results/NVDA/TradingAgentsStrategy_logs/full_states_log_2026-03-29.json",
+  "full_states_log_file": "analysis_history/NVDA/2026-03-29/full_states_log.json"
+}
