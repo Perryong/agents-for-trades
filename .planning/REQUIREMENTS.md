@@ -8,8 +8,8 @@
 ### Options Data Infrastructure
 
 - [ ] **DATA-01**: Tradier API client integrated using existing `requests`-based pattern (same as Alpha Vantage)
-- [ ] **DATA-02**: Options chain data retrievable per ticker: strikes, expiries, bid/ask, volume, open interest, greeks (delta, gamma, theta, vega), IV per contract
-- [ ] **DATA-03**: Options vendor abstraction layer added to `interface.py` using existing `VENDOR_METHODS` routing pattern with a new `options_data` category
+- [x] **DATA-02**: Options chain data retrievable per ticker: strikes, expiries, bid/ask, volume, open interest, greeks (delta, gamma, theta, vega), IV per contract
+- [x] **DATA-03**: Options vendor abstraction layer added to `interface.py` using existing `VENDOR_METHODS` routing pattern with a new `options_data` category
 - [ ] **DATA-04**: Tradier API key configured via `.env` and `DEFAULT_CONFIG`
 - [ ] **DATA-05**: Historical IV data retrievable per ticker over 52-week window (for IV rank/percentile calculation)
 
