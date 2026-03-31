@@ -19,6 +19,7 @@ from .managers.research_manager import create_research_manager
 from .managers.risk_manager import create_risk_manager
 
 from .trader.trader import create_trader
+from .options.volatility_analyst import create_volatility_analyst
 
 __all__ = [
     "FinancialSituationMemory",
@@ -39,4 +40,5 @@ __all__ = [
     "create_conservative_debator",
     "create_social_media_analyst",
     "create_trader",
+    "create_volatility_analyst",
 ]

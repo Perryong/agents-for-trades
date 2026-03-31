@@ -75,3 +75,7 @@ class AgentState(MessagesState):
         RiskDebateState, "Current state of the debate on evaluating risk"
     ]
     final_trade_decision: Annotated[str, "Final decision made by the Risk Analysts"]
+
+    # options pipeline report fields
+    volatility_report: Annotated[str, "Report from the Volatility Analyst"]
+    options_flow_report: Annotated[str, "Report from the Options Flow Analyst"]
