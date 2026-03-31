@@ -79,3 +79,5 @@ class AgentState(MessagesState):
     # options pipeline report fields
     volatility_report: Annotated[str, "Report from the Volatility Analyst"]
     options_flow_report: Annotated[str, "Report from the Options Flow Analyst"]
+    options_strategy: Annotated[str, "Options strategy selected by the Strategy Selector"]
+    options_legs: Annotated[str, "Specific contracts selected by the Strike/Expiry Selector"]

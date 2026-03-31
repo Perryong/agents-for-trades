@@ -40,6 +40,40 @@ def test_agent_state_options_flow_report_is_annotated_str():
     assert args[0] is str, f"options_flow_report base type should be str, got {args[0]}"
 
 
+def test_agent_state_has_options_strategy_field():
+    """AgentState must have an options_strategy field."""
+    from tradingagents.agents.utils.agent_states import AgentState
+    assert "options_strategy" in AgentState.__annotations__, (
+        "AgentState missing 'options_strategy' field"
+    )
+
+
+def test_agent_state_has_options_legs_field():
+    """AgentState must have an options_legs field."""
+    from tradingagents.agents.utils.agent_states import AgentState
+    assert "options_legs" in AgentState.__annotations__, (
+        "AgentState missing 'options_legs' field"
+    )
+
+
+def test_agent_state_options_strategy_is_annotated_str():
+    """options_strategy field annotation base type should be str."""
+    from tradingagents.agents.utils.agent_states import AgentState
+    annotation = AgentState.__annotations__["options_strategy"]
+    args = getattr(annotation, "__args__", None)
+    assert args is not None, "options_strategy should be Annotated[str, ...]"
+    assert args[0] is str, f"options_strategy base type should be str, got {args[0]}"
+
+
+def test_agent_state_options_legs_is_annotated_str():
+    """options_legs field annotation base type should be str."""
+    from tradingagents.agents.utils.agent_states import AgentState
+    annotation = AgentState.__annotations__["options_legs"]
+    args = getattr(annotation, "__args__", None)
+    assert args is not None, "options_legs should be Annotated[str, ...]"
+    assert args[0] is str, f"options_legs base type should be str, got {args[0]}"
+
+
 def test_create_volatility_analyst_importable_from_options_package():
     """create_volatility_analyst must be importable from tradingagents.agents.options."""
     from tradingagents.agents.options import create_volatility_analyst
