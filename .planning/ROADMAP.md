@@ -7,7 +7,7 @@
 
 - [x] **Phase 1: Options Data Infrastructure** - Tradier client, options chain + historical IV, vendor abstraction layer, config keys (completed 2026-03-31)
 - [x] **Phase 2: Volatility & Flow Agents** - IV regime analysis agent and options flow analysis agent (completed 2026-03-31)
-- [ ] **Phase 3: Strategy & Contract Selection Agents** - Strategy selector agent and strike/expiry selector agent
+- [x] **Phase 3: Strategy & Contract Selection Agents** - Strategy selector agent and strike/expiry selector agent (completed 2026-03-31)
 - [ ] **Phase 4: Pricing, Order Building & Greeks** - Black-Scholes utility, pricing agent, legs builder, Greeks monitor
 - [ ] **Phase 5: Graph Integration** - Options branch wired into StateGraph, AgentState extended, enable_options config flag
 - [ ] **Phase 6: Debator & Risk Manager Updates** - Options-aware prompts for all debators and Risk Manager enforcement rules
@@ -60,11 +60,11 @@ Plans:
 **Goal:** Given directional bias and IV view from upstream agents, the system selects a single named options strategy and then identifies specific liquid contracts for each leg.
 **Depends on:** Phase 2
 **Requirements:** AGENT-03, AGENT-04
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 03-01-PLAN.md — Options strategy selector agent + AgentState extension with options_strategy and options_legs fields
-- [ ] 03-02-PLAN.md — Strike and expiry selector agent with Python-first deterministic contract filtering
+- [x] 03-02-PLAN.md — Strike and expiry selector agent with Python-first deterministic contract filtering
 
 **Success criteria:**
 - [ ] `options_strategy` field in state names exactly one strategy from the defined list with a rationale string
@@ -138,7 +138,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Options Data Infrastructure | 3/3 | Complete   | 2026-03-31 |
 | 2. Volatility & Flow Agents | 2/2 | Complete   | 2026-03-31 |
-| 3. Strategy & Contract Selection Agents | 1/2 | In Progress|  |
+| 3. Strategy & Contract Selection Agents | 2/2 | Complete   | 2026-03-31 |
 | 4. Pricing, Order Building & Greeks | 0/4 | Not started | - |
 | 5. Graph Integration | 0/3 | Not started | - |
 | 6. Debator & Risk Manager Updates | 0/2 | Not started | - |

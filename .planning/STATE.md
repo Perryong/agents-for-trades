@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-03-31T05:11:04.572Z"
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-03-31T05:14:33.233Z"
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 7
-  completed_plans: 6
+  completed_plans: 7
   percent: 86
 ---
 
@@ -54,6 +54,8 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 - [Phase 02-volatility-flow-agents]: Unusual volume guard requires open_interest > 0 to avoid false-positives on new listings (plan 02-02)
 - [Phase 03-strategy-contract-selection-agents]: System prompt lists all 10 strategies by name as numbered constraint to prevent LLM strategy hallucination
 - [Phase 03-strategy-contract-selection-agents]: Angle-bracket placeholders in SYSTEM_PROMPT avoid LangChain template variable conflicts with curly braces
+- [Phase 03-strategy-contract-selection-agents]: Duplicate _parse_tabular_string locally in strike_expiry_selector to keep modules independent
+- [Phase 03-strategy-contract-selection-agents]: LLM parameter accepted but unused in strike/expiry selector — Python-first filtering per locked decision
 
 ## Performance Metrics
 
@@ -65,11 +67,12 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 | Phase 02-volatility-flow-agents P01 | 7min | 2 tasks | 7 files |
 | Phase 02-volatility-flow-agents P02 | 4min | 1 tasks | 4 files |
 | Phase 03-strategy-contract-selection-agents P01 | 2min | 2 tasks | 6 files |
+| Phase 03-strategy-contract-selection-agents P02 | 4min | 1 tasks | 4 files |
 
 ## Session
 
-**Last session:** 2026-03-31T05:11:04.570Z
-**Stopped at:** Completed 03-01-PLAN.md
+**Last session:** 2026-03-31T05:14:29.160Z
+**Stopped at:** Completed 03-02-PLAN.md
 
 ## Next Action
 
