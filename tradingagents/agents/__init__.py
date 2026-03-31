@@ -21,6 +21,7 @@ from .managers.risk_manager import create_risk_manager
 from .trader.trader import create_trader
 from .options.volatility_analyst import create_volatility_analyst
 from .options.options_flow_analyst import create_options_flow_analyst
+from .options.options_strategy_selector import create_options_strategy_selector
 
 __all__ = [
     "FinancialSituationMemory",
@@ -43,4 +44,5 @@ __all__ = [
     "create_trader",
     "create_volatility_analyst",
     "create_options_flow_analyst",
+    "create_options_strategy_selector",
 ]
