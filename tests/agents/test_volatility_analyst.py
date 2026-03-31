@@ -15,17 +15,21 @@ from unittest.mock import patch, MagicMock
 # ---------------------------------------------------------------------------
 
 def _make_mock_llm(report_content="mocked volatility report"):
-    """Create a mock LLM compatible with (prompt | llm).invoke({}) chain pattern."""
-    mock_chain = MagicMock()
+    """Create a mock LLM compatible with (prompt | llm).invoke({}) chain pattern.
+
+    LangChain's RunnableSequence calls the LLM as a callable (llm(messages)).
+    We configure mock_llm.return_value so that mock_llm(...) returns mock_response.
+    """
     mock_response = MagicMock()
     mock_response.content = report_content
 
-    mock_chain.invoke = MagicMock(return_value=mock_response)
-
     mock_llm = MagicMock()
-    mock_llm.__ror__ = MagicMock(return_value=mock_chain)
+    # LangChain calls llm(messages) when running the chain
+    mock_llm.return_value = mock_response
+    # Also cover llm.invoke(messages) path for newer LangChain versions
+    mock_llm.invoke = MagicMock(return_value=mock_response)
 
-    return mock_llm, mock_chain, mock_response
+    return mock_llm, mock_llm, mock_response
 
 
 # ---------------------------------------------------------------------------
