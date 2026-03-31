@@ -44,7 +44,7 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — AgentState extension + volatility analyst agent (IV rank, IV percentile, HV, skew, term structure)
+- [x] 02-01-PLAN.md — AgentState extension + volatility analyst agent (IV rank, IV percentile, HV, skew, term structure)
 - [ ] 02-02-PLAN.md — Options flow analyst agent (unusual volume, P/C ratio, net flow bias)
 
 **Success criteria:**

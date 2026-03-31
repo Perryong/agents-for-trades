@@ -15,7 +15,7 @@
 
 ### New Options Agents
 
-- [ ] **AGENT-01**: Volatility analyst agent (`volatility_analyst.py`) — outputs IV rank, IV percentile, IV vs 30-day HV (rich/cheap), skew shape, term structure (contango/backwardation), one-line regime summary
+- [x] **AGENT-01**: Volatility analyst agent (`volatility_analyst.py`) — outputs IV rank, IV percentile, IV vs 30-day HV (rich/cheap), skew shape, term structure (contango/backwardation), one-line regime summary
 - [ ] **AGENT-02**: Options flow analyst agent (`options_flow_analyst.py`) — outputs unusual volume vs OI, block/sweep detection, put/call ratio divergence vs recent average, net flow bias, one-line directional implication
 - [ ] **AGENT-03**: Options strategy selector agent (`options_strategy_selector.py`) — maps directional bias + IV view + time horizon + risk preference to single strategy from defined list; includes one-sentence rationale
 - [ ] **AGENT-04**: Strike and expiry selector agent (`strike_expiry_selector.py`) — selects specific expiry date and strike(s) per leg given strategy type, delta targets, DTE window, OI threshold; outputs liquidity pass/fail per leg

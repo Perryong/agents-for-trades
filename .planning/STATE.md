@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 01-03-PLAN.md (Phase 1 complete)
-last_updated: "2026-03-31T04:09:27.718Z"
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-03-31T04:42:57.557Z"
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 100
+  total_plans: 5
+  completed_plans: 4
+  percent: 80
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-31)
 
 **Core value:** Trader receives a complete, executable options recommendation derived from the same AI analytical process that drives the equity decision
-**Current focus:** Phase 01 — options-data-infrastructure
+**Current focus:** Phase 02 — volatility-flow-agents
 
 ## Status
 
 **Phase:** 2 of 6 (volatility & flow agents)
 **Milestone:** v1 — Options Pipeline
 **Mode:** YOLO (auto-approve)
-**Progress:** [██████████] 100%
+**Progress:** [████████░░] 80%
 
 ## Phase Progress
 
@@ -48,6 +48,8 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 - [Phase 01-options-data-infrastructure]: Tradier public functions return strings (not DataFrames) to match existing dataflow contract (alpha_vantage_stock, y_finance)
 - [Phase 01-options-data-infrastructure]: TradierRateLimitError combined with AlphaVantageRateLimitError in single except tuple in route_to_vendor (plan 01-03)
 - [Phase 01-options-data-infrastructure]: Options config keys added as flat top-level keys in DEFAULT_CONFIG matching existing style (plan 01-03)
+- [Phase 02-volatility-flow-agents]: Mock LLM via return_value not __ror__ — LangChain calls LLM as callable in RunnableSequence (plan 02-01)
+- [Phase 02-volatility-flow-agents]: System prompt uses angle-bracket placeholders to avoid LangChain template variable conflicts with curly braces (plan 02-01)
 
 ## Performance Metrics
 
@@ -56,11 +58,12 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 | 01-options-data-infrastructure | 02 | 8min | 1 | 4 |
 | Phase 01-options-data-infrastructure P01 | 3 | 2 tasks | 6 files |
 | Phase 01-options-data-infrastructure P03 | 2min | 2 tasks | 4 files |
+| Phase 02-volatility-flow-agents P01 | 7min | 2 tasks | 7 files |
 
 ## Session
 
-**Last session:** 2026-03-31T04:03:02.775Z
-**Stopped at:** Completed 01-03-PLAN.md (Phase 1 complete)
+**Last session:** 2026-03-31T04:42:57.555Z
+**Stopped at:** Completed 02-01-PLAN.md
 
 ## Next Action
 
