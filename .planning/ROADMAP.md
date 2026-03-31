@@ -60,10 +60,11 @@ Plans:
 **Goal:** Given directional bias and IV view from upstream agents, the system selects a single named options strategy and then identifies specific liquid contracts for each leg.
 **Depends on:** Phase 2
 **Requirements:** AGENT-03, AGENT-04
+**Plans:** 2 plans
 
-### Plans
-1. Options strategy selector agent — implement `tradingagents/agents/options/options_strategy_selector.py` using `create_options_strategy_selector` factory; map directional bias + IV view + time horizon + risk preference to one strategy from the defined list (long call, long put, bull call spread, bear put spread, iron condor, covered call, cash-secured put, long straddle, long strangle, calendar spread); include one-sentence rationale; write to `AgentState["options_strategy"]`
-2. Strike and expiry selector agent — implement `tradingagents/agents/options/strike_expiry_selector.py` using `create_strike_expiry_selector` factory; given strategy type, delta targets, DTE window, and OI threshold from config, select expiry date and strike(s); output liquidity pass/fail per leg; write to `AgentState["options_legs"]` (pre-pricing placeholder structure)
+Plans:
+- [ ] 03-01-PLAN.md — Options strategy selector agent + AgentState extension with options_strategy and options_legs fields
+- [ ] 03-02-PLAN.md — Strike and expiry selector agent with Python-first deterministic contract filtering
 
 **Success criteria:**
 - [ ] `options_strategy` field in state names exactly one strategy from the defined list with a rationale string
