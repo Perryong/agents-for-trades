@@ -6,7 +6,7 @@
 ## Phases
 
 - [x] **Phase 1: Options Data Infrastructure** - Tradier client, options chain + historical IV, vendor abstraction layer, config keys (completed 2026-03-31)
-- [ ] **Phase 2: Volatility & Flow Agents** - IV regime analysis agent and options flow analysis agent
+- [x] **Phase 2: Volatility & Flow Agents** - IV regime analysis agent and options flow analysis agent (completed 2026-03-31)
 - [ ] **Phase 3: Strategy & Contract Selection Agents** - Strategy selector agent and strike/expiry selector agent
 - [ ] **Phase 4: Pricing, Order Building & Greeks** - Black-Scholes utility, pricing agent, legs builder, Greeks monitor
 - [ ] **Phase 5: Graph Integration** - Options branch wired into StateGraph, AgentState extended, enable_options config flag
@@ -41,11 +41,11 @@ Plans:
 **Goal:** Two specialist agents can independently characterize the IV environment and options market flow for a ticker, each producing a structured one-paragraph report.
 **Depends on:** Phase 1
 **Requirements:** AGENT-01, AGENT-02
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 02-01-PLAN.md — AgentState extension + volatility analyst agent (IV rank, IV percentile, HV, skew, term structure)
-- [ ] 02-02-PLAN.md — Options flow analyst agent (unusual volume, P/C ratio, net flow bias)
+- [x] 02-02-PLAN.md — Options flow analyst agent (unusual volume, P/C ratio, net flow bias)
 
 **Success criteria:**
 - [ ] `volatility_analyst` node populates `state["volatility_report"]` with IV rank, IV percentile, HV comparison, skew descriptor, term structure descriptor, and regime summary string
@@ -136,7 +136,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Options Data Infrastructure | 3/3 | Complete   | 2026-03-31 |
-| 2. Volatility & Flow Agents | 0/2 | Not started | - |
+| 2. Volatility & Flow Agents | 2/2 | Complete   | 2026-03-31 |
 | 3. Strategy & Contract Selection Agents | 0/2 | Not started | - |
 | 4. Pricing, Order Building & Greeks | 0/4 | Not started | - |
 | 5. Graph Integration | 0/3 | Not started | - |
