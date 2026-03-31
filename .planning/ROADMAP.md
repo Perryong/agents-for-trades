@@ -60,10 +60,10 @@ Plans:
 **Goal:** Given directional bias and IV view from upstream agents, the system selects a single named options strategy and then identifies specific liquid contracts for each leg.
 **Depends on:** Phase 2
 **Requirements:** AGENT-03, AGENT-04
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
-- [ ] 03-01-PLAN.md — Options strategy selector agent + AgentState extension with options_strategy and options_legs fields
+- [x] 03-01-PLAN.md — Options strategy selector agent + AgentState extension with options_strategy and options_legs fields
 - [ ] 03-02-PLAN.md — Strike and expiry selector agent with Python-first deterministic contract filtering
 
 **Success criteria:**
@@ -138,7 +138,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Options Data Infrastructure | 3/3 | Complete   | 2026-03-31 |
 | 2. Volatility & Flow Agents | 2/2 | Complete   | 2026-03-31 |
-| 3. Strategy & Contract Selection Agents | 0/2 | Not started | - |
+| 3. Strategy & Contract Selection Agents | 1/2 | In Progress|  |
 | 4. Pricing, Order Building & Greeks | 0/4 | Not started | - |
 | 5. Graph Integration | 0/3 | Not started | - |
 | 6. Debator & Risk Manager Updates | 0/2 | Not started | - |
