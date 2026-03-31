@@ -24,6 +24,17 @@ from .alpha_vantage import (
     get_global_news as get_alpha_vantage_global_news,
 )
 from .alpha_vantage_common import AlphaVantageRateLimitError
+from .tradier_utils import (
+    get_options_expirations as get_tradier_options_expirations,
+    get_options_chain as get_tradier_options_chain,
+    get_historical_iv as get_tradier_historical_iv,
+    TradierRateLimitError,
+)
+from .y_finance_options import (
+    get_options_expirations as get_yfinance_options_expirations,
+    get_options_chain as get_yfinance_options_chain,
+    get_historical_iv as get_yfinance_historical_iv,
+)
 
 # Configuration and routing logic
 from .config import get_config
@@ -64,12 +75,21 @@ TOOLS_CATEGORIES = {
         "tools": [
             "get_technical_analysis",
         ],
-    }
+    },
+    "options_data": {
+        "description": "Options chain, expirations, and historical IV",
+        "tools": [
+            "get_options_expirations",
+            "get_options_chain",
+            "get_historical_iv",
+        ],
+    },
 }
 
 VENDOR_LIST = [
     "yfinance",
     "alpha_vantage",
+    "tradier",
 ]
 
 # Mapping of methods to their vendor-specific implementations
@@ -116,6 +136,19 @@ VENDOR_METHODS = {
     },
     "get_technical_analysis": {
         "yfinance": get_yfinance_technical_analysis,
+    },
+    # options_data
+    "get_options_expirations": {
+        "tradier": get_tradier_options_expirations,
+        "yfinance": get_yfinance_options_expirations,
+    },
+    "get_options_chain": {
+        "tradier": get_tradier_options_chain,
+        "yfinance": get_yfinance_options_chain,
+    },
+    "get_historical_iv": {
+        "tradier": get_tradier_historical_iv,
+        "yfinance": get_yfinance_historical_iv,
     },
 }
 
@@ -166,7 +199,7 @@ def route_to_vendor(method: str, *args, **kwargs):
 
         try:
             return impl_func(*args, **kwargs)
-        except AlphaVantageRateLimitError:
-            continue  # Only rate limits trigger fallback
+        except (AlphaVantageRateLimitError, TradierRateLimitError):
+            continue  # Rate limits trigger fallback to next vendor
 
     raise RuntimeError(f"No available vendor for '{method}'")
