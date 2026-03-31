@@ -5,7 +5,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Options Data Infrastructure** - Tradier client, options chain + historical IV, vendor abstraction layer, config keys
+- [x] **Phase 1: Options Data Infrastructure** - Tradier client, options chain + historical IV, vendor abstraction layer, config keys (completed 2026-03-31)
 - [ ] **Phase 2: Volatility & Flow Agents** - IV regime analysis agent and options flow analysis agent
 - [ ] **Phase 3: Strategy & Contract Selection Agents** - Strategy selector agent and strike/expiry selector agent
 - [ ] **Phase 4: Pricing, Order Building & Greeks** - Black-Scholes utility, pricing agent, legs builder, Greeks monitor
@@ -21,12 +21,12 @@
 **Goal:** The system can retrieve options chain data and historical IV from Tradier, routed through the same vendor abstraction layer used by equity data.
 **Depends on:** Nothing (foundation)
 **Requirements:** DATA-01, DATA-02, DATA-03, DATA-04, DATA-05
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 01-01-PLAN.md — Tradier API client (tradier_utils.py) with test infrastructure and unit tests
 - [x] 01-02-PLAN.md — yfinance options fallback module (y_finance_options.py) with matching function signatures
-- [ ] 01-03-PLAN.md — Vendor abstraction wiring (interface.py + default_config.py) with config keys and fallback routing
+- [x] 01-03-PLAN.md — Vendor abstraction wiring (interface.py + default_config.py) with config keys and fallback routing
 
 **Success criteria:**
 - [ ] `interface.get_options_chain("AAPL")` returns a populated dataframe with strike, expiry, bid, ask, volume, OI, delta, gamma, theta, vega, IV columns
@@ -134,7 +134,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Options Data Infrastructure | 2/3 | In Progress|  |
+| 1. Options Data Infrastructure | 3/3 | Complete   | 2026-03-31 |
 | 2. Volatility & Flow Agents | 0/2 | Not started | - |
 | 3. Strategy & Contract Selection Agents | 0/2 | Not started | - |
 | 4. Pricing, Order Building & Greeks | 0/4 | Not started | - |
