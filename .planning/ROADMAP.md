@@ -41,10 +41,11 @@ Plans:
 **Goal:** Two specialist agents can independently characterize the IV environment and options market flow for a ticker, each producing a structured one-paragraph report.
 **Depends on:** Phase 1
 **Requirements:** AGENT-01, AGENT-02
+**Plans:** 2 plans
 
-### Plans
-1. Volatility analyst agent — implement `tradingagents/agents/options/volatility_analyst.py` using `create_volatility_analyst` factory; compute IV rank, IV percentile, IV vs 30-day HV (rich/cheap classification), skew shape, term structure (contango/backwardation); emit one-line regime summary; write result to `AgentState["volatility_report"]`
-2. Options flow analyst agent — implement `tradingagents/agents/options/options_flow_analyst.py` using `create_options_flow_analyst` factory; detect unusual volume vs OI, block/sweep activity, put/call ratio divergence vs recent average, net flow bias; emit one-line directional implication; write result to `AgentState["options_flow_report"]`
+Plans:
+- [ ] 02-01-PLAN.md — AgentState extension + volatility analyst agent (IV rank, IV percentile, HV, skew, term structure)
+- [ ] 02-02-PLAN.md — Options flow analyst agent (unusual volume, P/C ratio, net flow bias)
 
 **Success criteria:**
 - [ ] `volatility_analyst` node populates `state["volatility_report"]` with IV rank, IV percentile, HV comparison, skew descriptor, term structure descriptor, and regime summary string
