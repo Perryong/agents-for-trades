@@ -21,11 +21,12 @@
 **Goal:** The system can retrieve options chain data and historical IV from Tradier, routed through the same vendor abstraction layer used by equity data.
 **Depends on:** Nothing (foundation)
 **Requirements:** DATA-01, DATA-02, DATA-03, DATA-04, DATA-05
+**Plans:** 3 plans
 
-### Plans
-1. Tradier API client — implement `tradingagents/dataflows/tradier_utils.py` using `requests`, matching the Alpha Vantage client pattern; cover options chain endpoint and historical IV endpoint
-2. Options vendor abstraction — add `options_data` category to `VENDOR_METHODS` in `interface.py`; route chain and IV calls through it; add `DEFAULT_CONFIG` keys (`enable_options`, `options_vendor`, `options_delta_target`, `options_dte_window`, `options_min_oi`) and `.env` support for `TRADIER_API_KEY`
-3. Data validation & smoke tests — verify chain response includes strikes, expiries, bid/ask, volume, OI, greeks (delta/gamma/theta/vega), IV per contract; verify historical IV covers 52-week window
+Plans:
+- [ ] 01-01-PLAN.md — Tradier API client (tradier_utils.py) with test infrastructure and unit tests
+- [ ] 01-02-PLAN.md — yfinance options fallback module (y_finance_options.py) with matching function signatures
+- [ ] 01-03-PLAN.md — Vendor abstraction wiring (interface.py + default_config.py) with config keys and fallback routing
 
 **Success criteria:**
 - [ ] `interface.get_options_chain("AAPL")` returns a populated dataframe with strike, expiry, bid, ask, volume, OI, delta, gamma, theta, vega, IV columns
@@ -133,7 +134,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Options Data Infrastructure | 0/3 | Not started | - |
+| 1. Options Data Infrastructure | 0/3 | Planning complete | - |
 | 2. Volatility & Flow Agents | 0/2 | Not started | - |
 | 3. Strategy & Contract Selection Agents | 0/2 | Not started | - |
 | 4. Pricing, Order Building & Greeks | 0/4 | Not started | - |
