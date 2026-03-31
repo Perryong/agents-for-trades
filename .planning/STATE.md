@@ -2,13 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in-progress
-last_updated: "2026-03-31T03:54:47Z"
+status: unknown
+stopped_at: Completed 01-options-data-infrastructure-01-PLAN.md
+last_updated: "2026-03-31T03:57:45.581Z"
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 3
   completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -25,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 **Phase:** 1 of 6
 **Milestone:** v1 — Options Pipeline
 **Mode:** YOLO (auto-approve)
-**Progress:** [███░░░░░░░] 33% (2 of 3 plans completed in phase 1)
+**Progress:** [███████░░░] 67%
 
 ## Phase Progress
 
@@ -42,17 +44,20 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 
 - Greeks columns set to None explicitly in yfinance fallback to maintain Tradier contract shape (plan 01-02)
 - get_historical_iv uses median impliedVolatility of calls per expiration as ATM IV proxy (plan 01-02)
+- [Phase 01-options-data-infrastructure]: TRADIER_SANDBOX defaults to true — avoids accidental production calls without explicit opt-in
+- [Phase 01-options-data-infrastructure]: Tradier public functions return strings (not DataFrames) to match existing dataflow contract (alpha_vantage_stock, y_finance)
 
 ## Performance Metrics
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
 | 01-options-data-infrastructure | 02 | 8min | 1 | 4 |
+| Phase 01-options-data-infrastructure P01 | 3 | 2 tasks | 6 files |
 
 ## Session
 
-**Last session:** 2026-03-31T03:54:47Z
-**Stopped at:** Completed 01-02-PLAN.md
+**Last session:** 2026-03-31T03:57:45.579Z
+**Stopped at:** Completed 01-options-data-infrastructure-01-PLAN.md
 
 ## Next Action
 
