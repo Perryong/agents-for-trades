@@ -23,6 +23,9 @@ from .options.volatility_analyst import create_volatility_analyst
 from .options.options_flow_analyst import create_options_flow_analyst
 from .options.options_strategy_selector import create_options_strategy_selector
 from .options.strike_expiry_selector import create_strike_expiry_selector
+from .options.options_pricing_agent import create_options_pricing_agent
+from .options.options_legs_builder import create_options_legs_builder
+from .options.greeks_monitor import create_greeks_monitor
 
 __all__ = [
     "FinancialSituationMemory",
@@ -47,4 +50,7 @@ __all__ = [
     "create_options_flow_analyst",
     "create_options_strategy_selector",
     "create_strike_expiry_selector",
+    "create_options_pricing_agent",
+    "create_options_legs_builder",
+    "create_greeks_monitor",
 ]
