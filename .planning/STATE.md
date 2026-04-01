@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-04-01T12:12:35.912Z"
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-04-01T12:17:50.732Z"
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 11
-  completed_plans: 8
-  percent: 73
+  completed_plans: 10
+  percent: 91
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 **Phase:** 4 of 6 (pricing, order building & greeks)
 **Milestone:** v1 — Options Pipeline
 **Mode:** YOLO (auto-approve)
-**Progress:** [███████░░░] 73%
+**Progress:** [█████████░] 91%
 
 ## Phase Progress
 
@@ -59,6 +59,10 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 - [Phase 04-pricing-order-building-greeks]: Stdlib-only Black-Scholes using math.erf — eliminates scipy dependency entirely
 - [Phase 04-pricing-order-building-greeks]: r and q have no defaults in BS functions — config default 0.05 applied at call site per PRICE-02
 - [Phase 04-pricing-order-building-greeks]: T<=0 or sigma<=0 guard returns intrinsic value to prevent ZeroDivisionError at expiry
+- [Phase 04-pricing-order-building-greeks]: Angle-bracket placeholders in SYSTEM_PROMPT — curly braces conflict with LangChain template parsing (plan 04-02)
+- [Phase 04-pricing-order-building-greeks]: Verdict thresholds: >+5% = Positive edge, <-5% = Overpriced, else Fairly priced (plan 04-02)
+- [Phase 04-pricing-order-building-greeks]: Zero mid (bid=ask=0) flagged as WIDE_SPREAD to avoid ZeroDivisionError and treat as worst-case illiquid scenario
+- [Phase 04-pricing-order-building-greeks]: covered_call max_profit uses net_credit only — underlying_price not available in agent state at legs-builder stage
 
 ## Performance Metrics
 
@@ -72,11 +76,13 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 | Phase 03-strategy-contract-selection-agents P01 | 2min | 2 tasks | 6 files |
 | Phase 03-strategy-contract-selection-agents P02 | 4min | 1 tasks | 4 files |
 | Phase 04-pricing-order-building-greeks P01 | 5min | 2 tasks | 4 files |
+| Phase 04-pricing-order-building-greeks P02 | 3min | 2 tasks | 2 files |
+| Phase 04-pricing-order-building-greeks P03 | 2min | 1 tasks | 2 files |
 
 ## Session
 
-**Last session:** 2026-04-01T12:12:35.909Z
-**Stopped at:** Completed 04-01-PLAN.md
+**Last session:** 2026-04-01T12:17:50.730Z
+**Stopped at:** Completed 04-03-PLAN.md
 
 ## Next Action
 
