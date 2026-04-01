@@ -33,18 +33,18 @@
 
 ### Debator Agent Updates
 
-- [ ] **DEBATE-01**: Aggressive debator prompt extended with options-specific assessment: defined vs undefined max loss, payoff shape (long premium / short premium), Greeks risk flags (excess theta decay, uncapped vega, conflicting delta), assignment and pin risk
-- [ ] **DEBATE-02**: Conservative debator prompt extended with same options-specific assessment additions
-- [ ] **DEBATE-03**: Neutral debator prompt extended with same options-specific assessment additions
-- [ ] **DEBATE-04**: All three debators adjust their stance (aggressive / conservative / neutral) to reflect options-specific risks in addition to directional risk
+- [x] **DEBATE-01**: Aggressive debator prompt extended with options-specific assessment: defined vs undefined max loss, payoff shape (long premium / short premium), Greeks risk flags (excess theta decay, uncapped vega, conflicting delta), assignment and pin risk
+- [x] **DEBATE-02**: Conservative debator prompt extended with same options-specific assessment additions
+- [x] **DEBATE-03**: Neutral debator prompt extended with same options-specific assessment additions
+- [x] **DEBATE-04**: All three debators adjust their stance (aggressive / conservative / neutral) to reflect options-specific risks in addition to directional risk
 
 ### Risk Manager Updates
 
-- [ ] **RISK-01**: Risk Manager enforces max loss gate — rejects any trade where max loss is undefined unless portfolio collateral is documented
-- [ ] **RISK-02**: Risk Manager requires defined exit rule for short premium strategies (condors, strangles, naked puts/calls) — e.g. "close at 2x premium received" or "close at 21 DTE"
-- [ ] **RISK-03**: Risk Manager checks for early assignment risk on short ITM legs of spreads, flagging proximity to ex-dividend dates
-- [ ] **RISK-04**: Risk Manager verifies net Greeks of proposed trade do not exceed portfolio thresholds (defers to Greeks Monitor output)
-- [ ] **RISK-05**: Risk Manager flags any strategy with negative theta on a position intended to be held more than 30 days without a catalyst
+- [x] **RISK-01**: Risk Manager enforces max loss gate — rejects any trade where max loss is undefined unless portfolio collateral is documented
+- [x] **RISK-02**: Risk Manager requires defined exit rule for short premium strategies (condors, strangles, naked puts/calls) — e.g. "close at 2x premium received" or "close at 21 DTE"
+- [x] **RISK-03**: Risk Manager checks for early assignment risk on short ITM legs of spreads, flagging proximity to ex-dividend dates
+- [x] **RISK-04**: Risk Manager verifies net Greeks of proposed trade do not exceed portfolio thresholds (defers to Greeks Monitor output)
+- [x] **RISK-05**: Risk Manager flags any strategy with negative theta on a position intended to be held more than 30 days without a catalyst
 
 ### Black-Scholes Pricing
 

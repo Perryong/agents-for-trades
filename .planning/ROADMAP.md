@@ -10,7 +10,7 @@
 - [x] **Phase 3: Strategy & Contract Selection Agents** - Strategy selector agent and strike/expiry selector agent (completed 2026-03-31)
 - [x] **Phase 4: Pricing, Order Building & Greeks** - Black-Scholes utility, pricing agent, legs builder, Greeks monitor (completed 2026-04-01)
 - [x] **Phase 5: Graph Integration** - Options branch wired into StateGraph, AgentState extended, enable_options config flag (completed 2026-04-01)
-- [ ] **Phase 6: Debator & Risk Manager Updates** - Options-aware prompts for all debators and Risk Manager enforcement rules
+- [x] **Phase 6: Debator & Risk Manager Updates** - Options-aware prompts for all debators and Risk Manager enforcement rules (completed 2026-04-01)
 
 ---
 
@@ -118,11 +118,11 @@ Plans:
 **Goal:** All three debators reason about options-specific risk (max loss shape, Greeks, assignment/pin risk) and the Risk Manager enforces five options-specific rules before approving any options trade.
 **Depends on:** Phase 5
 **Requirements:** DEBATE-01, DEBATE-02, DEBATE-03, DEBATE-04, RISK-01, RISK-02, RISK-03, RISK-04, RISK-05
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 06-01-PLAN.md — Debator prompt extensions (OPTIONS RISK ASSESSMENT block in aggressive, conservative, neutral debators)
-- [ ] 06-02-PLAN.md — Risk Manager enforcement rules (5 OPTIONS RISK RULES in risk_manager.py)
+- [x] 06-01-PLAN.md — Debator prompt extensions (OPTIONS RISK ASSESSMENT block in aggressive, conservative, neutral debators)
+- [x] 06-02-PLAN.md — Risk Manager enforcement rules (5 OPTIONS RISK RULES in risk_manager.py)
 
 **Success criteria:**
 - [ ] In a full graph run with `enable_options=True`, the aggressive debator output contains explicit options-specific language (references to max loss, payoff shape, or Greeks risk)
@@ -142,7 +142,7 @@ Plans:
 | 3. Strategy & Contract Selection Agents | 2/2 | Complete   | 2026-03-31 |
 | 4. Pricing, Order Building & Greeks | 4/4 | Complete   | 2026-04-01 |
 | 5. Graph Integration | 2/2 | Complete   | 2026-04-01 |
-| 6. Debator & Risk Manager Updates | 0/2 | Not started | - |
+| 6. Debator & Risk Manager Updates | 2/2 | Complete   | 2026-04-01 |
 
 ---
 
