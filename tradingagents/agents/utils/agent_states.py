@@ -81,3 +81,5 @@ class AgentState(MessagesState):
     options_flow_report: Annotated[str, "Report from the Options Flow Analyst"]
     options_strategy: Annotated[str, "Options strategy selected by the Strategy Selector"]
     options_legs: Annotated[str, "Specific contracts selected by the Strike/Expiry Selector"]
+    options_pricing_report: Annotated[str, "Pricing report from the Options Pricing Agent"]
+    greeks_report: Annotated[str, "Greeks report from the Greeks Monitor"]

@@ -80,3 +80,37 @@ def test_create_volatility_analyst_importable_from_options_package():
     assert callable(create_volatility_analyst), (
         "create_volatility_analyst should be callable"
     )
+
+
+def test_agent_state_has_options_pricing_report_field():
+    """AgentState must have an options_pricing_report field (Phase 4)."""
+    from tradingagents.agents.utils.agent_states import AgentState
+    assert "options_pricing_report" in AgentState.__annotations__, (
+        "AgentState missing 'options_pricing_report' field"
+    )
+
+
+def test_agent_state_has_greeks_report_field():
+    """AgentState must have a greeks_report field (Phase 4)."""
+    from tradingagents.agents.utils.agent_states import AgentState
+    assert "greeks_report" in AgentState.__annotations__, (
+        "AgentState missing 'greeks_report' field"
+    )
+
+
+def test_agent_state_options_pricing_report_is_annotated_str():
+    """options_pricing_report field annotation base type should be str."""
+    from tradingagents.agents.utils.agent_states import AgentState
+    annotation = AgentState.__annotations__["options_pricing_report"]
+    args = getattr(annotation, "__args__", None)
+    assert args is not None, "options_pricing_report should be Annotated[str, ...]"
+    assert args[0] is str, f"options_pricing_report base type should be str, got {args[0]}"
+
+
+def test_agent_state_greeks_report_is_annotated_str():
+    """greeks_report field annotation base type should be str."""
+    from tradingagents.agents.utils.agent_states import AgentState
+    annotation = AgentState.__annotations__["greeks_report"]
+    args = getattr(annotation, "__args__", None)
+    assert args is not None, "greeks_report should be Annotated[str, ...]"
+    assert args[0] is str, f"greeks_report base type should be str, got {args[0]}"
