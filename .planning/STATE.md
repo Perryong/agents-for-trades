@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 07-03-PLAN.md
-last_updated: "2026-04-01T14:13:55.646Z"
+stopped_at: Completed 07-04-PLAN.md
+last_updated: "2026-04-01T14:19:07.813Z"
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 20
-  completed_plans: 18
-  percent: 90
+  completed_plans: 19
+  percent: 95
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 **Phase:** 07 of 6 (visual frontend)
 **Milestone:** v1 — Options Pipeline
 **Mode:** YOLO (auto-approve)
-**Progress:** [█████████░] 90%
+**Progress:** [██████████] 95%
 
 ## Phase Progress
 
@@ -80,6 +80,8 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 - [Phase 07-visual-frontend]: Vite proxy /api -> localhost:8000 changeOrigin: true; Vite 8 template uses tsconfig types array instead of vite-env.d.ts
 - [Phase 07-visual-frontend]: Named exports for all four React components — consistent pattern, easier to refactor
 - [Phase 07-visual-frontend]: StatusDot extracted as internal helper in ProgressStepper to keep status icon logic isolated
+- [Phase 07-visual-frontend]: isRunningRef (useRef<boolean>) used instead of state.status in es.onerror to fix stale closure bug — useCallback([]) always captures initialState
+- [Phase 07-visual-frontend]: reportContent derived from REPORT_TABS.stateKey lookup on state.result — no redundant activeReport state field
 
 ## Performance Metrics
 
@@ -103,11 +105,12 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 | Phase 07-visual-frontend P01 | 2min | 2 tasks | 9 files |
 | Phase 07-visual-frontend P02 | 4min | 2 tasks | 11 files |
 | Phase 07-visual-frontend P03 | 4min | 2 tasks | 4 files |
+| Phase 07-visual-frontend P04 | 5min | 2 tasks | 2 files |
 
 ## Session
 
-**Last session:** 2026-04-01T14:13:55.643Z
-**Stopped at:** Completed 07-03-PLAN.md
+**Last session:** 2026-04-01T14:19:07.810Z
+**Stopped at:** Completed 07-04-PLAN.md
 
 ## Next Action
 
