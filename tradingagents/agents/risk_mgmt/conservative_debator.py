@@ -19,6 +19,35 @@ def create_conservative_debator(llm):
 
         trader_decision = state["trader_investment_plan"]
 
+        options_legs = state.get("options_legs", "")
+
+        options_section = ""
+        if options_legs:
+            options_strategy = state.get("options_strategy", "")
+            options_pricing_report = state.get("options_pricing_report", "")
+            greeks_report = state.get("greeks_report", "")
+            volatility_report = state.get("volatility_report", "")
+            options_flow_report = state.get("options_flow_report", "")
+            options_section = f"""
+
+OPTIONS RISK ASSESSMENT — The trader's plan includes an options position. Evaluate the following:
+
+Strategy: {options_strategy}
+Legs: {options_legs}
+Pricing: {options_pricing_report}
+Greeks: {greeks_report}
+Volatility Context: {volatility_report}
+Flow Context: {options_flow_report}
+
+Consider these options-specific risk dimensions:
+1. Is max loss defined or undefined? If undefined, how does this affect your stance?
+2. What is the payoff shape — long premium (time decay works against) or short premium (unlimited risk potential)?
+3. Are there concerning Greeks flags — excess theta decay, uncapped vega exposure, conflicting delta vs directional view?
+4. Is there assignment risk on any short legs?
+5. Is there pin/gamma risk if expiry is near?
+
+Incorporate these options risks into your overall assessment alongside the equity analysis."""
+
         prompt = f"""As the Conservative Risk Analyst, your primary objective is to protect assets, minimize volatility, and ensure steady, reliable growth. You prioritize stability, security, and risk mitigation, carefully assessing potential losses, economic downturns, and market volatility. When evaluating the trader's decision or plan, critically examine high-risk elements, pointing out where the decision may expose the firm to undue risk and where more cautious alternatives could secure long-term gains. Here is the trader's decision:
 
 {trader_decision}
@@ -31,7 +60,7 @@ Latest World Affairs Report: {news_report}
 Company Fundamentals Report: {fundamentals_report}
 Here is the current conversation history: {history} Here is the last response from the aggressive analyst: {current_aggressive_response} Here is the last response from the neutral analyst: {current_neutral_response}. If there are no responses from the other viewpoints, do not hallucinate and just present your point.
 
-Engage by questioning their optimism and emphasizing the potential downsides they may have overlooked. Address each of their counterpoints to showcase why a conservative stance is ultimately the safest path for the firm's assets. Focus on debating and critiquing their arguments to demonstrate the strength of a low-risk strategy over their approaches. Output conversationally as if you are speaking without any special formatting."""
+Engage by questioning their optimism and emphasizing the potential downsides they may have overlooked. Address each of their counterpoints to showcase why a conservative stance is ultimately the safest path for the firm's assets. Focus on debating and critiquing their arguments to demonstrate the strength of a low-risk strategy over their approaches. Output conversationally as if you are speaking without any special formatting.{options_section}"""
 
         response = llm.invoke(prompt)
 
