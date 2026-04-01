@@ -48,9 +48,9 @@
 
 ### Black-Scholes Pricing
 
-- [ ] **PRICE-01**: Black-Scholes implementation for call and put theoretical value (inputs: underlying price, strike, time to expiry, risk-free rate, dividend yield, IV)
-- [ ] **PRICE-02**: Risk-free rate sourced from config or fetched (e.g. 3-month T-bill rate)
-- [ ] **PRICE-03**: Dividend yield sourced from existing fundamentals data (yfinance already retrieves this)
+- [x] **PRICE-01**: Black-Scholes implementation for call and put theoretical value (inputs: underlying price, strike, time to expiry, risk-free rate, dividend yield, IV)
+- [x] **PRICE-02**: Risk-free rate sourced from config or fetched (e.g. 3-month T-bill rate)
+- [x] **PRICE-03**: Dividend yield sourced from existing fundamentals data (yfinance already retrieves this)
 
 ## v2 Requirements
 

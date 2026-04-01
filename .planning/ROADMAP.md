@@ -139,7 +139,7 @@ Plans:
 | 1. Options Data Infrastructure | 3/3 | Complete   | 2026-03-31 |
 | 2. Volatility & Flow Agents | 2/2 | Complete   | 2026-03-31 |
 | 3. Strategy & Contract Selection Agents | 2/2 | Complete   | 2026-03-31 |
-| 4. Pricing, Order Building & Greeks | 0/4 | Not started | - |
+| 4. Pricing, Order Building & Greeks | 1/4 | In Progress|  |
 | 5. Graph Integration | 0/3 | Not started | - |
 | 6. Debator & Risk Manager Updates | 0/2 | Not started | - |
 
