@@ -53,8 +53,8 @@ function StatusDot({ nodeStatus }: { nodeStatus: NodeStatus }) {
     );
   }
   return (
-    <div className={`${baseClass} bg-gray-200 text-gray-400`}>
-      <span className="w-2 h-2 rounded-full border border-gray-400 block" />
+    <div className={`${baseClass} bg-gray-200 dark:bg-gray-600 text-gray-400 dark:text-gray-500`}>
+      <span className="w-2 h-2 rounded-full border border-gray-400 dark:border-gray-500 block" />
     </div>
   );
 }
@@ -67,7 +67,7 @@ export function ProgressStepper({
 }: ProgressStepperProps) {
   if (status === 'idle') {
     return (
-      <p className="text-sm text-gray-400">
+      <p className="text-sm text-gray-400 dark:text-gray-500">
         Configure and click Analyze to start
       </p>
     );
@@ -85,10 +85,10 @@ export function ProgressStepper({
             <span
               className={`text-sm ${
                 nodeStatus === 'done'
-                  ? 'text-gray-700'
+                  ? 'text-gray-700 dark:text-gray-300'
                   : nodeStatus === 'running'
-                    ? 'text-blue-700 font-medium'
-                    : 'text-gray-400'
+                    ? 'text-blue-700 dark:text-blue-400 font-medium'
+                    : 'text-gray-400 dark:text-gray-500'
               }`}
             >
               {node}

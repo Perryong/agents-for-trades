@@ -52,13 +52,13 @@ export function ConfigSidebar({ onAnalyze, isRunning }: ConfigSidebarProps) {
   }
 
   const inputClass =
-    'w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none';
+    'w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none';
 
   return (
     <div className="space-y-6">
       {/* Ticker Symbol */}
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Ticker Symbol
         </label>
         <input
@@ -72,7 +72,7 @@ export function ConfigSidebar({ onAnalyze, isRunning }: ConfigSidebarProps) {
 
       {/* Analysis Date */}
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Analysis Date
         </label>
         <input
@@ -85,16 +85,16 @@ export function ConfigSidebar({ onAnalyze, isRunning }: ConfigSidebarProps) {
 
       {/* Analysts */}
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium text-gray-700">Analysts</legend>
+        <legend className="text-sm font-medium text-gray-700 dark:text-gray-300">Analysts</legend>
         {ANALYST_OPTIONS.map(({ id, label }) => (
           <label key={id} className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={analysts.includes(id)}
               onChange={() => toggleAnalyst(id)}
-              className="rounded border-gray-300 text-blue-600"
+              className="rounded border-gray-300 dark:border-gray-600 text-blue-600"
             />
-            <span className="text-sm text-gray-700">{label}</span>
+            <span className="text-sm text-gray-700 dark:text-gray-300">{label}</span>
           </label>
         ))}
       </fieldset>
@@ -105,16 +105,16 @@ export function ConfigSidebar({ onAnalyze, isRunning }: ConfigSidebarProps) {
           type="checkbox"
           checked={enableOptions}
           onChange={e => setEnableOptions(e.target.checked)}
-          className="rounded border-gray-300 text-blue-600"
+          className="rounded border-gray-300 dark:border-gray-600 text-blue-600"
         />
-        <span className="text-sm font-medium text-gray-700">
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
           Enable Options Analysis
         </span>
       </label>
 
       {/* LLM Provider */}
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           LLM Provider
         </label>
         <select
@@ -130,7 +130,7 @@ export function ConfigSidebar({ onAnalyze, isRunning }: ConfigSidebarProps) {
 
       {/* Deep Think Model */}
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Deep Think Model
         </label>
         <input
@@ -143,7 +143,7 @@ export function ConfigSidebar({ onAnalyze, isRunning }: ConfigSidebarProps) {
 
       {/* Quick Think Model */}
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Quick Think Model
         </label>
         <input
@@ -158,7 +158,7 @@ export function ConfigSidebar({ onAnalyze, isRunning }: ConfigSidebarProps) {
       <button
         onClick={handleAnalyze}
         disabled={isRunning || !ticker.trim()}
-        className="w-full py-2 px-4 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+        className="w-full py-2 px-4 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
       >
         {isRunning ? 'Analyzing...' : 'Analyze'}
       </button>
