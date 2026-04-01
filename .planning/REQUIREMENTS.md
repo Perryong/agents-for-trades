@@ -25,11 +25,11 @@
 
 ### Graph Integration
 
-- [ ] **GRAPH-01**: Options agents wired into `StateGraph` as parallel branch alongside existing equity agents
-- [ ] **GRAPH-02**: `AgentState` extended with options-specific fields: `volatility_report`, `options_flow_report`, `options_strategy`, `options_legs`, `options_pricing_report`, `greeks_report`
-- [ ] **GRAPH-03**: Options branch results available to Risk Judge before final decision
-- [ ] **GRAPH-04**: Existing equity-only mode remains fully functional — options branch is additive (can be enabled/disabled via config)
-- [ ] **GRAPH-05**: `DEFAULT_CONFIG` updated with options settings: `enable_options`, `options_vendor`, `options_delta_target`, `options_dte_window`, `options_min_oi`
+- [x] **GRAPH-01**: Options agents wired into `StateGraph` as parallel branch alongside existing equity agents
+- [x] **GRAPH-02**: `AgentState` extended with options-specific fields: `volatility_report`, `options_flow_report`, `options_strategy`, `options_legs`, `options_pricing_report`, `greeks_report`
+- [x] **GRAPH-03**: Options branch results available to Risk Judge before final decision
+- [x] **GRAPH-04**: Existing equity-only mode remains fully functional — options branch is additive (can be enabled/disabled via config)
+- [x] **GRAPH-05**: `DEFAULT_CONFIG` updated with options settings: `enable_options`, `options_vendor`, `options_delta_target`, `options_dte_window`, `options_min_oi`
 
 ### Debator Agent Updates
 
