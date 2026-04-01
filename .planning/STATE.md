@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-04-01T12:57:06.467Z"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-04-01T13:05:53.819Z"
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 13
-  completed_plans: 12
-  percent: 92
+  completed_plans: 13
+  percent: 100
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 **Phase:** 4 of 6 (pricing, order building & greeks)
 **Milestone:** v1 — Options Pipeline
 **Mode:** YOLO (auto-approve)
-**Progress:** [█████████░] 92%
+**Progress:** [██████████] 100%
 
 ## Phase Progress
 
@@ -68,6 +68,8 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 - [Phase 05-graph-integration]: Options node names use dash separator ('Options - Volatility Analyst') — LangGraph reserves ':' as a reserved character in node names
 - [Phase 05-graph-integration]: Conditional fan-out from START uses add_conditional_edges returning a list for parallel execution to both equity and options branches
 - [Phase 05-graph-integration]: _safe_options_node wrapper catches all exceptions and returns empty string fallback to prevent single agent failure from breaking the entire options branch
+- [Phase 05-graph-integration]: Mock LLM must use AIMessage with tool_calls=[] so conditional_logic routes to Msg Clear node (plan 05-02)
+- [Phase 05-graph-integration]: Module-level patches required for options agents route_to_vendor — dataflows-level patch does not reach imported symbols (plan 05-02)
 
 ## Performance Metrics
 
@@ -85,11 +87,12 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 | Phase 04-pricing-order-building-greeks P03 | 2min | 1 tasks | 2 files |
 | Phase 04-pricing-order-building-greeks P04 | 5min | 2 tasks | 4 files |
 | Phase 05-graph-integration P01 | 4min | 2 tasks | 6 files |
+| Phase 05-graph-integration P02 | 2min | 1 tasks | 1 files |
 
 ## Session
 
-**Last session:** 2026-04-01T12:57:06.464Z
-**Stopped at:** Completed 05-01-PLAN.md
+**Last session:** 2026-04-01T13:05:53.816Z
+**Stopped at:** Completed 05-02-PLAN.md
 
 ## Next Action
 

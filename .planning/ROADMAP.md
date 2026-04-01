@@ -9,7 +9,7 @@
 - [x] **Phase 2: Volatility & Flow Agents** - IV regime analysis agent and options flow analysis agent (completed 2026-03-31)
 - [x] **Phase 3: Strategy & Contract Selection Agents** - Strategy selector agent and strike/expiry selector agent (completed 2026-03-31)
 - [x] **Phase 4: Pricing, Order Building & Greeks** - Black-Scholes utility, pricing agent, legs builder, Greeks monitor (completed 2026-04-01)
-- [ ] **Phase 5: Graph Integration** - Options branch wired into StateGraph, AgentState extended, enable_options config flag
+- [x] **Phase 5: Graph Integration** - Options branch wired into StateGraph, AgentState extended, enable_options config flag (completed 2026-04-01)
 - [ ] **Phase 6: Debator & Risk Manager Updates** - Options-aware prompts for all debators and Risk Manager enforcement rules
 
 ---
@@ -99,11 +99,11 @@ Plans:
 **Goal:** Options agents run as a parallel branch inside the existing StateGraph; the options branch activates when `enable_options` is true and the equity-only path remains fully functional without it.
 **Depends on:** Phase 4
 **Requirements:** GRAPH-01, GRAPH-02, GRAPH-03, GRAPH-04, GRAPH-05
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 05-01-PLAN.md — Test scaffolds + graph wiring (setup.py options branch, propagation.py initial state, trading_graph.py state logging)
-- [ ] 05-02-PLAN.md — End-to-end integration smoke tests (options-enabled, equity-only, graceful degradation)
+- [x] 05-02-PLAN.md — End-to-end integration smoke tests (options-enabled, equity-only, graceful degradation)
 
 **Success criteria:**
 - [ ] Full graph run with `enable_options=True` produces a final decision that includes both equity analysis and options recommendation fields
@@ -140,7 +140,7 @@ Plans:
 | 2. Volatility & Flow Agents | 2/2 | Complete   | 2026-03-31 |
 | 3. Strategy & Contract Selection Agents | 2/2 | Complete   | 2026-03-31 |
 | 4. Pricing, Order Building & Greeks | 4/4 | Complete   | 2026-04-01 |
-| 5. Graph Integration | 1/2 | In Progress|  |
+| 5. Graph Integration | 2/2 | Complete   | 2026-04-01 |
 | 6. Debator & Risk Manager Updates | 0/2 | Not started | - |
 
 ---
