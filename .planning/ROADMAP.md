@@ -1,6 +1,6 @@
 # Roadmap: TradingAgents — Options Extension
 
-**Total phases:** 6
+**Total phases:** 7
 **Milestone:** v1 — Options Pipeline
 
 ## Phases
@@ -11,6 +11,7 @@
 - [x] **Phase 4: Pricing, Order Building & Greeks** - Black-Scholes utility, pricing agent, legs builder, Greeks monitor (completed 2026-04-01)
 - [x] **Phase 5: Graph Integration** - Options branch wired into StateGraph, AgentState extended, enable_options config flag (completed 2026-04-01)
 - [x] **Phase 6: Debator & Risk Manager Updates** - Options-aware prompts for all debators and Risk Manager enforcement rules (completed 2026-04-01)
+- [ ] **Phase 7: Visual Frontend** - React + FastAPI web frontend with SSE streaming, config sidebar, progress stepper, tabbed reports
 
 ---
 
@@ -143,6 +144,7 @@ Plans:
 | 4. Pricing, Order Building & Greeks | 4/4 | Complete   | 2026-04-01 |
 | 5. Graph Integration | 2/2 | Complete   | 2026-04-01 |
 | 6. Debator & Risk Manager Updates | 2/2 | Complete   | 2026-04-01 |
+| 7. Visual Frontend | 0/5 | In Progress | — |
 
 ---
 
@@ -157,15 +159,28 @@ Plans:
 
 ### Phase 7: Visual Frontend
 
-**Goal:** A web-based visual frontend encapsulates the full trading analysis pipeline, allowing users to configure tickers, dates, analyst sets, and options settings through a GUI; view real-time agent progress; and read the final trade decision with all reports in a structured, navigable layout.
-**Requirements**: TBD
+**Goal:** A web-based visual frontend encapsulates the full trading analysis pipeline, allowing users to configure tickers, dates, analyst sets, and options settings through a GUI; view real-time agent progress via SSE streaming; and read the final trade decision with all reports in a structured, navigable layout.
+**Requirements**: FE-API-01, FE-API-02, FE-API-03, FE-SCAFFOLD-01, FE-SCAFFOLD-02, FE-UI-01, FE-UI-02, FE-UI-03, FE-UI-04, FE-WIRE-01, FE-WIRE-02, FE-WIRE-03, FE-VERIFY-01
 **Depends on:** Phase 6
-**Plans:** 0 plans
+**Plans:** 5 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 7 to break down)
+- [ ] 07-01-PLAN.md — FastAPI backend: Pydantic schemas, SSE progress handler, API routes, app entrypoint with tests
+- [ ] 07-02-PLAN.md — Frontend scaffolding: Vite + React + TypeScript + Tailwind v4, shared types, minimal App shell
+- [ ] 07-03-PLAN.md — UI components: ConfigSidebar, ProgressStepper, ReportTabs, ReportPane
+- [ ] 07-04-PLAN.md — Integration wiring: useAnalysis hook (useReducer + EventSource SSE), App.tsx composition
+- [ ] 07-05-PLAN.md — Visual verification checkpoint: browser + backend startup confirmation
+
+**Success criteria:**
+- [ ] FastAPI backend starts and serves `/api/analyze` POST and `/api/analyze/{run_id}/stream` SSE GET endpoints
+- [ ] React frontend builds with Vite and renders sidebar + main area layout with Tailwind styling
+- [ ] Config sidebar contains ticker, date, analyst checkboxes, options toggle, LLM selectors, Analyze button
+- [ ] Progress stepper shows real-time agent node status via SSE events
+- [ ] Report tabs display all equity + options reports, with options tabs conditional on enable_options toggle
+- [ ] All backend tests pass (`python -m pytest tests/api/ -x -q`)
+- [ ] Frontend builds without errors (`npm run build`)
 
 ---
 
 *Roadmap created: 2026-03-31*
-*Requirements coverage: 30/30 v1 requirements mapped*
+*Requirements coverage: 30/30 v1 requirements mapped + 13 Phase 7 frontend requirements*
