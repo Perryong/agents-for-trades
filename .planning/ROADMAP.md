@@ -118,10 +118,11 @@ Plans:
 **Goal:** All three debators reason about options-specific risk (max loss shape, Greeks, assignment/pin risk) and the Risk Manager enforces five options-specific rules before approving any options trade.
 **Depends on:** Phase 5
 **Requirements:** DEBATE-01, DEBATE-02, DEBATE-03, DEBATE-04, RISK-01, RISK-02, RISK-03, RISK-04, RISK-05
+**Plans:** 2 plans
 
-### Plans
-1. Debator prompt extensions — add options-specific assessment block to prompts in `aggressive_debator.py`, `conservative_debator.py`, `neutral_debator.py`; block covers: defined vs undefined max loss, payoff shape (long/short premium), Greeks risk flags (excess theta, uncapped vega, conflicting delta), assignment risk, pin risk; each debator adjusts stance to reflect options risks
-2. Risk Manager enforcement rules — add five conditional checks to `risk_manager.py` that activate when options fields are present in state: max loss gate (reject undefined max loss without documented collateral), exit rule requirement (short premium strategies must have a defined exit rule), early assignment check (flag short ITM legs near ex-dividend dates), Greeks threshold gate (defer to `greeks_report` flags), negative theta flag (flag theta-negative positions held >30 days without catalyst)
+Plans:
+- [ ] 06-01-PLAN.md — Debator prompt extensions (OPTIONS RISK ASSESSMENT block in aggressive, conservative, neutral debators)
+- [ ] 06-02-PLAN.md — Risk Manager enforcement rules (5 OPTIONS RISK RULES in risk_manager.py)
 
 **Success criteria:**
 - [ ] In a full graph run with `enable_options=True`, the aggressive debator output contains explicit options-specific language (references to max loss, payoff shape, or Greeks risk)
