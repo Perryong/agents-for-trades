@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-04-01T13:29:20.201Z"
+stopped_at: Completed 07-01-PLAN.md
+last_updated: "2026-04-01T14:01:27.331Z"
 progress:
   total_phases: 7
   completed_phases: 6
-  total_plans: 15
-  completed_plans: 15
-  percent: 100
+  total_plans: 20
+  completed_plans: 16
+  percent: 80
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-31)
 
 **Core value:** Trader receives a complete, executable options recommendation derived from the same AI analytical process that drives the equity decision
-**Current focus:** Phase 06 — debator-risk-manager-updates
+**Current focus:** Phase 07 — visual-frontend
 
 ## Status
 
 **Phase:** 07 of 6 (visual frontend)
 **Milestone:** v1 — Options Pipeline
 **Mode:** YOLO (auto-approve)
-**Progress:** [██████████] 100%
+**Progress:** [████████░░] 80%
 
 ## Phase Progress
 
@@ -73,6 +73,9 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 - [Phase 06-debator-risk-manager-updates]: Append options_section to end of existing prompt string — avoids restructuring prompt, preserves existing equity debate logic intact
 - [Phase 06-debator-risk-manager-updates]: options_section is empty string when options_legs is empty — zero changes to equity-only prompt (DEBATE-04 backward compatibility)
 - [Phase 06-debator-risk-manager-updates]: Options rules appended as options_rules_section to existing prompt f-string preserves equity-only behaviour exactly
+- [Phase 07-visual-frontend]: ProgressEvent includes signal: Optional[str] = None to carry trading signal on complete events (matches wire format)
+- [Phase 07-visual-frontend]: asyncio.run_coroutine_threadsafe used in ProgressCallbackHandler._put to safely bridge sync LangGraph thread to async FastAPI loop
+- [Phase 07-visual-frontend]: SPA catch-all uses @app.get route not StaticFiles mount at / to avoid clobbering API routes (api routes registered before SPA)
 
 ## Performance Metrics
 
@@ -93,11 +96,12 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 | Phase 05-graph-integration P02 | 2min | 1 tasks | 1 files |
 | Phase 06-debator-risk-manager-updates P01 | 2min | 1 tasks | 4 files |
 | Phase 06-debator-risk-manager-updates P02 | 2min | 1 tasks | 2 files |
+| Phase 07-visual-frontend P01 | 2min | 2 tasks | 9 files |
 
 ## Session
 
-**Last session:** 2026-04-01T13:21:26.532Z
-**Stopped at:** Completed 06-01-PLAN.md
+**Last session:** 2026-04-01T14:01:27.328Z
+**Stopped at:** Completed 07-01-PLAN.md
 
 ## Next Action
 
