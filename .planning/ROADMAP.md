@@ -155,6 +155,16 @@ Plans:
 - [ ] Running with `enable_options=False` (default) is indistinguishable from the pre-extension system
 - [ ] All 30 v1 requirements mapped and implemented (DATA-01 to DATA-05, AGENT-01 to AGENT-07, GRAPH-01 to GRAPH-05, DEBATE-01 to DEBATE-04, RISK-01 to RISK-05, PRICE-01 to PRICE-03)
 
+### Phase 7: Visual Frontend
+
+**Goal:** A web-based visual frontend encapsulates the full trading analysis pipeline, allowing users to configure tickers, dates, analyst sets, and options settings through a GUI; view real-time agent progress; and read the final trade decision with all reports in a structured, navigable layout.
+**Requirements**: TBD
+**Depends on:** Phase 6
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 7 to break down)
+
 ---
 
 *Roadmap created: 2026-03-31*
