@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-04-01T12:17:50.732Z"
+stopped_at: Completed 04-04-PLAN.md
+last_updated: "2026-04-01T12:29:04.501Z"
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 11
-  completed_plans: 10
-  percent: 91
+  completed_plans: 11
+  percent: 100
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 **Phase:** 4 of 6 (pricing, order building & greeks)
 **Milestone:** v1 — Options Pipeline
 **Mode:** YOLO (auto-approve)
-**Progress:** [█████████░] 91%
+**Progress:** [██████████] 100%
 
 ## Phase Progress
 
@@ -63,6 +63,8 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 - [Phase 04-pricing-order-building-greeks]: Verdict thresholds: >+5% = Positive edge, <-5% = Overpriced, else Fairly priced (plan 04-02)
 - [Phase 04-pricing-order-building-greeks]: Zero mid (bid=ask=0) flagged as WIDE_SPREAD to avoid ZeroDivisionError and treat as worst-case illiquid scenario
 - [Phase 04-pricing-order-building-greeks]: covered_call max_profit uses net_credit only — underlying_price not available in agent state at legs-builder stage
+- [Phase 04-pricing-order-building-greeks]: Dual-format leg parser in Greeks monitor supports Phase 4 and Phase 3 leg strings for backward compatibility
+- [Phase 04-pricing-order-building-greeks]: Chain cache keyed by (ticker, expiry) avoids duplicate Tradier fetches for spreads sharing expiry
 
 ## Performance Metrics
 
@@ -78,11 +80,12 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 | Phase 04-pricing-order-building-greeks P01 | 5min | 2 tasks | 4 files |
 | Phase 04-pricing-order-building-greeks P02 | 3min | 2 tasks | 2 files |
 | Phase 04-pricing-order-building-greeks P03 | 2min | 1 tasks | 2 files |
+| Phase 04-pricing-order-building-greeks P04 | 5min | 2 tasks | 4 files |
 
 ## Session
 
-**Last session:** 2026-04-01T12:17:50.730Z
-**Stopped at:** Completed 04-03-PLAN.md
+**Last session:** 2026-04-01T12:29:04.498Z
+**Stopped at:** Completed 04-04-PLAN.md
 
 ## Next Action
 

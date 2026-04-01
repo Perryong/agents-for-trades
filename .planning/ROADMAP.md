@@ -8,7 +8,7 @@
 - [x] **Phase 1: Options Data Infrastructure** - Tradier client, options chain + historical IV, vendor abstraction layer, config keys (completed 2026-03-31)
 - [x] **Phase 2: Volatility & Flow Agents** - IV regime analysis agent and options flow analysis agent (completed 2026-03-31)
 - [x] **Phase 3: Strategy & Contract Selection Agents** - Strategy selector agent and strike/expiry selector agent (completed 2026-03-31)
-- [ ] **Phase 4: Pricing, Order Building & Greeks** - Black-Scholes utility, pricing agent, legs builder, Greeks monitor
+- [x] **Phase 4: Pricing, Order Building & Greeks** - Black-Scholes utility, pricing agent, legs builder, Greeks monitor (completed 2026-04-01)
 - [ ] **Phase 5: Graph Integration** - Options branch wired into StateGraph, AgentState extended, enable_options config flag
 - [ ] **Phase 6: Debator & Risk Manager Updates** - Options-aware prompts for all debators and Risk Manager enforcement rules
 
@@ -139,7 +139,7 @@ Plans:
 | 1. Options Data Infrastructure | 3/3 | Complete   | 2026-03-31 |
 | 2. Volatility & Flow Agents | 2/2 | Complete   | 2026-03-31 |
 | 3. Strategy & Contract Selection Agents | 2/2 | Complete   | 2026-03-31 |
-| 4. Pricing, Order Building & Greeks | 3/4 | In Progress|  |
+| 4. Pricing, Order Building & Greeks | 4/4 | Complete   | 2026-04-01 |
 | 5. Graph Integration | 0/3 | Not started | - |
 | 6. Debator & Risk Manager Updates | 0/2 | Not started | - |
 

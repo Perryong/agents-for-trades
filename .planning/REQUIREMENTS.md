@@ -21,7 +21,7 @@
 - [x] **AGENT-04**: Strike and expiry selector agent (`strike_expiry_selector.py`) — selects specific expiry date and strike(s) per leg given strategy type, delta targets, DTE window, OI threshold; outputs liquidity pass/fail per leg
 - [x] **AGENT-05**: Options pricing agent (`options_pricing_agent.py`) — computes Black-Scholes theoretical value per leg, net structure value, market mid, edge ($ and %), one-line verdict (fairly priced / positive edge / overpriced)
 - [x] **AGENT-06**: Options legs builder agent (`options_legs_builder.py`) — generates structured multi-leg order (BUY/SELL, contract count, ticker, expiry, strike, option type, limit price); outputs net debit/credit, max profit, max loss, breakeven; flags wide bid/ask (>10% of mid)
-- [ ] **AGENT-07**: Greeks monitor agent (`greeks_monitor.py`) — computes portfolio-level net delta, gamma, theta, vega from open positions; flags: delta heavy (|delta| > $5k), pin/gamma risk (gamma > 0.10 within 5 DTE), high decay cost (theta < -$200/day), vol sensitive (|vega| > $500 per 1% IV)
+- [x] **AGENT-07**: Greeks monitor agent (`greeks_monitor.py`) — computes portfolio-level net delta, gamma, theta, vega from open positions; flags: delta heavy (|delta| > $5k), pin/gamma risk (gamma > 0.10 within 5 DTE), high decay cost (theta < -$200/day), vol sensitive (|vega| > $500 per 1% IV)
 
 ### Graph Integration
 
