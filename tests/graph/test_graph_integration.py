@@ -7,6 +7,8 @@ RED phase: These tests fail until setup.py, propagation.py, and trading_graph.py
 """
 from unittest.mock import patch, MagicMock
 import pytest
+import pandas as pd
+from langchain_core.messages import AIMessage
 
 
 # ---------------------------------------------------------------------------
@@ -254,3 +256,268 @@ def test_log_state_includes_options_fields():
         assert logged[field] == final_state[field], (
             f"Field '{field}': expected {final_state[field]!r}, got {logged[field]!r}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Smoke test helpers
+# ---------------------------------------------------------------------------
+
+def _make_proper_mock_llm():
+    """Create a mock LLM that works with LangChain bind_tools and RunnableSequence.
+
+    Key requirements:
+    - bind_tools() must return the same mock (so .invoke() is configured)
+    - .invoke() and __call__ must return an AIMessage with tool_calls=[]
+      so conditional_logic sees no tool calls and routes to Msg Clear node
+    """
+    ai_msg = AIMessage(content="mock report", tool_calls=[])
+    mock_llm = MagicMock()
+    mock_llm.return_value = ai_msg        # __call__ path (RunnableSequence)
+    mock_llm.invoke.return_value = ai_msg  # .invoke() path
+    mock_llm.bind_tools.return_value = mock_llm  # bind_tools returns same mock
+    return mock_llm
+
+
+def _make_smoke_graph(enable_options: bool):
+    """Build a compiled graph with a single 'market' analyst and all deps mocked.
+
+    Uses GraphSetup directly (avoids TradingAgentsGraph.__init__ complexity).
+    Returns the compiled graph and graph args.
+    """
+    from tradingagents.graph.setup import GraphSetup
+    from tradingagents.graph.conditional_logic import ConditionalLogic
+    from tradingagents.graph.propagation import Propagator
+    from langchain_core.tools import tool as lc_tool
+    from langgraph.prebuilt import ToolNode
+
+    mock_llm = _make_proper_mock_llm()
+
+    @lc_tool
+    def _dummy_tool(query: str) -> str:
+        """Dummy tool for graph smoke tests."""
+        return "dummy"
+
+    dummy_tool_node = ToolNode([_dummy_tool])
+    tool_nodes = {"market": dummy_tool_node}
+
+    conditional_logic = ConditionalLogic(
+        max_debate_rounds=1,
+        max_risk_discuss_rounds=1,
+    )
+
+    graph_setup = GraphSetup(
+        quick_thinking_llm=mock_llm,
+        deep_thinking_llm=mock_llm,
+        tool_nodes=tool_nodes,
+        bull_memory=MagicMock(),
+        bear_memory=MagicMock(),
+        trader_memory=MagicMock(),
+        invest_judge_memory=MagicMock(),
+        risk_manager_memory=MagicMock(),
+        conditional_logic=conditional_logic,
+    )
+
+    config_dict = {
+        "enable_options": enable_options,
+        "options_vendor": "tradier",
+        "options_delta_target": 0.30,
+        "options_dte_window": [21, 45],
+        "options_min_oi": 100,
+    }
+
+    with patch("tradingagents.graph.setup.get_config", return_value=config_dict):
+        compiled = graph_setup.setup_graph(selected_analysts=["market"])
+
+    propagator = Propagator()
+    init_state = propagator.create_initial_state("AAPL", "2025-01-15")
+    args = propagator.get_graph_args()
+
+    return compiled, init_state, args
+
+
+def _make_options_data_patches():
+    """Return a dict of mock route_to_vendor side_effect and yfinance mock."""
+    prices = pd.Series([150.0 + i * 0.1 for i in range(90)])
+    mock_hist = pd.DataFrame({"Close": prices})
+    mock_yf = MagicMock()
+    mock_yf.Ticker.return_value.history.return_value = mock_hist
+
+    valid_iv_str = (
+        "date    iv\n"
+        "2025-04-01  0.20\n"
+        "2025-07-01  0.25\n"
+        "2026-01-01  0.35\n"
+        "2026-04-01  0.40\n"
+    )
+    chain_str = (
+        "strike  option_type  volume  open_interest  iv  delta\n"
+        "145.0  call  1000  500  0.28  0.55\n"
+        "150.0  put  900  450  0.32  -0.45\n"
+    )
+
+    def mock_route(method, *args, **kwargs):
+        if method == "get_historical_iv":
+            return valid_iv_str
+        if method == "get_options_expirations":
+            return ["2026-04-17", "2026-06-20"]
+        if method == "get_options_chain":
+            return chain_str
+        return ""
+
+    return mock_route, mock_yf
+
+
+# ---------------------------------------------------------------------------
+# Smoke Test 1: options enabled → all 6 options fields populated
+# ---------------------------------------------------------------------------
+
+def test_full_graph_options_enabled_populates_all_fields():
+    """Full graph run with enable_options=True must populate all 6 options state fields."""
+    compiled, init_state, args = _make_smoke_graph(enable_options=True)
+    mock_route, mock_yf = _make_options_data_patches()
+
+    with patch("tradingagents.dataflows.interface.route_to_vendor", side_effect=mock_route), \
+         patch("tradingagents.agents.options.volatility_analyst.route_to_vendor", side_effect=mock_route), \
+         patch("tradingagents.agents.options.options_flow_analyst.route_to_vendor", side_effect=mock_route), \
+         patch("tradingagents.agents.options.volatility_analyst.yf", mock_yf):
+        final_state = compiled.invoke(init_state, **args)
+
+    # All 6 options fields must be non-empty strings
+    assert final_state["volatility_report"] != "", "volatility_report must be non-empty"
+    assert final_state["options_flow_report"] != "", "options_flow_report must be non-empty"
+    assert final_state["options_strategy"] != "", "options_strategy must be non-empty"
+    assert final_state["options_legs"] != "", "options_legs must be non-empty"
+    assert final_state["options_pricing_report"] != "", "options_pricing_report must be non-empty"
+    assert final_state["greeks_report"] != "", "greeks_report must be non-empty"
+
+    # Equity pipeline must also work
+    assert final_state["market_report"] != "", "market_report must be non-empty (equity still works)"
+
+
+# ---------------------------------------------------------------------------
+# Smoke Test 2: equity-only mode → options fields empty, equity populated
+# ---------------------------------------------------------------------------
+
+def test_full_graph_equity_only_no_options_content():
+    """Full graph run with "enable_options": False must leave options fields as empty strings."""
+    compiled, init_state, args = _make_smoke_graph(enable_options=False)
+    mock_route, mock_yf = _make_options_data_patches()
+
+    # equity-only mode — no options data patches needed, but use them anyway to be safe
+    with patch("tradingagents.dataflows.interface.route_to_vendor", side_effect=mock_route), \
+         patch("tradingagents.agents.options.volatility_analyst.route_to_vendor", side_effect=mock_route), \
+         patch("tradingagents.agents.options.volatility_analyst.yf", mock_yf):
+        final_state = compiled.invoke(init_state, **args)
+
+    # Options fields must remain empty (no options branch was run)
+    assert final_state["volatility_report"] == "", (
+        f"volatility_report must be empty in equity-only mode, got: {final_state['volatility_report']!r}"
+    )
+    assert final_state["options_flow_report"] == "", (
+        f"options_flow_report must be empty in equity-only mode"
+    )
+    assert final_state["options_strategy"] == "", (
+        f"options_strategy must be empty in equity-only mode"
+    )
+    assert final_state["options_legs"] == "", (
+        f"options_legs must be empty in equity-only mode"
+    )
+    assert final_state["options_pricing_report"] == "", (
+        f"options_pricing_report must be empty in equity-only mode"
+    )
+    assert final_state["greeks_report"] == "", (
+        f"greeks_report must be empty in equity-only mode"
+    )
+
+    # Equity pipeline must still work
+    assert final_state["market_report"] != "", "market_report must be non-empty in equity-only mode"
+
+
+# ---------------------------------------------------------------------------
+# Smoke Test 3: graceful degradation — one options agent failure
+# ---------------------------------------------------------------------------
+
+def test_options_branch_failure_graceful_degradation():
+    """When one options agent raises, the graph completes; that agent's field is empty."""
+    from tradingagents.graph.setup import OPTIONS_NODES
+
+    mock_route, mock_yf = _make_options_data_patches()
+
+    # Build a patched OPTIONS_NODES where the flow analyst raises RuntimeError
+    def failing_flow_factory(llm):
+        def node(state):
+            raise RuntimeError("data unavailable")
+        return node
+
+    # __name__ must match the _OPTIONS_STATE_KEYS lookup
+    failing_flow_factory.__name__ = "create_options_flow_analyst"
+
+    patched_nodes = [
+        (name, failing_flow_factory if name == "Options - Flow Analyst" else fn)
+        for name, fn in OPTIONS_NODES
+    ]
+
+    from tradingagents.graph.setup import GraphSetup
+    from tradingagents.graph.conditional_logic import ConditionalLogic
+    from tradingagents.graph.propagation import Propagator
+    from langchain_core.tools import tool as lc_tool
+    from langgraph.prebuilt import ToolNode
+
+    mock_llm = _make_proper_mock_llm()
+
+    @lc_tool
+    def _dummy_tool(query: str) -> str:
+        """Dummy tool for graceful degradation test."""
+        return "dummy"
+
+    dummy_tool_node = ToolNode([_dummy_tool])
+    tool_nodes = {"market": dummy_tool_node}
+    conditional_logic = ConditionalLogic(max_debate_rounds=1, max_risk_discuss_rounds=1)
+
+    graph_setup = GraphSetup(
+        quick_thinking_llm=mock_llm,
+        deep_thinking_llm=mock_llm,
+        tool_nodes=tool_nodes,
+        bull_memory=MagicMock(),
+        bear_memory=MagicMock(),
+        trader_memory=MagicMock(),
+        invest_judge_memory=MagicMock(),
+        risk_manager_memory=MagicMock(),
+        conditional_logic=conditional_logic,
+    )
+
+    config_dict = {
+        "enable_options": True,
+        "options_vendor": "tradier",
+        "options_delta_target": 0.30,
+        "options_dte_window": [21, 45],
+        "options_min_oi": 100,
+    }
+
+    with patch("tradingagents.graph.setup.get_config", return_value=config_dict), \
+         patch("tradingagents.graph.setup.OPTIONS_NODES", patched_nodes):
+        compiled = graph_setup.setup_graph(selected_analysts=["market"])
+
+    propagator = Propagator()
+    init_state = propagator.create_initial_state("AAPL", "2025-01-15")
+    args = propagator.get_graph_args()
+
+    # Must not raise — graceful degradation
+    with patch("tradingagents.dataflows.interface.route_to_vendor", side_effect=mock_route), \
+         patch("tradingagents.agents.options.volatility_analyst.route_to_vendor", side_effect=mock_route), \
+         patch("tradingagents.agents.options.options_flow_analyst.route_to_vendor", side_effect=mock_route), \
+         patch("tradingagents.agents.options.volatility_analyst.yf", mock_yf):
+        final_state = compiled.invoke(init_state, **args)
+
+    # Failed agent's field must be empty string (graceful fallback)
+    assert final_state["options_flow_report"] == "", (
+        f"options_flow_report must be empty when flow analyst fails, got: {final_state['options_flow_report']!r}"
+    )
+
+    # Upstream agent that succeeded must have non-empty output
+    assert final_state["volatility_report"] != "", (
+        "volatility_report must be non-empty (upstream agent succeeded before failure)"
+    )
+
+    # Equity pipeline must be unaffected
+    assert final_state["market_report"] != "", "market_report must be non-empty (equity unaffected)"
