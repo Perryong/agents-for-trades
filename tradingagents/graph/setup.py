@@ -7,8 +7,55 @@ from langgraph.prebuilt import ToolNode
 
 from tradingagents.agents import *
 from tradingagents.agents.utils.agent_states import AgentState
+from tradingagents.agents.options import (
+    create_volatility_analyst,
+    create_options_flow_analyst,
+    create_options_strategy_selector,
+    create_strike_expiry_selector,
+    create_options_pricing_agent,
+    create_options_legs_builder,
+    create_greeks_monitor,
+)
+from tradingagents.dataflows.config import get_config
 
 from .conditional_logic import ConditionalLogic
+
+
+# Options branch: sequential chain of 7 agents
+# Note: LangGraph reserves ':' in node names — use dash separator instead.
+OPTIONS_NODES = [
+    ("Options - Volatility Analyst",  create_volatility_analyst),
+    ("Options - Flow Analyst",        create_options_flow_analyst),
+    ("Options - Strategy Selector",   create_options_strategy_selector),
+    ("Options - Strike/Expiry",       create_strike_expiry_selector),
+    ("Options - Pricing Agent",       create_options_pricing_agent),
+    ("Options - Legs Builder",        create_options_legs_builder),
+    ("Options - Greeks Monitor",      create_greeks_monitor),
+]
+
+# Maps factory function name -> state key it writes to
+_OPTIONS_STATE_KEYS = {
+    "create_volatility_analyst":       "volatility_report",
+    "create_options_flow_analyst":     "options_flow_report",
+    "create_options_strategy_selector": "options_strategy",
+    "create_strike_expiry_selector":   "options_legs",
+    "create_options_pricing_agent":    "options_pricing_report",
+    "create_options_legs_builder":     "options_legs",
+    "create_greeks_monitor":           "greeks_report",
+}
+
+
+def _safe_options_node(factory_fn, state_key, llm):
+    """Wrap an options agent to catch errors and return empty string fallback."""
+    inner = factory_fn(llm)
+
+    def node(state: dict) -> dict:
+        try:
+            return inner(state)
+        except Exception:
+            return {state_key: ""}
+
+    return node
 
 
 class GraphSetup:
@@ -137,7 +184,41 @@ class GraphSetup:
         # Define edges
         # Start with the first analyst
         first_analyst = selected_analysts[0]
-        workflow.add_edge(START, f"{first_analyst.capitalize()} Analyst")
+
+        # Read enable_options from config
+        cfg = get_config()
+        enable_options = cfg.get("enable_options", False)
+
+        first_equity = f"{first_analyst.capitalize()} Analyst"
+
+        if enable_options:
+            # Add all 7 options nodes with graceful error wrapping
+            for node_name, factory_fn in OPTIONS_NODES:
+                state_key = _OPTIONS_STATE_KEYS[factory_fn.__name__]
+                workflow.add_node(
+                    node_name,
+                    _safe_options_node(factory_fn, state_key, self.quick_thinking_llm),
+                )
+
+            # Sequential chain within options branch
+            for i in range(len(OPTIONS_NODES) - 1):
+                workflow.add_edge(OPTIONS_NODES[i][0], OPTIONS_NODES[i + 1][0])
+
+            # Fan-in: last options node -> Bull Researcher
+            workflow.add_edge("Options - Greeks Monitor", "Bull Researcher")
+
+            # Conditional fan-out from START to both branches
+            def route_from_start(state):
+                return [first_equity, "Options - Volatility Analyst"]
+
+            workflow.add_conditional_edges(
+                START,
+                route_from_start,
+                [first_equity, "Options - Volatility Analyst"],
+            )
+        else:
+            # Equity-only: single edge from START
+            workflow.add_edge(START, first_equity)
 
         # Connect analysts in sequence
         for i, analyst_type in enumerate(selected_analysts):

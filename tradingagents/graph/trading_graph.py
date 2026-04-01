@@ -259,6 +259,13 @@ class TradingAgentsGraph:
             },
             "investment_plan": final_state["investment_plan"],
             "final_trade_decision": final_state["final_trade_decision"],
+            # Options pipeline fields (empty string if equity-only)
+            "volatility_report": final_state.get("volatility_report", ""),
+            "options_flow_report": final_state.get("options_flow_report", ""),
+            "options_strategy": final_state.get("options_strategy", ""),
+            "options_legs": final_state.get("options_legs", ""),
+            "options_pricing_report": final_state.get("options_pricing_report", ""),
+            "greeks_report": final_state.get("greeks_report", ""),
         }
 
         # Save to file

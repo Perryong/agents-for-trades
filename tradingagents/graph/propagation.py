@@ -52,6 +52,13 @@ class Propagator:
             "fundamentals_report": "",
             "sentiment_report": "",
             "news_report": "",
+            # Options pipeline fields — empty string default, populated only when enable_options=True
+            "volatility_report": "",
+            "options_flow_report": "",
+            "options_strategy": "",
+            "options_legs": "",
+            "options_pricing_report": "",
+            "greeks_report": "",
         }
 
     def get_graph_args(self, callbacks: Optional[List] = None) -> Dict[str, Any]:

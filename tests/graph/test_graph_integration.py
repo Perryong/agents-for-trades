@@ -115,12 +115,12 @@ def test_initial_state_has_options_fields():
 # ---------------------------------------------------------------------------
 
 def test_setup_graph_equity_only_no_options_nodes():
-    """When enable_options=False, compiled graph must NOT contain any 'Options:' nodes."""
+    """When enable_options=False, compiled graph must NOT contain any 'Options' nodes."""
     compiled = _make_graph_setup(enable_options=False)
     node_names = list(compiled.get_graph().nodes.keys())
-    options_nodes = [n for n in node_names if n.startswith("Options:")]
+    options_nodes = [n for n in node_names if n.startswith("Options")]
     assert options_nodes == [], (
-        f"Equity-only graph should have no 'Options:' nodes, found: {options_nodes}"
+        f"Equity-only graph should have no 'Options' nodes, found: {options_nodes}"
     )
 
 
@@ -134,13 +134,13 @@ def test_setup_graph_options_enabled_has_options_nodes():
     node_names = list(compiled.get_graph().nodes.keys())
 
     expected_options_nodes = [
-        "Options: Volatility Analyst",
-        "Options: Flow Analyst",
-        "Options: Strategy Selector",
-        "Options: Strike/Expiry",
-        "Options: Pricing Agent",
-        "Options: Legs Builder",
-        "Options: Greeks Monitor",
+        "Options - Volatility Analyst",
+        "Options - Flow Analyst",
+        "Options - Strategy Selector",
+        "Options - Strike/Expiry",
+        "Options - Pricing Agent",
+        "Options - Legs Builder",
+        "Options - Greeks Monitor",
     ]
     for node in expected_options_nodes:
         assert node in node_names, (
@@ -159,7 +159,7 @@ def test_setup_graph_options_fan_in_to_bull_researcher():
 
     # Collect all edges from the graph
     edges = [(e.source, e.target) for e in graph_repr.edges]
-    fan_in_edge = ("Options: Greeks Monitor", "Bull Researcher")
+    fan_in_edge = ("Options - Greeks Monitor", "Bull Researcher")
     assert fan_in_edge in edges, (
         f"Expected edge {fan_in_edge} not found. Edges: {edges}"
     )
