@@ -46,9 +46,9 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
   3. After market close, a new session open invalidates the cache and triggers a fresh fetch
   4. Fetching a universe of 500+ tickers completes without HTTP 429 errors, with coverage above 80% tracked and surfaced in the output
   5. Screener data is routed through the `VENDOR_METHODS` pattern under a `screener_data` category, with no direct yfinance imports outside `interface.py`
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
-- [ ] 08-01-PLAN.md — Core screener module: bulk fetch, scoring, cache, Pydantic model, tests
+- [x] 08-01-PLAN.md — Core screener module: bulk fetch, scoring, cache, Pydantic model, tests
 - [ ] 08-02-PLAN.md — VENDOR_METHODS integration wiring and integration tests
 
 ### Phase 9: LLM Screener Agent
@@ -97,7 +97,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 8. Screener Data Layer | 0/2 | Planned | - |
+| 8. Screener Data Layer | 1/2 | In Progress|  |
 | 9. LLM Screener Agent | 0/? | Not started | - |
 | 10. Backend API Endpoint | 0/? | Not started | - |
 | 11. Frontend Screener Tab | 0/? | Not started | - |

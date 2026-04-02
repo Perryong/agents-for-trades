@@ -9,10 +9,10 @@ Requirements for stock recommendation/screening system. Each maps to roadmap pha
 
 ### Screener Data Layer
 
-- [ ] **SCREEN-01**: Programmatic pre-filter scans market universe via yfinance bulk download with chunked fetching and rate-limit safety
-- [ ] **SCREEN-02**: Pre-filter outputs scored candidate list (max 50) ranked by volume, momentum, and unusual activity signals
+- [x] **SCREEN-01**: Programmatic pre-filter scans market universe via yfinance bulk download with chunked fetching and rate-limit safety
+- [x] **SCREEN-02**: Pre-filter outputs scored candidate list (max 50) ranked by volume, momentum, and unusual activity signals
 - [ ] **SCREEN-03**: Screener data routed through existing `VENDOR_METHODS` pattern with new `screener_data` category
-- [ ] **SCREEN-04**: Market-session-aware cache prevents stale data during trading hours and avoids unnecessary refetches after close
+- [x] **SCREEN-04**: Market-session-aware cache prevents stale data during trading hours and avoids unnecessary refetches after close
 
 ### LLM Screener Agent
 
@@ -65,10 +65,10 @@ Requirements for stock recommendation/screening system. Each maps to roadmap pha
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCREEN-01 | Phase 8 | Pending |
-| SCREEN-02 | Phase 8 | Pending |
+| SCREEN-01 | Phase 8 | Complete |
+| SCREEN-02 | Phase 8 | Complete |
 | SCREEN-03 | Phase 8 | Pending |
-| SCREEN-04 | Phase 8 | Pending |
+| SCREEN-04 | Phase 8 | Complete |
 | RANK-01 | Phase 9 | Pending |
 | RANK-02 | Phase 9 | Pending |
 | RANK-03 | Phase 9 | Pending |
