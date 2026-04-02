@@ -106,3 +106,24 @@ export const REPORT_TABS: ReportTab[] = [
   { id: 'debate', label: 'Debate History', stateKey: 'investment_plan' },
   { id: 'decision', label: 'Final Decision', stateKey: 'final_trade_decision' },
 ];
+
+// --- Screener types ---
+
+export interface ScreenerPick {
+  ticker: string;
+  score: number;
+  rationale: string;
+  confidence: number;
+  key_metrics: Record<string, number | undefined>;
+  sector: string | null;
+  market_cap: string | null;
+}
+
+export type ScreenerStatus = 'idle' | 'loading' | 'done' | 'error';
+
+export interface ScreenerState {
+  status: ScreenerStatus;
+  picks: ScreenerPick[];
+  screenedAt: string | null;
+  errorMsg: string | null;
+}
