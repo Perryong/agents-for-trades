@@ -1,0 +1,29 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-04-02T17:53:50.485Z",
+  "phase": "12",
+  "phase_name": "cli-integration",
+  "phase_dir": ".planning/phases/12-cli-integration",
+  "plan": 1,
+  "task": 1,
+  "total_tasks": 1,
+  "status": "paused",
+  "completed_tasks": [],
+  "remaining_tasks": [
+    {"id": 1, "name": "screen subcommand with Rich table, --max-picks, --json, tests (TDD)", "status": "not_started"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {"action": "Manual browser testing for Phase 11 frontend (4 items deferred)", "context": "Screener tab nav, select-to-analyze flow, timestamp/stale indicator, dark mode", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "S&P 500 universe, equal-weight scoring, 15-min TTL cache", "rationale": "Standard screener defaults", "phase": "8"},
+    {"decision": "JSON mode + Pydantic validation for LLM output", "rationale": "Reliable structured output", "phase": "9"},
+    {"decision": "Separate screener_routes.py for SSE independence", "rationale": "API-02 structural isolation", "phase": "10"},
+    {"decision": "Card-based WatchlistPanel with Analyze button per pick", "rationale": "FE-02 pre-fill flow", "phase": "11"},
+    {"decision": "screen subcommand with --max-picks/--json flags", "rationale": "CLI-01/CLI-02 requirements", "phase": "12"}
+  ],
+  "uncommitted_files": [".planning/STATE.md", "cli/main.py", "tests/cli/"],
+  "next_action": "Execute plan 12-01: spawn gsd-executor for the screen subcommand TDD task (1 task, 1 wave)",
+  "context_notes": "Running /gsd:autonomous for v1.1 milestone. Phases 8-11 complete (8: data layer, 9: LLM agent, 10: API endpoint, 11: frontend tab). Phase 12 is the last phase — plan exists, just needs execution + verification. After Phase 12 completes, the autonomous workflow proceeds to lifecycle: audit → complete → cleanup."
+}
