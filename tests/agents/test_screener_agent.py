@@ -18,10 +18,17 @@ from tradingagents.dataflows.screener_data import ScreenerCandidate
 # ---------------------------------------------------------------------------
 
 def _make_mock_llm(content: str):
+    """Create a mock LLM compatible with (prompt | llm).invoke({}) chain pattern.
+
+    LangChain's RunnableSequence calls llm.invoke(messages) when running the chain.
+    We configure both the callable and .invoke paths.
+    """
     mock_response = MagicMock()
     mock_response.content = content
     mock_llm = MagicMock()
-    mock_llm.__or__ = lambda self, other: self  # support (prompt | llm)
+    # LangChain calls llm(messages) when running the chain
+    mock_llm.return_value = mock_response
+    # Also cover llm.invoke(messages) path for newer LangChain versions
     mock_llm.invoke = MagicMock(return_value=mock_response)
     return mock_llm
 
