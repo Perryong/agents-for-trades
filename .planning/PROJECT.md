@@ -45,14 +45,20 @@ The trader receives a complete, executable options recommendation — strategy, 
 
 ### Active
 
-*(No active requirements — start next milestone to define)*
+*(v1.1 Stock Recommendation System — defining)*
+
+- [ ] Programmatic pre-filter narrows market universe to ~20-50 candidates (volume movers, unusual activity, sector momentum)
+- [ ] LLM screener agent ranks filtered candidates, produces top 3-5 picks with rationale
+- [ ] User can select recommended picks to run through the full analysis pipeline
+- [ ] Screener results displayed in frontend (new tab/section) and CLI
 
 ### Out of Scope
 
 - Live order execution / broker API integration — analysis and order generation only; no automated submission
-- Options backtesting engine — backtrader dependency exists but options backtesting is a separate initiative
+- Backtesting engine — deferred to v1.2 when logged decisions accumulate; options backtesting has data availability issues
 - Real-time streaming data — batch/on-demand analysis only, same as existing equity flow
 - Portfolio management / position tracking UI — Greeks monitor outputs state, no persistent portfolio tracker
+- Auto-running full pipeline on all screened picks — LLM cost prohibitive; user selects which to analyze
 
 ## Context
 
