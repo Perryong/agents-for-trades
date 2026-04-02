@@ -26,7 +26,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 
 ### v1.1 Stock Recommendation System
 
-- [ ] **Phase 8: Screener Data Layer** — Programmatic market universe pre-filter with rate-limit-safe bulk fetch and session-boundary caching
+- [x] **Phase 8: Screener Data Layer** — Programmatic market universe pre-filter with rate-limit-safe bulk fetch and session-boundary caching (completed 2026-04-02)
 - [ ] **Phase 9: LLM Screener Agent** — LLM ranker that accepts pre-filtered candidates and returns top 3-5 picks with rationale
 - [ ] **Phase 10: Backend API Endpoint** — Synchronous `POST /api/screen` endpoint exposing screener results as JSON
 - [ ] **Phase 11: Frontend Screener Tab** — WatchlistPanel component with ranked picks, timestamps, and select-to-analyze flow
@@ -46,10 +46,10 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
   3. After market close, a new session open invalidates the cache and triggers a fresh fetch
   4. Fetching a universe of 500+ tickers completes without HTTP 429 errors, with coverage above 80% tracked and surfaced in the output
   5. Screener data is routed through the `VENDOR_METHODS` pattern under a `screener_data` category, with no direct yfinance imports outside `interface.py`
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [x] 08-01-PLAN.md — Core screener module: bulk fetch, scoring, cache, Pydantic model, tests
-- [ ] 08-02-PLAN.md — VENDOR_METHODS integration wiring and integration tests
+- [x] 08-02-PLAN.md — VENDOR_METHODS integration wiring and integration tests
 
 ### Phase 9: LLM Screener Agent
 **Goal**: The LLM screener agent ranks pre-filtered candidates and returns structured top picks that are fully isolated from the analysis pipeline state
@@ -97,7 +97,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 8. Screener Data Layer | 1/2 | In Progress|  |
+| 8. Screener Data Layer | 2/2 | Complete   | 2026-04-02 |
 | 9. LLM Screener Agent | 0/? | Not started | - |
 | 10. Backend API Endpoint | 0/? | Not started | - |
 | 11. Frontend Screener Tab | 0/? | Not started | - |
