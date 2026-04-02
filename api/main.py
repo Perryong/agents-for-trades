@@ -17,6 +17,8 @@ app.add_middleware(
 
 # API routes first — before any static mount
 app.include_router(router)
+from .screener_routes import screener_router
+app.include_router(screener_router)
 
 # Production: serve Vite dist if it exists
 DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")

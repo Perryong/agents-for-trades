@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 
 
@@ -31,3 +31,24 @@ class ProgressEvent(BaseModel):
     state: Optional[Dict[str, Any]] = None
     signal: Optional[str] = None  # populated on "complete" events
     message: Optional[str] = None  # populated on "error" events
+
+
+class ScreenRequest(BaseModel):
+    max_picks: int = Field(default=5, ge=1, le=10)
+    universe: str = "sp500"
+    llm_provider: str = "openai"
+    quick_think_llm: str = "gpt-5-mini"
+
+    def config_dict(self) -> Dict[str, Any]:
+        from tradingagents.default_config import DEFAULT_CONFIG
+        cfg = dict(DEFAULT_CONFIG)
+        cfg["screener_n_picks"] = self.max_picks
+        cfg["llm_provider"] = self.llm_provider
+        cfg["quick_think_llm"] = self.quick_think_llm
+        return cfg
+
+
+class ScreenResponse(BaseModel):
+    status: str           # "success" | "partial" | "error"
+    data: Dict[str, Any]  # ScreenerResult.model_dump(mode="json") or error dict
+    screened_at: str       # ISO 8601 UTC — empty string on hard error
