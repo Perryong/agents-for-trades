@@ -205,7 +205,6 @@ class TestUnusualActivityThreshold:
 # SCREEN-03: VENDOR_METHODS / TOOLS_CATEGORIES integration — deferred to Plan 02
 # ---------------------------------------------------------------------------
 
-@pytest.mark.skip(reason="VENDOR_METHODS wiring done in Plan 02")
 def test_vendor_methods_has_screener_keys():
     """VENDOR_METHODS has get_screener_universe and get_screener_signals keys."""
     from tradingagents.dataflows.interface import VENDOR_METHODS
@@ -215,7 +214,6 @@ def test_vendor_methods_has_screener_keys():
     assert "yfinance" in VENDOR_METHODS["get_screener_signals"]
 
 
-@pytest.mark.skip(reason="VENDOR_METHODS wiring done in Plan 02")
 def test_tools_categories_has_screener_data():
     """TOOLS_CATEGORIES has screener_data category with get_screener_universe and get_screener_signals."""
     from tradingagents.dataflows.interface import TOOLS_CATEGORIES
@@ -225,7 +223,6 @@ def test_tools_categories_has_screener_data():
     assert "get_screener_signals" in tools
 
 
-@pytest.mark.skip(reason="VENDOR_METHODS wiring done in Plan 02")
 def test_route_to_vendor_screener_universe():
     """route_to_vendor('get_screener_universe') calls the yfinance implementation."""
     from tradingagents.dataflows.interface import route_to_vendor, VENDOR_METHODS
