@@ -16,10 +16,10 @@ Requirements for stock recommendation/screening system. Each maps to roadmap pha
 
 ### LLM Screener Agent
 
-- [ ] **RANK-01**: `create_screener_agent` factory follows existing `create_*` pattern, uses `quick_thinking_llm` for cost control
-- [ ] **RANK-02**: LLM ranker accepts pre-filtered candidates (hard cap 50) and returns top 3-5 picks with rationale and confidence score
-- [ ] **RANK-03**: Screener output uses dedicated `ScreenerResult` model — never written to `AgentState`
-- [ ] **RANK-04**: Structured JSON output per pick: ticker, score, rationale, key metrics (volume, momentum, sector)
+- [x] **RANK-01**: `create_screener_agent` factory follows existing `create_*` pattern, uses `quick_thinking_llm` for cost control
+- [x] **RANK-02**: LLM ranker accepts pre-filtered candidates (hard cap 50) and returns top 3-5 picks with rationale and confidence score
+- [x] **RANK-03**: Screener output uses dedicated `ScreenerResult` model — never written to `AgentState`
+- [x] **RANK-04**: Structured JSON output per pick: ticker, score, rationale, key metrics (volume, momentum, sector)
 
 ### Backend API
 
@@ -69,10 +69,10 @@ Requirements for stock recommendation/screening system. Each maps to roadmap pha
 | SCREEN-02 | Phase 8 | Complete |
 | SCREEN-03 | Phase 8 | Complete |
 | SCREEN-04 | Phase 8 | Complete |
-| RANK-01 | Phase 9 | Pending |
-| RANK-02 | Phase 9 | Pending |
-| RANK-03 | Phase 9 | Pending |
-| RANK-04 | Phase 9 | Pending |
+| RANK-01 | Phase 9 | Complete |
+| RANK-02 | Phase 9 | Complete |
+| RANK-03 | Phase 9 | Complete |
+| RANK-04 | Phase 9 | Complete |
 | API-01 | Phase 10 | Pending |
 | API-02 | Phase 10 | Pending |
 | FE-01 | Phase 11 | Pending |

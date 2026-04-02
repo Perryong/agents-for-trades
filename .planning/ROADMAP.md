@@ -27,7 +27,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 ### v1.1 Stock Recommendation System
 
 - [x] **Phase 8: Screener Data Layer** — Programmatic market universe pre-filter with rate-limit-safe bulk fetch and session-boundary caching (completed 2026-04-02)
-- [ ] **Phase 9: LLM Screener Agent** — LLM ranker that accepts pre-filtered candidates and returns top 3-5 picks with rationale
+- [x] **Phase 9: LLM Screener Agent** — LLM ranker that accepts pre-filtered candidates and returns top 3-5 picks with rationale (completed 2026-04-02)
 - [ ] **Phase 10: Backend API Endpoint** — Synchronous `POST /api/screen` endpoint exposing screener results as JSON
 - [ ] **Phase 11: Frontend Screener Tab** — WatchlistPanel component with ranked picks, timestamps, and select-to-analyze flow
 - [ ] **Phase 12: CLI Integration** — `screen` subcommand displaying ranked picks in a Rich table
@@ -60,9 +60,9 @@ Plans:
   2. The `create_screener_agent` factory matches the `create_*` pattern and uses `quick_thinking_llm`
   3. `ScreenerResult` is never written to `AgentState` — passing the result through analysis pipeline entry raises a validation error
   4. The agent handles LLM response variation gracefully (malformed JSON, missing fields) without crashing
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
-- [ ] 09-01-PLAN.md — Screener agent module: Pydantic models, factory, run_screener entry point, isolation guard, tests, __init__.py wiring
+- [x] 09-01-PLAN.md — Screener agent module: Pydantic models, factory, run_screener entry point, isolation guard, tests, __init__.py wiring
 
 ### Phase 10: Backend API Endpoint
 **Goal**: The screener is accessible via a stable JSON API that is entirely independent from the analysis SSE stream
@@ -100,7 +100,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 8. Screener Data Layer | 2/2 | Complete   | 2026-04-02 |
-| 9. LLM Screener Agent | 0/1 | Planning complete | - |
+| 9. LLM Screener Agent | 1/1 | Complete   | 2026-04-02 |
 | 10. Backend API Endpoint | 0/? | Not started | - |
 | 11. Frontend Screener Tab | 0/? | Not started | - |
 | 12. CLI Integration | 0/? | Not started | - |
