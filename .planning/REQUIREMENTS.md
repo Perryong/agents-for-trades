@@ -23,8 +23,8 @@ Requirements for stock recommendation/screening system. Each maps to roadmap pha
 
 ### Backend API
 
-- [ ] **API-01**: `POST /api/screen` endpoint returns synchronous JSON with ranked picks and `screened_at` timestamp
-- [ ] **API-02**: Screener endpoint is independent from analysis SSE stream — no coupling between screener and pipeline
+- [x] **API-01**: `POST /api/screen` endpoint returns synchronous JSON with ranked picks and `screened_at` timestamp
+- [x] **API-02**: Screener endpoint is independent from analysis SSE stream — no coupling between screener and pipeline
 
 ### Frontend Integration
 
@@ -73,8 +73,8 @@ Requirements for stock recommendation/screening system. Each maps to roadmap pha
 | RANK-02 | Phase 9 | Complete |
 | RANK-03 | Phase 9 | Complete |
 | RANK-04 | Phase 9 | Complete |
-| API-01 | Phase 10 | Pending |
-| API-02 | Phase 10 | Pending |
+| API-01 | Phase 10 | Complete |
+| API-02 | Phase 10 | Complete |
 | FE-01 | Phase 11 | Pending |
 | FE-02 | Phase 11 | Pending |
 | FE-03 | Phase 11 | Pending |

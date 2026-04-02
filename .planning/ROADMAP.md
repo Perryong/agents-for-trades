@@ -28,7 +28,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 
 - [x] **Phase 8: Screener Data Layer** — Programmatic market universe pre-filter with rate-limit-safe bulk fetch and session-boundary caching (completed 2026-04-02)
 - [x] **Phase 9: LLM Screener Agent** — LLM ranker that accepts pre-filtered candidates and returns top 3-5 picks with rationale (completed 2026-04-02)
-- [ ] **Phase 10: Backend API Endpoint** — Synchronous `POST /api/screen` endpoint exposing screener results as JSON
+- [x] **Phase 10: Backend API Endpoint** — Synchronous `POST /api/screen` endpoint exposing screener results as JSON (completed 2026-04-02)
 - [ ] **Phase 11: Frontend Screener Tab** — WatchlistPanel component with ranked picks, timestamps, and select-to-analyze flow
 - [ ] **Phase 12: CLI Integration** — `screen` subcommand displaying ranked picks in a Rich table
 
@@ -72,9 +72,9 @@ Plans:
   1. `POST /api/screen` returns a JSON response containing ranked picks and a `screened_at` timestamp within 15 seconds
   2. The screener endpoint can be called while an analysis SSE stream is active with no interference in either direction
   3. The response shape matches the `ScreenResponse` Pydantic schema, verifiable with curl against a running FastAPI server
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
-- [ ] 10-01-PLAN.md — Schemas, route handler, main.py wiring, and endpoint tests
+- [x] 10-01-PLAN.md — Schemas, route handler, main.py wiring, and endpoint tests
 
 ### Phase 11: Frontend Screener Tab
 **Goal**: Users can view ranked screener picks in the frontend and select one to pre-populate and launch the full analysis pipeline
@@ -103,7 +103,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 8. Screener Data Layer | 2/2 | Complete   | 2026-04-02 |
 | 9. LLM Screener Agent | 1/1 | Complete   | 2026-04-02 |
-| 10. Backend API Endpoint | 0/1 | In progress | - |
+| 10. Backend API Endpoint | 1/1 | Complete   | 2026-04-02 |
 | 11. Frontend Screener Tab | 0/? | Not started | - |
 | 12. CLI Integration | 0/? | Not started | - |
 
