@@ -65,27 +65,27 @@ Requirements for stock recommendation/screening system. Each maps to roadmap pha
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCREEN-01 | TBD | Pending |
-| SCREEN-02 | TBD | Pending |
-| SCREEN-03 | TBD | Pending |
-| SCREEN-04 | TBD | Pending |
-| RANK-01 | TBD | Pending |
-| RANK-02 | TBD | Pending |
-| RANK-03 | TBD | Pending |
-| RANK-04 | TBD | Pending |
-| API-01 | TBD | Pending |
-| API-02 | TBD | Pending |
-| FE-01 | TBD | Pending |
-| FE-02 | TBD | Pending |
-| FE-03 | TBD | Pending |
-| CLI-01 | TBD | Pending |
-| CLI-02 | TBD | Pending |
+| SCREEN-01 | Phase 8 | Pending |
+| SCREEN-02 | Phase 8 | Pending |
+| SCREEN-03 | Phase 8 | Pending |
+| SCREEN-04 | Phase 8 | Pending |
+| RANK-01 | Phase 9 | Pending |
+| RANK-02 | Phase 9 | Pending |
+| RANK-03 | Phase 9 | Pending |
+| RANK-04 | Phase 9 | Pending |
+| API-01 | Phase 10 | Pending |
+| API-02 | Phase 10 | Pending |
+| FE-01 | Phase 11 | Pending |
+| FE-02 | Phase 11 | Pending |
+| FE-03 | Phase 11 | Pending |
+| CLI-01 | Phase 12 | Pending |
+| CLI-02 | Phase 12 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 15 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 15
+- Mapped to phases: 15
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-02*
-*Last updated: 2026-04-02 after v1.1 milestone initialization*
+*Last updated: 2026-04-02 after v1.1 roadmap creation*
