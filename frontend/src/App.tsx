@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAnalysis } from './hooks/useAnalysis';
+import { useScreener } from './hooks/useScreener';
 import { ConfigSidebar } from './components/ConfigSidebar';
+import { WatchlistPanel } from './components/WatchlistPanel';
 import { ProgressStepper } from './components/ProgressStepper';
 import { ReportTabs } from './components/ReportTabs';
 import { ReportPane } from './components/ReportPane';
@@ -19,6 +21,10 @@ function App() {
   const [activeTab, setActiveTab] = useState('market');
   const [enableOptions, setEnableOptions] = useState(false);
   const [dark, setDark] = useState(getInitialDark);
+  const [mainSection, setMainSection] = useState<'analysis' | 'screener'>('analysis');
+  const [prefillTicker, setPrefillTicker] = useState<string | undefined>(undefined);
+
+  const { state: screenerState, runScreen } = useScreener();
 
   useEffect(() => {
     const root = document.documentElement;
@@ -34,6 +40,11 @@ function App() {
   const handleAnalyze = (request: AnalyzeRequest) => {
     setEnableOptions(request.enable_options);
     startAnalysis(request);
+  };
+
+  const handleAnalyzePick = (ticker: string) => {
+    setPrefillTicker(ticker);
+    setMainSection('analysis');
   };
 
   // Find current tab's stateKey to get report content
@@ -60,56 +71,96 @@ function App() {
         <ConfigSidebar
           onAnalyze={handleAnalyze}
           isRunning={state.status === 'running'}
+          prefillTicker={prefillTicker}
         />
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Progress Stepper */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-y-auto max-h-64">
-          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Agent Progress</h2>
-          <ProgressStepper
-            completedNodes={state.completedNodes}
-            currentNode={state.currentNode}
-            enableOptions={enableOptions}
-            status={state.status}
-          />
+        {/* Top-level Section Nav */}
+        <div className="flex border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <button
+            onClick={() => setMainSection('analysis')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              mainSection === 'analysis'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
+          >
+            Analysis
+          </button>
+          <button
+            onClick={() => setMainSection('screener')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              mainSection === 'screener'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
+          >
+            Screener
+          </button>
         </div>
 
-        {/* Error Banner */}
-        {state.status === 'error' && state.errorMsg && (
-          <div className="px-6 py-3 bg-red-50 dark:bg-red-900/30 border-b border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">
-            Error: {state.errorMsg}
-          </div>
-        )}
+        {mainSection === 'analysis' ? (
+          <>
+            {/* Progress Stepper */}
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-y-auto max-h-64">
+              <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Agent Progress</h2>
+              <ProgressStepper
+                completedNodes={state.completedNodes}
+                currentNode={state.currentNode}
+                enableOptions={enableOptions}
+                status={state.status}
+              />
+            </div>
 
-        {/* Report Tabs */}
-        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-          <ReportTabs
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            enableOptions={enableOptions}
-          />
-        </div>
+            {/* Error Banner */}
+            {state.status === 'error' && state.errorMsg && (
+              <div className="px-6 py-3 bg-red-50 dark:bg-red-900/30 border-b border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">
+                Error: {state.errorMsg}
+              </div>
+            )}
 
-        {/* Report Content */}
-        <div className="flex-1 overflow-auto p-6 bg-gray-50 dark:bg-gray-900">
-          <ReportPane
-            content={reportContent}
-            status={state.status}
-          />
-        </div>
+            {/* Report Tabs */}
+            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+              <ReportTabs
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                enableOptions={enableOptions}
+              />
+            </div>
 
-        {/* Signal Banner */}
-        {state.result?.signal && (
-          <div className={`px-6 py-3 text-center text-sm font-bold border-t ${
-            state.result.signal.toUpperCase().includes('BUY')
-              ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800'
-              : state.result.signal.toUpperCase().includes('SELL')
-              ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800'
-              : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700'
-          }`}>
-            Signal: {state.result.signal}
+            {/* Report Content */}
+            <div className="flex-1 overflow-auto p-6 bg-gray-50 dark:bg-gray-900">
+              <ReportPane
+                content={reportContent}
+                status={state.status}
+              />
+            </div>
+
+            {/* Signal Banner */}
+            {state.result?.signal && (
+              <div className={`px-6 py-3 text-center text-sm font-bold border-t ${
+                state.result.signal.toUpperCase().includes('BUY')
+                  ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800'
+                  : state.result.signal.toUpperCase().includes('SELL')
+                  ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800'
+                  : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+              }`}>
+                Signal: {state.result.signal}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="flex-1 overflow-auto p-6 bg-gray-50 dark:bg-gray-900">
+            <WatchlistPanel
+              status={screenerState.status}
+              picks={screenerState.picks}
+              screenedAt={screenerState.screenedAt}
+              errorMsg={screenerState.errorMsg}
+              onRefresh={runScreen}
+              onAnalyze={handleAnalyzePick}
+            />
           </div>
         )}
       </main>

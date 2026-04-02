@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { AnalyzeRequest } from '../types';
 
 interface ConfigSidebarProps {
   onAnalyze: (request: AnalyzeRequest) => void;
   isRunning: boolean;
+  prefillTicker?: string;  // NEW — from screener pick selection
 }
 
 const ANALYST_OPTIONS = [
@@ -18,7 +19,7 @@ function todayISODate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function ConfigSidebar({ onAnalyze, isRunning }: ConfigSidebarProps) {
+export function ConfigSidebar({ onAnalyze, isRunning, prefillTicker }: ConfigSidebarProps) {
   const [ticker, setTicker] = useState('');
   const [date, setDate] = useState(todayISODate);
   const [analysts, setAnalysts] = useState<string[]>([
@@ -32,6 +33,12 @@ export function ConfigSidebar({ onAnalyze, isRunning }: ConfigSidebarProps) {
   const [llmProvider, setLlmProvider] = useState('openai');
   const [deepThinkLlm, setDeepThinkLlm] = useState('gpt-5.2');
   const [quickThinkLlm, setQuickThinkLlm] = useState('gpt-5-mini');
+
+  useEffect(() => {
+    if (prefillTicker) {
+      setTicker(prefillTicker.toUpperCase());
+    }
+  }, [prefillTicker]);
 
   function toggleAnalyst(id: string) {
     setAnalysts(prev =>
