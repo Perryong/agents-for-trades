@@ -103,8 +103,8 @@ Plans:
 |-------|----------------|--------|-----------|
 | 8. Screener Data Layer | 2/2 | Complete   | 2026-04-02 |
 | 9. LLM Screener Agent | 1/1 | Complete   | 2026-04-02 |
-| 10. Backend API Endpoint | 1/1 | Complete   | 2026-04-02 |
-| 11. Frontend Screener Tab | 0/? | Not started | - |
+| 10. Backend API Endpoint | 1/1 | Complete    | 2026-04-02 |
+| 11. Frontend Screener Tab | 1/2 | In Progress|  |
 | 12. CLI Integration | 0/? | Not started | - |
 
 ---
