@@ -29,7 +29,7 @@ Requirements for stock recommendation/screening system. Each maps to roadmap pha
 ### Frontend Integration
 
 - [x] **FE-01**: WatchlistPanel component displays ranked screener results with key metrics per pick
-- [ ] **FE-02**: User can select a screener pick to pre-populate the analysis config and run the full pipeline
+- [x] **FE-02**: User can select a screener pick to pre-populate the analysis config and run the full pipeline
 - [x] **FE-03**: Stale data indicator shows `screened_at` timestamp prominently
 
 ### CLI Integration
@@ -76,7 +76,7 @@ Requirements for stock recommendation/screening system. Each maps to roadmap pha
 | API-01 | Phase 10 | Complete |
 | API-02 | Phase 10 | Complete |
 | FE-01 | Phase 11 | Complete |
-| FE-02 | Phase 11 | Pending |
+| FE-02 | Phase 11 | Complete |
 | FE-03 | Phase 11 | Complete |
 | CLI-01 | Phase 12 | Pending |
 | CLI-02 | Phase 12 | Pending |
