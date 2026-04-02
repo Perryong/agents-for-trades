@@ -358,15 +358,15 @@ def get_screener_signals(
     """
     coverage = 1.0
 
-    if universe_data is None:
-        universe_data, coverage = fetch_universe_data()
-
-    # Session-boundary cache check
+    # Session-boundary cache check — BEFORE fetching to avoid unnecessary downloads
     session_key = _get_session_key()
     if session_key is not None:
         cached = _cache_get(session_key)
         if cached is not None:
             return cached, 1.0
+
+    if universe_data is None:
+        universe_data, coverage = fetch_universe_data()
 
     df_scored = _compute_signals(universe_data)
 
