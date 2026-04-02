@@ -72,7 +72,9 @@ Plans:
   1. `POST /api/screen` returns a JSON response containing ranked picks and a `screened_at` timestamp within 15 seconds
   2. The screener endpoint can be called while an analysis SSE stream is active with no interference in either direction
   3. The response shape matches the `ScreenResponse` Pydantic schema, verifiable with curl against a running FastAPI server
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 10-01-PLAN.md — Schemas, route handler, main.py wiring, and endpoint tests
 
 ### Phase 11: Frontend Screener Tab
 **Goal**: Users can view ranked screener picks in the frontend and select one to pre-populate and launch the full analysis pipeline
@@ -101,7 +103,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 8. Screener Data Layer | 2/2 | Complete   | 2026-04-02 |
 | 9. LLM Screener Agent | 1/1 | Complete   | 2026-04-02 |
-| 10. Backend API Endpoint | 0/? | Not started | - |
+| 10. Backend API Endpoint | 0/1 | In progress | - |
 | 11. Frontend Screener Tab | 0/? | Not started | - |
 | 12. CLI Integration | 0/? | Not started | - |
 
