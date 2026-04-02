@@ -26,6 +26,7 @@ from .options.strike_expiry_selector import create_strike_expiry_selector
 from .options.options_pricing_agent import create_options_pricing_agent
 from .options.options_legs_builder import create_options_legs_builder
 from .options.greeks_monitor import create_greeks_monitor
+from .screener.screener_agent import create_screener_agent
 
 __all__ = [
     "FinancialSituationMemory",
@@ -53,4 +54,5 @@ __all__ = [
     "create_options_pricing_agent",
     "create_options_legs_builder",
     "create_greeks_monitor",
+    "create_screener_agent",
 ]
