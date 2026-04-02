@@ -28,6 +28,7 @@ DEFAULT_CONFIG = {
         "fundamental_data": "yfinance",      # Options: alpha_vantage, yfinance
         "news_data": "yfinance",             # Options: alpha_vantage, yfinance
         "options_data": "tradier",           # Options: tradier, yfinance
+        "screener_data": "yfinance",         # Options: yfinance
     },
     # Tool-level configuration (takes precedence over category-level)
     "tool_vendors": {

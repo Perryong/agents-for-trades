@@ -35,6 +35,10 @@ from .y_finance_options import (
     get_options_chain as get_yfinance_options_chain,
     get_historical_iv as get_yfinance_historical_iv,
 )
+from .screener_data import (
+    get_screener_universe as get_yfinance_screener_universe,
+    get_screener_signals as get_yfinance_screener_signals,
+)
 
 # Configuration and routing logic
 from .config import get_config
@@ -82,6 +86,13 @@ TOOLS_CATEGORIES = {
             "get_options_expirations",
             "get_options_chain",
             "get_historical_iv",
+        ],
+    },
+    "screener_data": {
+        "description": "Bulk market universe fetch and signal scoring for screener",
+        "tools": [
+            "get_screener_universe",
+            "get_screener_signals",
         ],
     },
 }
@@ -149,6 +160,13 @@ VENDOR_METHODS = {
     "get_historical_iv": {
         "tradier": get_tradier_historical_iv,
         "yfinance": get_yfinance_historical_iv,
+    },
+    # screener_data
+    "get_screener_universe": {
+        "yfinance": get_yfinance_screener_universe,
+    },
+    "get_screener_signals": {
+        "yfinance": get_yfinance_screener_signals,
     },
 }
 
