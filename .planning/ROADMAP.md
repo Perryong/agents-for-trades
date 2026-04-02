@@ -93,7 +93,9 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Running `python -m cli screen` displays a Rich table of ranked picks with columns for Ticker, Score, Confidence, Rationale, and key metrics
   2. Each row in the CLI table matches the same ranked output that the frontend and API would return for the same market session
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 12-01-PLAN.md — Screen subcommand with Rich table, --max-picks, --json flags, and tests
 
 ---
 
@@ -104,8 +106,8 @@ Plans:
 | 8. Screener Data Layer | 2/2 | Complete   | 2026-04-02 |
 | 9. LLM Screener Agent | 1/1 | Complete   | 2026-04-02 |
 | 10. Backend API Endpoint | 1/1 | Complete    | 2026-04-02 |
-| 11. Frontend Screener Tab | 2/2 | Complete   | 2026-04-02 |
-| 12. CLI Integration | 0/? | Not started | - |
+| 11. Frontend Screener Tab | 2/2 | Complete    | 2026-04-02 |
+| 12. CLI Integration | 0/1 | Not started | - |
 
 ---
 
