@@ -60,7 +60,9 @@ Plans:
   2. The `create_screener_agent` factory matches the `create_*` pattern and uses `quick_thinking_llm`
   3. `ScreenerResult` is never written to `AgentState` — passing the result through analysis pipeline entry raises a validation error
   4. The agent handles LLM response variation gracefully (malformed JSON, missing fields) without crashing
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 09-01-PLAN.md — Screener agent module: Pydantic models, factory, run_screener entry point, isolation guard, tests, __init__.py wiring
 
 ### Phase 10: Backend API Endpoint
 **Goal**: The screener is accessible via a stable JSON API that is entirely independent from the analysis SSE stream
@@ -98,7 +100,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 8. Screener Data Layer | 2/2 | Complete   | 2026-04-02 |
-| 9. LLM Screener Agent | 0/? | Not started | - |
+| 9. LLM Screener Agent | 0/1 | Planning complete | - |
 | 10. Backend API Endpoint | 0/? | Not started | - |
 | 11. Frontend Screener Tab | 0/? | Not started | - |
 | 12. CLI Integration | 0/? | Not started | - |
