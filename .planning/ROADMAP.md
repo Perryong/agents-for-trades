@@ -38,7 +38,7 @@ See: `.planning/milestones/v1.1-ROADMAP.md` for full details.
 
 ### v1.2 Paper Trading & Validation
 
-- [ ] **Phase 13: TradingView Chart Integration** — Candlestick, volume, timeframe, and agent signal charts rendered in the frontend
+- [x] **Phase 13: TradingView Chart Integration** — Candlestick, volume, timeframe, and agent signal charts rendered in the frontend (completed 2026-04-03)
 - [ ] **Phase 14: Alpaca Paper Trading Execution** — Equity and options order submission, status display, trade markers, and auto-close
 - [ ] **Phase 15: Recommendation Scoring** — Trade outcome storage, win rate, expectancy, and confidence-calibration metrics
 - [ ] **Phase 16: Track Record Dashboard** — Summary stats, trade history table, equity curve, per-ticker breakdown, and options vs equity split
@@ -56,11 +56,11 @@ See: `.planning/milestones/v1.1-ROADMAP.md` for full details.
   2. User sees volume bars displayed below the candlestick chart on the same component
   3. User can click daily, weekly, or monthly toggle buttons and the chart re-renders to the selected timeframe
   4. User can see per-agent bull/bear signal annotations pinned at the decision date on the chart
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 Plans:
 - [x] 13-01-PLAN.md — Backend chart overlay endpoint + Pydantic schema + tests
 - [x] 13-02-PLAN.md — Frontend chart screen with candlestick + volume + timeframes
-- [ ] 13-03-PLAN.md — Overlay annotations, active mode, action panel, cross-navigation
+- [x] 13-03-PLAN.md — Overlay annotations, active mode, action panel, cross-navigation
 
 ### Phase 14: Alpaca Paper Trading Execution
 **Goal**: Users can submit paper equity and options orders from the agent decision, see live order status, see fill markers on the chart, and have positions auto-closed after N trading days
@@ -102,7 +102,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 13. TradingView Chart Integration | 2/3 | In Progress|  |
+| 13. TradingView Chart Integration | 3/3 | Complete   | 2026-04-03 |
 | 14. Alpaca Paper Trading Execution | 0/? | Not started | - |
 | 15. Recommendation Scoring | 0/? | Not started | - |
 | 16. Track Record Dashboard | 0/? | Not started | - |
