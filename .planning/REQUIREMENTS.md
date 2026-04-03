@@ -34,8 +34,8 @@ Requirements for stock recommendation/screening system. Each maps to roadmap pha
 
 ### CLI Integration
 
-- [ ] **CLI-01**: `screen` subcommand runs the screener and displays ranked results in a Rich table
-- [ ] **CLI-02**: CLI output includes ticker, score, rationale summary, and key metrics per pick
+- [x] **CLI-01**: `screen` subcommand runs the screener and displays ranked results in a Rich table
+- [x] **CLI-02**: CLI output includes ticker, score, rationale summary, and key metrics per pick
 
 ## v2 Requirements
 
@@ -78,8 +78,8 @@ Requirements for stock recommendation/screening system. Each maps to roadmap pha
 | FE-01 | Phase 11 | Complete |
 | FE-02 | Phase 11 | Complete |
 | FE-03 | Phase 11 | Complete |
-| CLI-01 | Phase 12 | Pending |
-| CLI-02 | Phase 12 | Pending |
+| CLI-01 | Phase 12 | Complete |
+| CLI-02 | Phase 12 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 15 total
