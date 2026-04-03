@@ -96,6 +96,7 @@ export function ChartScreen({ dark, initialTicker, onViewAnalysis }: ChartScreen
         trade_type: 'equity',
         strategy_name: overlay.strategy_name ?? undefined,
         analysis_date: overlay.analysis_date,
+        confidence_text: overlay.final_trade_decision ?? undefined,
       });
       setCurrentOrderId(response.order_id);
     } catch (err) {

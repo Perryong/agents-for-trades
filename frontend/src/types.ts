@@ -133,6 +133,7 @@ export interface TradeRequest {
   strike?: number;
   expiry?: string;
   contract_type?: string;
+  confidence_text?: string;
 }
 
 export interface TradeResponse {
