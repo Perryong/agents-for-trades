@@ -1,19 +1,19 @@
 # Project Research Summary
 
-**Project:** TradingAgents v1.1 — Stock Screener / Recommendation System
-**Domain:** AI-driven stock screener layered on an existing LangGraph multi-agent trading framework
-**Researched:** 2026-04-02
-**Confidence:** HIGH (architecture findings from direct codebase analysis; stack and pitfalls from verified sources)
+**Project:** TradingAgents — v1.2 Paper Trading & Validation
+**Domain:** AI multi-agent trading framework — paper execution, interactive charting, recommendation scoring, track record dashboard
+**Researched:** 2026-04-03
+**Confidence:** HIGH
 
 ---
 
 ## Executive Summary
 
-TradingAgents v1.1 adds a stock screening capability on top of a well-structured v1.0 pipeline. The v1.0 system already handles single-ticker analysis via LangGraph agents, FastAPI SSE streaming, and a React frontend — all of which remain unchanged. The v1.1 screener is a discrete pre-analysis discovery layer: it narrows a universe of ~500 tickers to 20-50 candidates via programmatic signal filters, then uses a single LLM call to rank the top 3-5 picks with momentum rationale. A user selects one pick and fires the unchanged full analysis pipeline. The screener is NOT a second LangGraph graph — it is a standalone Python module that hands off to the existing pipeline.
+v1.2 is a pure additive milestone that bolts four capabilities onto a shipping system: TradingView candlestick charts, Alpaca paper trade execution, recommendation scoring, and a track record dashboard. The existing stack (FastAPI, LangGraph, React 19, Tailwind v4, yfinance, Tradier) is unchanged. Four new packages cover the entire delta: `lightweight-charts ^5.1.0` (frontend), `alpaca-py ^0.43.2`, `sqlalchemy ^2.0.48`, and `aiosqlite ^0.22.1` (backend). All four are version-confirmed against their package registries, have official documentation for the integration patterns required, and introduce zero conflicts with existing peer dependencies.
 
-The recommended approach keeps the dependency footprint minimal and the integration surface small. One new Python package (`finvizfinance>=1.3.0`) handles broad market universe scanning; all other data access reuses existing `yfinance` patterns via the established `route_to_vendor` vendor abstraction. No new npm packages are required for the frontend MVP. The screener module lives at `tradingagents/screener/` with clean boundaries: `pre_filter.py` (pure Python math), `llm_ranker.py` (single LLM call), `models.py` (dataclasses), and `data_fetcher.py` (vendor layer wrapper). A new `POST /api/screen` endpoint returns synchronous JSON — no SSE overhead needed for a 5-8 second operation.
+The recommended build order flows from lowest to highest coupling: charts first (pure frontend, uses data already in the yfinance pipeline), then Alpaca paper execution (the gateway feature that makes trade records possible), then scoring (pure Python aggregation once trade records exist), then the track record dashboard (consumes scoring and chart data). Each stage is independently testable and delivers visible value before the next one begins. The LangGraph graph, AgentState, all existing agents, and existing API routes are untouched throughout.
 
-The principal risks are cost and correctness. On cost: the pre-filter must hard-cap LLM input at 50 candidates — 200+ candidates inflates token spend to ~$54/month per user at GPT-4o pricing and degrades ranking quality simultaneously. On correctness: the screener must be strictly isolated from `AgentState` to prevent state contamination across analysis runs, and screener results must carry session-boundary TTL caching to prevent stale picks from being acted on. The screener must never auto-trigger the full analysis pipeline; all pipeline runs must require explicit per-ticker user confirmation.
+The primary risks are not technical complexity — the libraries are mature and the patterns are established — but correctness of the feedback loop. Win rate displayed alone is actively misleading; the scoring schema must be defined before any code is written; paper fills have no slippage and will systematically overstate real-world edge. These are design-time decisions that cannot be retrofitted once the dashboard is in production. The second risk cluster is async correctness: the FastAPI event loop is already in production with SSE streaming, and any blocking synchronous Alpaca SDK call inside an `async def` handler will stall SSE delivery visibly.
 
 ---
 
@@ -21,157 +21,135 @@ The principal risks are cost and correctness. On cost: the pre-filter must hard-
 
 ### Recommended Stack
 
-The v1.0 stack (yfinance 0.2.63, stockstats 0.6.5, LangGraph, FastAPI, React 19 + TypeScript + Tailwind v4 + Vite 8) requires no replacements or upgrades. The sole new Python dependency is `finvizfinance>=1.3.0`, released January 2026 and actively maintained, which provides structured DataFrame output for broad market movers (unusual volume, top gainers/losers) with no API key requirement. `yfinance.screen()` exists in the current venv but has a known broken `size` parameter (GitHub issue #2419, April 2025) and serves only as a secondary fallback. Sector ETF momentum uses the existing `yf.download()` pattern over 11 SPDR ETF tickers — zero new dependency.
+The existing stack handles everything except chart rendering, broker execution, and persistence. The four new packages solve exactly those gaps. `lightweight-charts v5` is the correct charting choice: MIT license, 35kB gzipped, Canvas-based (no SVG performance cliff with trade history datasets), no React peer-dependency coupling, and an official TradingView documentation tutorial covering the exact React `useRef + useEffect` integration pattern needed. All community wrappers (kaktana, ukorvl) lag behind the v5 API breaking changes and must be rejected.
 
-Frontend additions are pure React + Tailwind using patterns already in the codebase. `@tanstack/react-table` v8 is the right choice if the screener table grows beyond a basic sortable list, but is deferred for MVP (20-50 rows do not justify it).
+`alpaca-py` (not the deprecated `alpaca-trade-api`) is the only correct Alpaca SDK. Paper mode is a single constructor flag: `TradingClient(paper=True)`. Level 3 options (spreads, straddles, iron condors) are enabled by default in paper accounts with no approval process or KYC required. SQLAlchemy 2.0 async with `aiosqlite` matches the existing FastAPI async event loop and is upgradeable to PostgreSQL by changing only the connection string when and if needed — the ORM layer provides the abstraction.
 
-**Core technologies (new additions only):**
-- `finvizfinance>=1.3.0`: Broad market screener universe feed — no API key, structured DataFrames, actively maintained
-- `yf.download()` (existing): Sector ETF momentum via 11 SPDR tickers — no new dependency
-- `yf.screen()` (existing, fallback only): Market movers fallback — broken size param, use only if finvizfinance unavailable
-- Native React + Tailwind (existing): Screener table UI — sufficient for 20-50 rows at MVP
-- `@tanstack/react-table` v8 (deferred): Headless table with sort/filter — add only if table complexity grows
+**Core new technologies:**
+- `lightweight-charts ^5.1.0`: Financial candlestick + volume + marker charts — purpose-built Canvas library; v5 API is a hard breaking change from v4; must use only the official v5 patterns
+- `alpaca-py ^0.43.2`: Paper trade execution (equity + multi-leg options) — `TradingClient(paper=True)` routes all calls to the paper sandbox automatically; no URL configuration needed
+- `sqlalchemy ^2.0.48` + `aiosqlite ^0.22.1`: Async SQLite persistence for trade records, scoring results, and paper order state — zero infrastructure, ORM abstraction allows future database upgrade by changing only the connection string
+
+**Explicitly rejected (do not add):**
+- Recharts / Chart.js / Victory: React 19 peer-dependency conflicts and SVG rendering performance issues with trade history datasets
+- Community lightweight-charts wrappers: all target v3/v4, unmaintained against the v5 API
+- Alembic: premature for a new schema with no existing data; `create_all()` on startup is sufficient
+- Redis / Celery: no queue or cache infrastructure needed at paper trading order volumes
+- `backtrader`: explicitly deferred to v1.3+ per PROJECT.md; must not be wired in during v1.2
+- `alpaca-trade-api` (legacy): officially deprecated; use `alpaca-py` only
 
 ### Expected Features
 
-The screener has a clear, narrow scope. The LLM's role is ranking and rationale, not filtering — programmatic filters gate the LLM. Features are ordered by implementation dependency.
-
 **Must have (table stakes):**
-- Market universe pre-filter — volume + market cap + RVol + price momentum in pure Python; narrows 500+ tickers to 20-50
-- Minimum volume threshold (500K ADV) and minimum market cap ($500M) — eliminates illiquid and noise-heavy names
-- Relative volume signal (RVol >= 2.0x 30-day average) — core momentum signal
-- LLM screener agent ranking top 3-5 picks with per-pick rationale and HIGH/MEDIUM/LOW confidence flag
-- Select-to-analyze integration — user clicks a pick, it pre-populates the existing analysis form; no backend state required
-- CLI `screen` subcommand with Rich table output — screener must work from CLI, consistent with v1.0
-- `POST /api/screen` endpoint returning synchronous JSON — mirrors existing `POST /api/analyze` structure
+- TradingView candlestick + volume bars — users orient visually before reading agent reports; absence registers as a regression from professional tool expectations
+- Alpaca paper order submission (equity) — core v1.2 requirement; without execution capability the milestone delivers no value
+- Order status display (submitted / filled / rejected) — silent execution is untrustworthy and makes the track record unreliable
+- Recommendation scoring with win rate + expectancy + profit factor — win rate alone is actively misleading and must never be the only displayed metric
+- Track record dashboard with summary stats + trade history table — the minimum answer to "how is this system doing?"
 
 **Should have (differentiators):**
-- Composite signal score (0-100) normalizing volume, momentum, and sector signals — enables visual ranking
-- Sector momentum context — weight candidates from sectors with positive ETF momentum
-- Options-readiness flag per pick — surface whether liquid options exist before user triggers full options analysis
-- SSE streaming for screener progress — if latency exceeds 15 seconds, add using existing `ProgressCallbackHandler` pattern
-- Screener results frontend tab with ranked card layout and prominent timestamps
+- Paper trade markers on price chart (fill price annotated as chart overlay) — closes the execution-to-visualization loop visually
+- Equity curve chart in track record (running P&L over time) — shows whether system is improving over the live paper period
+- Per-ticker breakdown in track record — identifies familiar vs unfamiliar ticker performance patterns
+- Multi-timeframe toggle on chart (daily / weekly / monthly) — traders make decisions across timeframes
+- Trade outcome auto-close via Alpaca positions API after N trading days
 
-**Defer to v1.2+:**
-- Backtesting screener effectiveness (explicitly out of scope per PROJECT.md)
-- Persistent watchlist / portfolio tracking
-- Real-time intraday tick scanning (requires streaming data vendor not in current stack)
-- Custom drag-and-drop filter builder UI
-- Natural language filter input
-- Social/news sentiment in pre-filter
+**Defer to follow-up or v1.3+:**
+- Options multi-leg paper order via Alpaca (translation layer from `OptionsLegsBuilderReport` to Alpaca legs array is high complexity; tackle after equity order lifecycle is stable and proven)
+- Per-agent accuracy scoring (requires structured individual agent votes; partially available in existing reports but not fully typed)
+- Confidence-calibration view (requires matching confidence scores against outcomes over time — meaningful only after several months of paper history)
+- Custom backtesting engine (explicitly v1.3+ per PROJECT.md)
+- Portfolio rebalancing / dynamic position sizing engine
 
 ### Architecture Approach
 
-The screener is a standalone module at `tradingagents/screener/` — not a second `StateGraph`. This is the correct architectural decision: the analysis graph is a parallel fan-out/fan-in pipeline for a single ticker; the screener is a sequential batch scan of many tickers followed by one LLM call. LangGraph adds graph compilation overhead and forces the pre-filter (pure Python math) into a node invocation, which is wasteful and makes unit testing harder. The screener outputs a `ScreenerResult` dataclass that is consumed by the API endpoint and returned as JSON; it never enters `AgentState`. The handoff from screener to analysis is a user action, not an automated edge.
+v1.2 adds three new backend modules and two new React component areas, all purely additive. Zero changes are made to the existing LangGraph graph, `AgentState` TypedDict, agent factory functions, or existing API routes. The execution layer (`tradingagents/broker/alpaca_trader.py`) is a plain Python service module called from a FastAPI POST endpoint — not a LangGraph node. Persistence uses SQLAlchemy 2.0 async with a session-injected `get_db()` dependency following the FastAPI canonical pattern. The chart data endpoint routes through the existing `VENDOR_METHODS` abstraction in `interface.py` rather than calling yfinance directly, preserving vendor swap capability for the whole system.
 
 **Major components:**
-1. `tradingagents/screener/pre_filter.py` — programmatic filters producing `list[CandidateTicker]`; no LLM dependency; testable in isolation
-2. `tradingagents/screener/llm_ranker.py` — `create_llm_ranker` factory (matches existing `create_*` pattern); single LLM call; returns `ScreenerResult`
-3. `tradingagents/screener/data_fetcher.py` — thin wrapper calling `route_to_vendor`; no direct yfinance imports
-4. `tradingagents/screener/models.py` — `ScreenerConfig`, `CandidateTicker`, `TopPick`, `ScreenerResult` dataclasses
-5. `api/routes.py` (modified) — `POST /api/screen` synchronous endpoint; `asyncio.to_thread` for blocking screener call
-6. `frontend/src/components/WatchlistPanel.tsx` (new) — ranked card list; `onPickSelected(symbol)` callback wired to `App.tsx` ticker state
-7. `tradingagents/dataflows/interface.py` (modified) — two new `VENDOR_METHODS` entries: `get_market_movers`, `get_sector_snapshot`
+1. `tradingagents/broker/alpaca_trader.py` — `TradingClient(paper=True)` wrapper; `submit_equity_order` and `submit_options_order` methods; all synchronous SDK calls wrapped with `asyncio.to_thread()` to protect the event loop
+2. `tradingagents/store/trade_store.py` — SQLAlchemy ORM `TradeRecord` model; CRUD operations plus `compute_score()` calculated at read time; SQLite via `aiosqlite`
+3. `tradingagents/dataflows/chart_data.py` — `get_ohlcv(ticker, days)` via `VENDOR_METHODS` routing; returns a JSON-serializable list for `ChartPanel`
+4. `api/trade_routes.py` + `api/chart_routes.py` — new FastAPI `APIRouter` instances following the `api/screener_routes.py` pattern; endpoints: `POST /api/trade`, `GET /api/trades`, `GET /api/score/{ticker}`, `PATCH /api/trade/{id}`, `GET /api/chart/{ticker}`
+5. `frontend/src/components/ChartPanel.tsx` — `useRef + useEffect + chart.remove()` cleanup pattern; `chart.addSeries(CandlestickSeries, options)` v5 API; conditional render gated on `status === 'complete'`
+6. `frontend/src/components/TrackRecordDashboard.tsx` — new "Track Record" tab in `App.tsx`; win rate + expectancy + profit factor stats cards + trade history table + equity curve line chart; persistent slippage disclaimers
 
-**Unchanged (do not touch):**
-- `trading_graph.py`, `setup.py`, `agent_states.py`, all existing agents, `api/progress.py`
+**Key patterns inherited from existing codebase:**
+- All new API routers follow the `api/screener_routes.py` model (APIRouter, Pydantic schemas, no SSE coupling)
+- Async SDK calls use `asyncio.to_thread()` — same as the screener endpoint
+- No new `AgentState` fields; no new LangGraph nodes; no SSE for new endpoints
+
+**Unchanged components (do not touch):**
+- `tradingagents/graph/trading_graph.py`, `graph/setup.py`, `agents/utils/agent_states.py`
+- All existing analysts, managers, and options agents
+- `api/routes.py`, `api/screener_routes.py`, `api/progress.py`
 
 ### Critical Pitfalls
 
-1. **Screener auto-triggering the full analysis pipeline** — The screener must have no outgoing edges to analysis nodes. `ScreenerResult` must never enter `AgentState`. Frontend "Analyze" requires explicit per-ticker click. Add an API-layer guard rejecting `screener_mode + tickers > 1` with HTTP 422. Detection: screener run taking >60 seconds means the analysis pipeline is running.
+1. **lightweight-charts v5 API incompatibility with v4 tutorials** — The v5 series creation API is a hard breaking change: `addLineSeries()` does not exist in v5; it is replaced by `chart.addSeries(CandlestickSeries, options)`. Most tutorials indexed by search engines target v3 or v4. React StrictMode (enabled by default in Vite projects) double-invokes `useEffect`; without a `chart.remove()` cleanup function, two chart instances mount silently and produce memory leaks. Fix: use only the official TradingView v5 React tutorial; always return `chart.remove()` in `useEffect` cleanup; never use community wrapper libraries.
 
-2. **yfinance 429 errors silently corrupting screener output** — Never iterate individual tickers. Use `yf.download()` in chunks of 80-100 with `threads=True`. Implement exponential backoff (2s initial, 60s max, 3 retries per chunk). Track `fetch_attempted` vs `fetch_succeeded`; surface coverage percentage in API response; abort if coverage drops below 80%.
+2. **Alpaca paper vs. live API key and URL mismatch** — Paper keys require `paper=True` in the `TradingClient` constructor, which routes calls to the paper base URL automatically. Using live keys in paper mode (or vice versa) produces generic 401/403 errors that look like account configuration problems. Fix: always pass `paper=True` explicitly; name env vars `ALPACA_PAPER_KEY` / `ALPACA_PAPER_SECRET` (never an ambiguous `ALPACA_KEY`); add a startup assertion that rejects configuration where paper mode is active but the base URL does not contain `paper-api`.
 
-3. **Stale pre-filter data feeding the LLM** — Cache TTL must be tied to market session boundaries, not wall-clock time: 15-minute TTL during market hours (9:30-4:00 ET), reset at next session open otherwise. LLM prompt must include `data_as_of` timestamp. Frontend must display "Screened at [time]" prominently with a stale indicator.
+3. **Blocking synchronous Alpaca SDK calls inside async FastAPI routes** — `alpaca-py` `TradingClient` methods (`submit_order`, `get_order`, `get_all_positions`) are synchronous. Calling them directly inside `async def` handlers blocks the event loop for 100-500ms per call. During that block, SSE events cannot be dispatched and the analysis progress stepper freezes visibly. Fix: wrap every SDK call with `asyncio.to_thread()`. Validate under concurrent load by opening two browser tabs running analysis simultaneously and confirming SSE delivery does not stall when an order is submitted in one tab.
 
-4. **LLM receiving too many candidates** — Hard cap at 50 candidates entering the LLM step. This is a configuration constant enforced in the pre-filter output contract. Pre-filter criteria must produce 20-50 results from a 500-ticker universe (RVol >= 2.0x AND price >= $5 AND market cap >= $500M). If > 50 pass, apply secondary sort by RVol desc and truncate. Log `input_token_count` per screener LLM call; alert if > 15,000 tokens.
+4. **Win rate as the standalone headline metric** — Win rate without average winner and loser sizes and expectancy is actively misleading: 67% win rate with 0.5:1 risk-reward loses money; 40% win rate with 3:1 risk-reward makes money. Fix: display win rate, average winner, average loser, profit factor, and expectancy together; never win rate alone. Design the scoring schema to capture `price_at_decision`, `recommended_target_price`, `recommended_stop_price`, and `target_horizon_days` before any scoring code is written.
 
-5. **AgentState contamination from screener fields** — Screener uses a separate `ScreenerState` TypedDict (or standalone dataclasses), never `AgentState`. Analysis pipeline state must be initialized fresh per ticker via `Propagator.create_initial_state()`. If `screener_*` keys appear in `AgentState` at pipeline entry, raise a validation error. Do not add speculative `screener_context` field to `AgentState` in v1.1.
+5. **Trade log schema insufficient for scoring** — Existing `analysis_history/` JSON logs record decisions but not the fields needed to measure outcome quality. Retrofitting historical records is destructive and introduces price data inaccuracies. Fix: define the v1.2 schema with a `schema_version` field before implementation begins; v1.2 records go into SQLite (separate from the old JSON files); pre-v1.2 logs are available in the history view but excluded from quantitative metrics; set the track record start date to the v1.2 deployment date.
 
 ---
 
 ## Implications for Roadmap
 
-Based on research, the build must be dependency-ordered: data layer first (testable without LLM), then LLM ranker (testable with mock candidates), then API (testable with curl), then frontend (needs API contract), with CLI parallel to API.
+### Phase 1: TradingView Chart Integration
 
-### Phase 1: Screener Data Layer
+**Rationale:** Zero broker dependency; OHLCV data already exists in the yfinance pipeline; delivers immediate visible value without any execution infrastructure; validates the lightweight-charts v5 React integration pattern before any other feature depends on it.
+**Delivers:** `ChartPanel.tsx` with candlestick + volume bars; `GET /api/chart/{ticker}` OHLCV endpoint via `VENDOR_METHODS` routing; `useChart.ts` hook; chart renders below the signal banner on analysis completion; foundation for paper trade marker overlay in Phase 2.
+**Addresses:** Table-stakes features — candlestick view, volume bars.
+**Avoids:** Pitfall 1 (v5 API incompatibility) by establishing the correct React pattern in isolation first; Pitfall 12 (data vendor divergence) by routing through `interface.py` rather than calling yfinance directly in the chart endpoint.
+**Research flag:** Standard — official TradingView v5 React tutorial is authoritative and complete. No additional research needed.
 
-**Rationale:** All downstream phases depend on the data layer being correct and rate-limit-safe. Building this first allows unit testing in isolation before any LLM spend is incurred. Pitfalls 2 and 3 (yfinance rate limits, stale cache) must be solved at this layer — they cannot be patched later.
+### Phase 2: Alpaca Paper Trading Execution
 
-**Delivers:** `get_yfinance_market_movers()`, `get_yfinance_sector_snapshot()` registered in `VENDOR_METHODS`; `screener_data: yfinance` in `default_config.py`; `models.py` dataclasses; `data_fetcher.py` vendor wrapper; `pre_filter.py` with chunk-based fetch, exponential backoff, coverage tracking, session-boundary TTL cache.
+**Rationale:** Gateway feature for the entire milestone. Trade records in the database are the prerequisite for Phases 3 and 4. The order lifecycle (submitted → filled → rejected → closed) must be proven end-to-end before any feature that reads fill prices is built.
+**Delivers:** `alpaca_trader.py` broker module; `trade_routes.py` with `POST /api/trade`; SQLite schema (`TradeRecord` model with `order_id`, `executed_price`, `outcome`, `pnl` fields); `ALPACA_PAPER_KEY` / `ALPACA_PAPER_SECRET` env vars; order status polling loop (5s interval, 12 iterations, `timeout` state if not filled); "Execute Paper Trade" confirmation button in the Analysis tab; chart trade markers once fill price is available.
+**Addresses:** Equity paper order submission (table stakes); order status display (table stakes); paper trade chart markers (differentiator).
+**Avoids:** Pitfall 2 (key/URL mismatch) via explicit `paper=True` and startup assertion; Pitfall 3 (options multi-leg — scope to equity-only for Phase 2 MVP); Pitfall 4 (event loop blocking) via `asyncio.to_thread()`; Pitfall 9 (stale "pending" orders) via the polling loop and explicit order state machine.
+**Research flag:** Standard for equity orders. Options multi-leg should be validated against a scratch paper account before implementation (Pitfall 3 documents gaps in Alpaca bracket order support for options); scope options execution as a sub-phase contingent on that validation.
 
-**Addresses:** Market universe pre-filter, volume/market cap/RVol/momentum filters (FEATURES.md table stakes)
+### Phase 3: Recommendation Scoring System
 
-**Avoids:** Pitfall 2 (yfinance 429 silent corruption), Pitfall 3 (stale data), Pitfall 8 (Tradier rate limits — apply options check after volume/price filter reduces to <=50 candidates)
+**Rationale:** Pure Python aggregation once `TradeRecord` rows exist. No new infrastructure. The schema must be locked in Phase 2 before any scoring metric is displayed. Deferred outcome evaluation (N-trading-day scoring trigger) is an architectural decision that must be made before implementation.
+**Delivers:** `compute_score()` in `trade_store.py` returning win rate + expectancy + profit factor + average winner + average loser; `GET /api/score/{ticker}` and `GET /api/score` aggregate endpoints; `PATCH /api/trade/{id}` close-trade endpoint; deferred evaluation mechanism (pending vs. scored states); `scoring_results` table in SQLite.
+**Addresses:** Win rate calculation (table stakes); per-ticker breakdown (differentiator); outcome auto-close (differentiator).
+**Avoids:** Pitfall 5 (win rate alone) — expose the full metric suite from day one, never win rate as a standalone headline; Pitfall 7 (schema insufficiency) — schema locked in Phase 2 before any scoring reads exist; Pitfall 11 (confidence score as proxy for outcome) — scoring requires deferred evaluation, not same-day calculation against the AI's stated confidence.
+**Research flag:** No additional research needed. All metrics (Sharpe ratio, profit factor, expectancy) are expressible with pandas already in requirements and Python stdlib.
 
-**Gate:** Unit tests with mock yfinance data. Verify candidate output shape, filter thresholds, graceful skip on bad tickers, coverage metric in output.
+### Phase 4: Track Record Dashboard
 
-### Phase 2: LLM Screener Agent
-
-**Rationale:** Depends on Phase 1 models and data contracts. Built second so the prompt can be validated against real pre-filter output. The 50-candidate cap and prompt token budget must be defined here before the frontend builds expectations around output shape.
-
-**Delivers:** `llm_ranker.py` with `create_llm_ranker` factory; `screener/__init__.py` with `run_screener(config, llm)` public entry point; minimal screener-specific prompt template (<= 300 token system prompt, no inherited options pipeline context).
-
-**Addresses:** LLM agent ranking top 3-5 picks, per-pick rationale, confidence flag (FEATURES.md table stakes and differentiators)
-
-**Avoids:** Pitfall 1 (no outgoing edges to analysis — screener is a module, not a graph), Pitfall 4 (50-candidate hard cap), Pitfall 5 (no `AgentState` fields added), Pitfall 6 (explicit momentum regime declared in prompt), Pitfall 10 (minimal prompt template)
-
-**Gate:** Integration test with small fixed candidate list. Verify `ScreenerResult` parse is robust to LLM response variation.
-
-### Phase 3: Backend API Endpoint
-
-**Rationale:** Depends on Phase 2 `run_screener()` public interface. Defines the API contract that the frontend Phase 4 depends on. Using synchronous JSON (not SSE) keeps this phase simple and removes the `run_id` / `ProgressCallbackHandler` machinery for a 5-8 second operation.
-
-**Delivers:** `ScreenRequest`, `ScreenResponse`, `TopPick` Pydantic schemas in `api/schemas.py`; `POST /api/screen` endpoint in `api/routes.py` using `asyncio.to_thread`; `screened_at` and `market_session` fields always in response envelope.
-
-**Addresses:** Backend endpoint for screener (FEATURES.md table stakes)
-
-**Avoids:** Pitfall 9 (timestamp in API envelope from day one), Pitfall 1 (API-layer guard rejecting auto-analysis)
-
-**Gate:** `curl` test against running FastAPI server. Verify JSON shape matches `ScreenResponse`.
-
-### Phase 4: Frontend Screener Tab
-
-**Rationale:** Depends on Phase 3 API contract. State lifting for ticker selection in `App.tsx` is the most impactful frontend change — do it here rather than patching it later. Frontend must disable "Run Screener" during active analysis SSE stream to prevent state collision.
-
-**Delivers:** `ScreenRequest` / `ScreenResponse` / `TopPick` types in `types.ts`; `useScreen.ts` fetch hook; `WatchlistPanel.tsx` with ranked card layout (max 5 picks, #1 visually prominent), prominent timestamp display, stale indicator; `App.tsx` modifications (screener tab, lifted ticker state, `onPickSelected` callback wiring).
-
-**Addresses:** Screener results frontend tab, select-to-analyze integration (FEATURES.md table stakes and differentiators)
-
-**Avoids:** Pitfall 9 (prominent timestamp + stale indicator), Pitfall 11 (disabled screener button during active analysis, separate state slice), Pitfall 12 (5-pick cap, ranked card layout, subdued CTAs on lower picks), Pitfall 13 (configurable thresholds in config sidebar)
-
-**Gate:** Manual test: run screener from UI, verify picks render with timestamp, click "Analyze", verify existing analysis pipeline starts with correct ticker pre-populated.
-
-### Phase 5: CLI Integration
-
-**Rationale:** Depends on Phase 2 `run_screener()` only; independent of Phases 3-4 and can run in parallel with Phase 3 if needed. Low complexity — follows existing Typer + Rich patterns exactly.
-
-**Delivers:** `screen` Typer subcommand in `cli/main.py` with Rich table output (Ticker, Score, Confidence, Rationale).
-
-**Addresses:** CLI output for screener results (FEATURES.md table stakes)
-
-**Gate:** `python -m cli screen --date 2026-04-02` returns table of picks.
-
----
+**Rationale:** Consumes Phase 2 trade records and Phase 3 score metrics. Final integration phase that makes the system's self-evaluation visible. All data dependencies are satisfied by this point.
+**Delivers:** New "Track Record" tab in `App.tsx`; `TrackRecordDashboard.tsx` with stats cards + trade history table + equity curve line chart (reusing Phase 1 lightweight-charts setup as a line series); persistent disclaimer about simulated performance and assumed position sizing; configurable fixed-dollar position size displayed explicitly; separate equity vs. options performance views.
+**Addresses:** Track record summary stats (table stakes); trade history table (table stakes); equity curve chart (differentiator); per-ticker and equity/options split views (differentiators).
+**Avoids:** Pitfall 6 (paper fill overstatement) — persistent dashboard disclaimer; Pitfall 10 (relative returns without position sizing) — configurable fixed-dollar assumed position displayed in the UI; Pitfall 15 (mixing equity and options metrics) — separate views for each asset class with appropriate metrics per category.
+**Research flag:** Standard. React tab + table + stats card patterns are established in the existing codebase. Equity curve reuses Phase 1 chart setup (line series instead of candlestick).
 
 ### Phase Ordering Rationale
 
-- Data layer first (Phase 1) ensures rate-limit safety and cache correctness are solved before any LLM spend is incurred — these cannot be fixed retroactively.
-- LLM ranker second (Phase 2) because its output shape defines the API contract downstream phases depend on.
-- API before frontend (Phase 3 before 4) because the frontend hook is blocked on a stable JSON schema.
-- CLI parallel to or after Phase 2 because it only depends on `run_screener()`, not the API layer.
-- This ordering matches ARCHITECTURE.md's recommended build sequence (Phase A through Phase E) exactly.
+- **Phase 1 before Phase 2:** Charts have zero broker dependency and validate the most likely technical pitfall (v5 API incompatibility) in isolation. Establishing the chart component first reduces the blast radius of v5 integration mistakes.
+- **Phase 2 before Phase 3:** Scoring requires fill prices from confirmed Alpaca paper fills stored in the database. There are no meaningful records to score until at least one trade is executed and closed.
+- **Phase 3 before Phase 4:** The dashboard is a read layer on top of scored trade records. Building the dashboard before the scoring schema is locked risks displaying the wrong metrics in ways that are difficult to reverse once users have seen them.
+- **Equity orders before options multi-leg:** Options multi-leg translation (from `OptionsLegsBuilderReport` to Alpaca `legs` array with OCC-format symbols) is the highest-complexity item in the milestone. Establishing the full equity order lifecycle first means the options path inherits a proven end-to-end flow with known failure modes.
 
 ### Research Flags
 
-Phases with standard, well-documented patterns (skip research-phase):
-- **Phase 2 (LLM ranker):** `create_*` factory pattern is already established in codebase; single LLM call with structured output is well-understood
-- **Phase 3 (API endpoint):** `POST /api/analyze` pattern is directly replicated; schemas follow existing Pydantic patterns
-- **Phase 4 (Frontend):** `useAnalysis` hook is the direct model for `useScreen`; React state lifting is standard
-- **Phase 5 (CLI):** Typer + Rich table is an existing pattern in the codebase
+Phases needing deeper investigation during planning:
 
-Phases likely needing closer attention during planning:
-- **Phase 1 (Data layer):** `finvizfinance` scraping behavior needs validation against current Finviz HTML structure; yfinance bulk fetch chunking strategy needs performance testing against actual rate limit behavior post-2024 changes. Confidence is MEDIUM on finvizfinance stability.
+- **Phase 2 (options multi-leg sub-scope):** Alpaca's support for bracket orders and certain complex order types on options contracts has documented gaps in the paper environment (PITFALLS.md Pitfall 3). Before committing to options multi-leg execution scope, validate with a test order against a scratch paper account. If gaps persist, options execution remains out of scope for v1.2.
+- **Phase 3 (deferred outcome evaluation mechanism):** The N-trading-day scoring trigger requires a deferred evaluation step. No background job infrastructure currently exists in the project. The mechanism must be chosen during Phase 3 planning: (a) manual "close trade" button in the dashboard UI, (b) Alpaca positions API polled on dashboard load to compute unrealized P&L, or (c) a lightweight APScheduler background task. This is a required architecture decision before any scoring code is written.
+
+Phases with standard patterns (skip additional research):
+
+- **Phase 1 (charts):** Official TradingView v5 React tutorial is authoritative and directly applicable. No research phase needed.
+- **Phase 3 (score metrics):** Standard trading performance metrics are expressible with pandas (existing dependency) and Python stdlib. No library research needed.
+- **Phase 4 (dashboard):** React tab, table, and stats card patterns are already present in the codebase. Equity curve chart reuses Phase 1 chart setup. No research phase needed.
 
 ---
 
@@ -179,48 +157,51 @@ Phases likely needing closer attention during planning:
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | MEDIUM | finvizfinance is scraping-based and can break on Finviz HTML changes; yfinance.screen() fallback has known broken params. All other stack findings are HIGH — existing codebase patterns verified by direct reading. |
-| Features | HIGH | Feature scope is tightly constrained by PROJECT.md and the existing pipeline. Table stakes features are well-defined by domain standards. Anti-features are principled and backed by cost math. |
-| Architecture | HIGH | All decisions derived from direct codebase reading. `route_to_vendor` pattern, `create_*` factory pattern, `AgentState` structure, API endpoint shape — all confirmed by source inspection. No external sources needed. |
-| Pitfalls | HIGH | yfinance rate limits confirmed by GitHub issues and reproduction reports post-late-2024. Tradier rate limit from official docs. LLM cost math from official pricing. Pipeline auto-trigger risk directly from PROJECT.md scope declarations. |
+| Stack | HIGH | All package versions confirmed against npm and PyPI; official documentation covers all integration patterns; rejection rationale for alternatives is grounded in confirmed issues (Recharts GitHub #4558, alpaca-trade-api deprecation notice) |
+| Features | HIGH | Feature priority derived from user expectation analysis, existing pipeline capability assessment, and explicit Alpaca API documentation confirming paper Level 3 options access |
+| Architecture | HIGH | Based on direct codebase inspection plus verified external API docs; component boundaries explicitly matched to existing patterns; invariants confirmed by reading source files |
+| Pitfalls | HIGH (Alpaca/charting) / MEDIUM (scoring methodology) | Alpaca and lightweight-charts pitfalls sourced from official changelogs and confirmed GitHub issues; scoring pitfalls are domain knowledge with community consensus across multiple sources |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **finvizfinance HTML stability:** The library scrapes Finviz HTML. If Finviz redesigns their screener page, the library breaks. Mitigation is already specified (yfinance fallback), but the fallback is also fragile. During Phase 1, validate that `finvizfinance.screener.overview.Overview` returns expected columns against the live site before committing to the screener data contract.
+- **Options multi-leg paper order scope:** Alpaca docs confirm Level 3 paper support exists, but community reports document gaps in complex order type support for options in the paper environment. Validate with a test order before committing to options execution scope in Phase 2. If gaps persist, options execution stays out of v1.2 scope.
 
-- **yfinance bulk fetch performance post-2024:** GitHub issues confirm rate limits tightened in late 2024 at ~950 tickers. The recommended chunk size (80-100 tickers) is conservative, but the exact limit is not officially documented. During Phase 1, instrument coverage tracking from the first run and tune chunk size empirically.
+- **Deferred outcome evaluation mechanism:** The scoring system requires marking trades as `pending_outcome` and evaluating them after N trading days. No background job infrastructure currently exists in the project. This mechanism must be chosen during Phase 3 planning before any scoring code is written. The three candidate approaches (manual trigger, Alpaca positions API on dashboard load, APScheduler background task) each have different tradeoffs that need a deliberate decision.
 
-- **Options-readiness signal cost:** Checking options chain availability for 50 candidates at Tradier (120 req/min limit) is feasible if applied after the volume/price filter, but the exact latency hit needs measurement. Defer this feature to after core screener is stable (it is already in the "defer" category per FEATURES.md).
-
-- **`finvizfinance` vs actual S&P 500 constituent list:** The library returns results based on Finviz's own index constituents, which may differ slightly from the canonical S&P 500. For v1.1 this is acceptable; for v1.2 backtesting, a canonical constituent list source will be needed.
+- **Historical log compatibility for track record display:** Pre-v1.2 `analysis_history/` JSON files will not have the fields needed for quantitative scoring. The dashboard must handle this gracefully — show historical records in the trade history view but exclude them from quantitative metrics. This UI design decision should be confirmed before Phase 4 implementation begins to avoid a retroactive schema conflict.
 
 ---
 
 ## Sources
 
 ### Primary (HIGH confidence)
-
-- Direct codebase reading: `tradingagents/graph/setup.py`, `trading_graph.py`, `agent_states.py`, `dataflows/interface.py`, `api/routes.py`, `api/schemas.py`, `frontend/src/hooks/useAnalysis.ts`, `App.tsx` — confirmed all integration patterns
-- `.planning/PROJECT.md` — v1.1 requirements and out-of-scope boundaries
-- Tradier Rate Limiting — Official Docs: https://docs.tradier.com/docs/rate-limiting
-- yfinance screener issue #2419 (broken size/offset): https://github.com/ranaroussi/yfinance/issues/2419
-- yfinance rate limiting issues #2128, #2422, #2614: confirmed post-2024 tightening
+- `https://www.npmjs.com/package/lightweight-charts` — v5.1.0 confirmed as latest
+- `https://tradingview.github.io/lightweight-charts/tutorials/react/simple` — official v5 React integration pattern (`useRef + useEffect + chart.remove()`)
+- `https://tradingview.github.io/lightweight-charts/tutorials/react/advanced` — multi-component chart pattern
+- `https://tradingview.github.io/lightweight-charts/docs/migrations/from-v4-to-v5` — v5 breaking changes (series API revamp, CommonJS dropped)
+- `https://pypi.org/project/alpaca-py/` — v0.43.2 confirmed
+- `https://docs.alpaca.markets/docs/paper-trading` — paper trading official documentation
+- `https://docs.alpaca.markets/changelog/multi-leg-level-3-options-trading-in-paper` — Level 3 paper options confirmed enabled by default
+- `https://github.com/alpacahq/alpaca-py/blob/master/examples/options-trading-mleg.ipynb` — mleg order format with OCC symbols
+- `https://www.sqlalchemy.org/changelog/CHANGES_2_0_44` — SQLAlchemy 2.0 series stable, Mar 2026 release confirmed
+- `https://pypi.org/project/aiosqlite/` — v0.22.1 confirmed Dec 2025
+- `https://fastapi.tiangolo.com/tutorial/sql-databases/` — async SQLAlchemy + FastAPI `Depends()` pattern
+- Direct codebase inspection — existing invariants, component patterns, `AgentState` structure, `VENDOR_METHODS` routing, SSE streaming machinery
 
 ### Secondary (MEDIUM confidence)
+- `https://github.com/recharts/recharts/issues/4558` — Recharts React 19 peer-dep conflict (community-reported, confirmed via issue thread)
+- `https://www.babypips.com/trading/trading-performance-metrics` — trading performance metric definitions
+- `https://www.luxalgo.com/blog/top-5-metrics-for-evaluating-trading-strategies/` — expectancy, profit factor, Sharpe definitions
+- `https://tradefundrr.com/trading-performance-tracking/` — track record dashboard design patterns
+- `https://alpaca.markets/sdks/python/trading.html` — alpaca-py SDK trading reference and order classes
+- `https://dev.to/tradehorde/we-built-an-ai-trading-tool-that-actually-keeps-score-53ap` — AI trading tool track record UX patterns
 
-- finvizfinance PyPI (v1.3.0, January 2026): https://pypi.org/project/finvizfinance/
-- finvizfinance screener docs: https://finvizfinance.readthedocs.io/en/latest/screener.html
-- TanStack Table v8: https://tanstack.com/table/v8/docs/guide/sorting
-- Survivorship bias in momentum rotational strategies (CAGR drop from 46% to 16%): https://www.priceactionlab.com/Blog/2019/11/survivorship-bias-in-backtests-of-momentum-rotational-strategies/
-- LLM cost token strategies 2025: https://sparkco.ai/blog/optimize-llm-api-costs-token-strategies-for-2025
-
-### Tertiary (LOW confidence)
-
-- yfinance.screen() fallback — broken `size` param, unofficial API, fragile. Use only if finvizfinance unavailable.
+### Tertiary (LOW confidence — validate before implementing)
+- Community forum reports on Alpaca options bracket order gaps in the paper environment — validate with a live test order before committing options multi-leg execution to Phase 2 scope
 
 ---
 
-*Research completed: 2026-04-02*
+*Research completed: 2026-04-03*
 *Ready for roadmap: yes*

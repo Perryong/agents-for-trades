@@ -1,258 +1,214 @@
-# Technology Stack — v1.1 Stock Recommendation System
+# Technology Stack — v1.2 Paper Trading & Validation
 
-**Project:** TradingAgents v1.1 (Stock Screener / Recommendation)
-**Researched:** 2026-04-02
-**Scope:** NEW additions only — does not re-document existing v1.0 stack
-
----
-
-## Context: What Already Exists
-
-The following are confirmed v1.0 capabilities that the new screener MUST integrate
-with, not duplicate:
-
-| Concern | Existing Solution | Integration Point |
-|---------|-------------------|-------------------|
-| Single-stock data | yfinance 0.2.63 via `get_YFin_data_online` | `VENDOR_METHODS["get_stock_data"]` |
-| Technical indicators | stockstats 0.6.5 via `get_stock_stats_indicators_window` | `VENDOR_METHODS["get_indicators"]` |
-| Fundamentals | yfinance `Ticker.info` via `get_fundamentals` | `VENDOR_METHODS["get_fundamentals"]` |
-| LangGraph agents | All `create_*` factory functions, `AgentState` dict | `trading_graph.py` / `setup.py` |
-| HTTP caching | `yfinance_cache.py` (`get_cached_text`, `get_cached_dataframe`) | Used by every data module |
-| Frontend | React 19, TypeScript, Tailwind v4, Vite 8, SSE streaming | `frontend/src/` |
-| Backend | FastAPI with SSE endpoint | `main.py` or equivalent |
+**Project:** TradingAgents — Options Extension
+**Milestone:** v1.2 Paper Trading & Validation
+**Researched:** 2026-04-03
+**Scope:** NEW additions only. Existing stack (Python, LangGraph, LangChain, FastAPI, React 19, TypeScript, Vite 8, Tailwind v4, pandas, yfinance, Tradier) is validated and unchanged.
 
 ---
 
-## New Additions Required
+## Context: What Already Exists (Do Not Re-add)
 
-### 1. Market Universe Data (Screener Feed)
-
-**Problem:** The system needs a list of ~20-50 candidates to pass to the LLM screener
-agent. There is no existing mechanism to fetch "market movers" — only single-ticker
-lookups are supported.
-
-#### Option A: yfinance.screen() / Screener class (CAUTION — LOW confidence)
-
-yfinance 0.2.x added a `Screener` class and `yf.screen()` function with predefined
-bodies: `most_actives`, `day_gainers`, `day_losers`, `undervalued_growth_stocks`,
-`growth_technology_stocks`.
-
-Usage pattern:
-```python
-import yfinance as yf
-result = yf.screen("most_actives", size=25)
-# Returns dict with "quotes" list of ticker dicts
-```
-
-**Verdict: Do NOT rely on this as the primary path.** As of April 2025, GitHub issue
-#2419 confirmed the `size` and `offset` parameters are broken because the library
-sends a GET request where Yahoo's API requires POST. The call silently returns only
-25 results regardless of requested size. This is an unofficial scraping layer that
-breaks whenever Yahoo changes their API. Confidence: LOW that this is stable.
-
-**Use only as a secondary convenience fallback** for getting 25 most-actives if
-`finvizfinance` is unavailable. No install required (already in venv).
-
-#### Option B: finvizfinance 1.3.0 (RECOMMENDED — MEDIUM confidence)
-
-finvizfinance is a Python wrapper for Finviz.com's screener. Current version: 1.3.0
-(released January 3, 2026). It scrapes Finviz's HTML screener pages (not an
-official API), but the site structure has been stable and the library is actively
-maintained with regular updates.
-
-```python
-from finvizfinance.screener.overview import Overview
-
-# Most active by volume
-foverview = Overview()
-foverview.set_filter(signal='ta_unusualvolume')
-df = foverview.screener_view()  # Returns pandas DataFrame
-
-# Volume movers in specific index
-foverview.set_filter(filters_dict={'Index': 'S&P 500'}, signal='ta_unusualvolume')
-df = foverview.screener_view()
-
-# Sector-based filter
-foverview.set_filter(filters_dict={'Sector': 'Technology', 'Index': 'S&P 500'})
-df = foverview.screener_view()
-```
-
-Columns returned include: Ticker, Company, Sector, Industry, Country, Market Cap,
-P/E, Price, Change, Volume.
-
-**Why finvizfinance over alternatives:**
-- Zero API key required (unlike Polygon.io, FMP, Finnhub)
-- Already has free-tier scrapers trusted by the quant community
-- Returns structured DataFrames — no parsing needed
-- v1.3.0 released January 2026, actively maintained
-- Finviz screener signals map directly to what the pre-filter needs:
-  `ta_unusualvolume` (unusual volume), `ta_topgainers` (top gainers),
-  `ta_toplosers` (top losers)
-
-**Risk:** Scraping-based — can break if Finviz redesigns their HTML.
-**Mitigation:** Wrap in try/except with yfinance.screen() fallback (already in venv).
-
-**Install:**
-```
-finvizfinance>=1.3.0
-```
-
-#### Option C: Sector ETF Momentum via yfinance (NO NEW DEPENDENCY)
-
-Sector momentum requires no new libraries. Use yfinance's existing `yf.download()`
-(already used by `_get_stock_stats_bulk`) on a fixed list of SPDR sector ETFs:
-
-```python
-SECTOR_ETFS = {
-    "XLK": "Technology", "XLF": "Financials", "XLV": "Healthcare",
-    "XLE": "Energy", "XLI": "Industrials", "XLY": "Consumer Discretionary",
-    "XLP": "Consumer Staples", "XLU": "Utilities", "XLB": "Materials",
-    "XLC": "Communication Services", "XLRE": "Real Estate"
-}
-# Fetch 30-day returns for each ETF ticker using existing yf.download()
-# Rank by 30-day and 5-day return — no new dependency needed
-```
-
-This uses existing yfinance data access patterns and existing `yfinance_cache.py`
-infrastructure. Confidence: HIGH.
+| Concern | Existing | Notes |
+|---------|----------|-------|
+| HTTP framework | FastAPI, SSE streaming | All new endpoints follow `api/screener_routes.py` pattern |
+| Data | yfinance, Tradier, pandas | OHLC data for charts available from existing yfinance layer |
+| Frontend | React 19, TypeScript, Tailwind v4, Vite 8 | No peer-dep changes allowed |
+| LLM | LangChain multi-provider | Scoring system is pure Python math, no LLM calls |
+| Caching | In-process dict with TTL | Sufficient for chart data; no new cache infra |
 
 ---
 
-### 2. Screener Data Module
+## New Stack Additions
 
-A new file `tradingagents/dataflows/screener.py` following the existing module
-pattern:
+### 1. Frontend: TradingView Lightweight Charts
 
-- Uses `finvizfinance` for broad market movers (unusual volume, top gainers/losers)
-- Uses `yf.download()` (existing) for sector ETF momentum
-- Returns results as normalized Python dicts (not raw DataFrames) — consistent with
-  other data modules that return strings or structured dicts
-- Plugs into `VENDOR_METHODS` as a new `"screener_data"` category with
-  `"finviz"` as primary vendor
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| lightweight-charts | ^5.1.0 | Candlestick/OHLC price history; equity curve line chart in track record dashboard | Official TradingView library. Canvas-based (not SVG) — handles 10k+ data points without perf degradation. 35kB gzipped. No React peer dependency — imperative DOM API means zero React version coupling. |
 
-**No changes to existing VENDOR_METHODS entries.** New category addition only.
+**Integration pattern — use the vanilla imperative API directly:**
 
----
+```tsx
+// frontend/src/components/PriceChart.tsx
+import { createChart, IChartApi, ISeriesApi } from 'lightweight-charts';
+import { useRef, useEffect } from 'react';
 
-### 3. New LangGraph Agent: Screener Agent
+export function PriceChart({ data }: { data: OHLCBar[] }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
 
-A `create_screener_agent` factory following the `create_*` pattern:
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const chart = createChart(containerRef.current, { width: 800, height: 400 });
+    const series = chart.addCandlestickSeries();
+    series.setData(data);
+    chartRef.current = chart;
+    return () => chart.remove();  // cleanup
+  }, []);
 
-- **Input:** `AgentState` with a new `screener_filters` field (dict: index, sector,
-  signal type)
-- **Output:** Writes to a new `screener_report` field in `AgentState`
-- **LLM use:** Uses existing `quick_thinking_llm` — takes the pre-filtered list
-  (~20-50 rows) and ranks/explains top 3-5 picks
-- **Graph placement:** New entry-point node, runs BEFORE the existing equity/options
-  pipeline. User selects a pick from screener results, THEN triggers the full pipeline.
+  // Update series on data change without recreating chart
+  useEffect(() => {
+    // call series.setData(data) on chartRef
+  }, [data]);
 
-This is architecturally separate from the existing parallel equity+options pipeline —
-it feeds the pipeline rather than running alongside it.
-
----
-
-### 4. Frontend: Screener Results Tab
-
-**What's needed:** A new tab in the existing `ReportTabs` component displaying a
-structured table of screener results, with click-to-analyze on each row.
-
-**Approach:** Pure React with `useState` hooks for sort/filter state — no new npm
-dependencies. The existing codebase has zero table libraries (just Tailwind v4 +
-React 19). Adding a new library for 40-50 rows of screener results is
-disproportionate overhead.
-
-**If the table grows complex:** `@tanstack/react-table` v8 is the right choice —
-headless (no CSS opinions), tree-shakable, zero peer dependencies beyond React,
-works well with Tailwind. It supports client-side sort + filter with ~4KB gzipped.
-But this is deferred unless the screener table needs pagination or complex filtering.
-
-**Required frontend additions (no new npm packages for MVP):**
-- New entry in `REPORT_TABS` constant for screener view
-- New `ScreenerPane.tsx` component: table with Ticker, Company, Sector, Price,
-  Change, Volume columns + "Analyze" button per row
-- New `ScreenerRequest` type in `types.ts` for triggering screener runs
-- New SSE event type for streaming screener results back to frontend
-- `useScreener` hook mirroring existing `useAnalysis` hook pattern
-
-**Optional (if table complexity justifies it):**
-```
-@tanstack/react-table@^8.21
-```
-Confidence: HIGH (well-maintained, v8 is current as of 2026).
-
----
-
-## Summary: New Dependencies
-
-| Package | Version | Purpose | Confidence |
-|---------|---------|---------|-----------|
-| `finvizfinance` | `>=1.3.0` | Broad market screener — unusual volume, gainers, losers, sector | MEDIUM |
-
-**No other new Python dependencies.** Sector ETF momentum uses existing yfinance.
-yfinance.screen() (already installed) serves as fallback.
-
-**No new npm dependencies for MVP.** Screener table uses React + Tailwind patterns
-already in place. `@tanstack/react-table` is a justified addition only if table
-complexity grows beyond a basic sortable list.
-
----
-
-## Alternatives Considered
-
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| Screener feed | finvizfinance | Polygon.io screener API | Requires paid API key; free tier is 5 req/min which is unusable for a universe scan |
-| Screener feed | finvizfinance | Financial Modeling Prep (FMP) | Requires API key; free tier limited; another vendor credential to manage |
-| Screener feed | finvizfinance | yfinance.screen() | Broken size/offset params as of Apr 2025; unstable unofficial layer |
-| Screener feed | finvizfinance | Finnhub `/stock/symbol` + filter loop | Would require iterating 500+ tickers individually — impractical latency |
-| Sector momentum | yf.download() (existing) | sector-specific ETF library | No such library needed; 11 ticker symbols downloaded in one batch call |
-| Frontend table | Native React + Tailwind | @tanstack/react-table | Justified only if complexity grows; overkill for 20-50 rows at MVP |
-| Frontend table | Native React + Tailwind | react-table v7 or AG Grid | react-table v7 is deprecated; AG Grid is enterprise-focused |
-
----
-
-## Integration with Existing VENDOR_METHODS Pattern
-
-```python
-# tradingagents/dataflows/interface.py additions
-
-TOOLS_CATEGORIES = {
-    # ... existing categories unchanged ...
-    "screener_data": {
-        "description": "Broad market screening — movers, volume, sector momentum",
-        "tools": [
-            "get_market_movers",
-            "get_sector_momentum",
-        ]
-    },
-}
-
-VENDOR_METHODS = {
-    # ... existing entries unchanged ...
-    "get_market_movers": {
-        "finviz": get_finviz_market_movers,
-        "yfinance": get_yfinance_market_movers,  # fallback using yf.screen()
-    },
-    "get_sector_momentum": {
-        "yfinance": get_yfinance_sector_momentum,  # uses yf.download() on SECTOR_ETFS
-    },
+  return <div ref={containerRef} />;
 }
 ```
 
-The existing `route_to_vendor` and fallback chain logic handles the finviz ->
-yfinance fallback automatically with no changes needed.
+This is the TradingView-documented pattern. No third-party wrapper library is needed or recommended.
+
+**Why not a wrapper library (kaktana, ukorvl, lightweight-charts-react-components):**
+All community wrappers lag behind v5 API. The v5 release completely revamped the series creation API (breaking change from v4). Using wrappers introduces a maintenance lag between v5 features and wrapper adoption. The imperative pattern is 20 lines and requires no additional package.
+
+**Why not Recharts:**
+Recharts 3.x requires `--legacy-peer-deps` with React 19 (known GitHub issue #4558, peer dep on `react-is`). SVG-based rendering degrades with trade history datasets. Recharts is general-purpose; lightweight-charts is purpose-built for financial time-series.
+
+**Why not react-stockcharts:**
+Abandoned — last commit 2019, D3 v4 dependency, no maintenance.
 
 ---
 
-## Installation
+### 2. Backend: Alpaca Paper Trading
 
-```bash
-# Python (add to requirements.txt)
-finvizfinance>=1.3.0
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| alpaca-py | ^0.43.2 | Submit paper orders (equity + multi-leg options), poll positions and account state | Official Alpaca Python SDK. Replaces the deprecated `alpaca-trade-api` package. `TradingClient(paper=True)` routes all calls to the paper sandbox automatically. |
 
-# Frontend (defer unless table complexity requires it)
-# npm install @tanstack/react-table
+**Confirmed capabilities (paper environment):**
+- `TradingClient('api-key', 'secret-key', paper=True)` — zero config switch to paper env
+- Equity: `MarketOrderRequest(symbol, qty, side, time_in_force)`
+- Multi-leg options: `order_class=OrderClass.MLEG`, `legs=[...]` with OCC-format symbols (e.g., `SPY250127C00608000` = SPY Jan 27 2025 Call $608)
+- Paper accounts have Level 3 options (spreads, straddles, iron condors) **enabled by default** — no approval process, no KYC
+- `get_all_positions()`, `get_account()` for portfolio state
+- Order callbacks: poll `get_order_by_id()` for fill confirmation
+
+**OCC symbol construction:**
+The existing options pipeline (legs builder agent) already selects strikes and expiry. The output must be reformatted to OCC format before Alpaca submission:
 ```
+{UNDERLYING}{YYMMDD}{C|P}{8-digit-strike-padded}
+e.g., SPY → expiry 2025-01-27 → Call → $608.00 → SPY250127C00608000
+```
+
+**Integration point:**
+New `api/paper_trading_routes.py` (APIRouter, following `api/screener_routes.py` pattern). Alpaca credentials added as env vars `ALPACA_API_KEY` and `ALPACA_SECRET_KEY` alongside existing `TRADIER_API_KEY`.
+
+**Why not `alpaca-trade-api` (legacy package):**
+Officially deprecated by Alpaca. All new development on `alpaca-py`.
+
+**Why not IBKR / Tastytrade:**
+Alpaca paper is free, instant account creation, no KYC, Python SDK matches existing architecture. IBKR requires running TWS/IB Gateway as a local process. Tastytrade has no paper trading API.
+
+---
+
+### 3. Backend: Persistence Layer
+
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| sqlalchemy | ^2.0.48 | ORM for trade recommendations, paper orders, scoring results | De facto FastAPI persistence standard. Async-native in 2.0 (matches existing async FastAPI event loop). Type-safe, Pydantic-interoperable. |
+| aiosqlite | ^0.22.1 | Async SQLite driver for SQLAlchemy 2.0 | Zero infrastructure — file-based DB embedded in Python stdlib driver. Sufficient for local tool data volumes (hundreds to low thousands of rows). Upgrade to PostgreSQL later by changing only the connection string. |
+
+**Connection string:** `sqlite+aiosqlite:///./data/trades.db`
+
+**Session injection:**
+```python
+# api/database.py
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+
+engine = create_async_engine("sqlite+aiosqlite:///./data/trades.db")
+AsyncSession = async_sessionmaker(engine, expire_on_commit=False)
+
+async def get_db():
+    async with AsyncSession() as session:
+        yield session
+```
+
+**Schema scope for v1.2:**
+
+```
+recommendations        — ticker, date, signal, confidence_score, agent_outputs (JSON)
+paper_orders           — alpaca_order_id, recommendation_id (FK), symbol, status, fill_price, filled_at
+scoring_results        — recommendation_id (FK), outcome (win/loss/neutral), return_pct, scored_at
+```
+
+**Why SQLite over PostgreSQL:**
+This is a single-user local dev tool. SQLite is zero-infra, built into Python, and adequate for the data volumes involved. The ORM layer means switching to Postgres later requires only a connection string change.
+
+**Why async SQLAlchemy over sync:**
+FastAPI is already async. Using `create_async_engine` + `aiosqlite` keeps the event loop clean and consistent with existing SSE streaming patterns. Mixing sync DB calls into an async FastAPI app causes thread-pool overhead.
+
+**Why not Alembic for migrations:**
+Premature for v1.2. `Base.metadata.create_all(engine)` on startup is sufficient when the schema is being defined for the first time. Add Alembic if schema migrations are needed in v1.3+.
+
+---
+
+### 4. Backend: Scoring System
+
+**No new library dependencies.** All scoring metrics are pure Python math on existing data:
+
+| Metric | Implementation | Library |
+|--------|---------------|---------|
+| Win rate | `wins / total_scored` | stdlib |
+| Average return % | `mean(return_pct)` | `statistics` (stdlib) |
+| Sharpe ratio | `mean_r / std_r * sqrt(252)` annualized | `statistics` (stdlib) or `pandas` (already in requirements) |
+| Max drawdown | Rolling max / min on equity curve | `pandas` (already in requirements) |
+| Profit factor | `gross_wins / abs(gross_losses)` | stdlib |
+| Consecutive wins/losses | Running streak counter | stdlib |
+
+**pandas is already in requirements.txt** — no new dependency for calculations.
+
+**Scoring trigger:** When Alpaca confirms a fill (`order.status == "filled"`), a background task computes `return_pct` against entry price and writes to `scoring_results`. Outcome (win/loss/neutral) is determined when position is closed.
+
+---
+
+## Complete Dependency Delta
+
+### Python — additions to `requirements.txt`
+
+```
+alpaca-py>=0.43.2
+sqlalchemy>=2.0.48
+aiosqlite>=0.22.1
+```
+
+### npm — addition to `frontend/package.json` dependencies
+
+```json
+"lightweight-charts": "^5.1.0"
+```
+
+**Total new packages: 4.** That's it.
+
+---
+
+## What NOT to Add
+
+| Rejected | Reason |
+|----------|--------|
+| Recharts / Chart.js / Victory | General-purpose charting with SVG rendering and React 19 peer-dep issues. lightweight-charts is the right tool for financial time-series — Canvas-based, financial-domain-native. |
+| community wrapper for lightweight-charts | All lag behind v5 API. Imperative pattern is 20 lines and needs no extra package. |
+| backtrader | Already in requirements (unused). Backtesting is explicitly deferred to v1.3+. Do NOT wire it into v1.2. |
+| redis | Overkill for local scoring persistence. Redis is already in requirements but was superseded by in-process dict for screener cache. Not needed here. |
+| Celery / task queues | Paper order submission is fast (<500ms). Scoring can run as a FastAPI `BackgroundTask`. No queue infra needed. |
+| PostgreSQL | Out of scope for a local single-user tool. SQLite + SQLAlchemy ORM provides the same API; switch connection string when/if needed. |
+| Alembic | Premature for v1.2. `create_all()` on startup is sufficient for a new schema with no existing data to migrate. |
+| TA-Lib | Technical indicator overlays would require native binary compilation. The existing Python agents already produce technical analysis. Pass computed indicator data as lightweight-charts series arrays — no TA-Lib needed. |
+| WebSocket (ws / socket.io) | Paper trading status can be polled via REST at 5s interval. Alpaca fills settle within seconds. Full WebSocket infra is disproportionate for this use case. |
+| alpaca-trade-api (legacy) | Officially deprecated by Alpaca. Use alpaca-py only. |
+
+---
+
+## Integration Points
+
+| New Feature | Attaches To | Notes |
+|------------|-------------|-------|
+| `<PriceChart>` component | React frontend — new component in `frontend/src/components/` | Receives OHLC bars via `GET /api/chart/{ticker}?days=90` — served by new endpoint that calls existing yfinance data layer. |
+| `<EquityCurve>` component | React frontend — track record Dashboard tab | Receives `{date, equity}` data from `GET /api/dashboard/equity-curve`. Rendered as lightweight-charts line series. |
+| Paper trading router | FastAPI — new `api/paper_trading_routes.py` | User confirms execution after seeing analysis. POST `/api/paper/execute` accepts final decision payload, submits to Alpaca, persists recommendation + order. |
+| SQLAlchemy models | `api/models.py` + `api/database.py` (new files) | Session injected via `Depends(get_db)` into route handlers. |
+| Scoring computation | `api/scoring.py` (new module) | Triggered by `BackgroundTasks` when Alpaca confirms fill. Reads from `paper_orders`, writes to `scoring_results`. |
+| Dashboard API endpoints | FastAPI — new `api/dashboard_routes.py` | `GET /api/dashboard/summary`, `/equity-curve`, `/trade-history`, `/scoring`. |
+| Track record Dashboard tab | React frontend — new tab in existing tab structure | Consumes dashboard endpoints. Table of past trades + equity curve chart + aggregate stats (win rate, Sharpe, avg return). |
 
 ---
 
@@ -260,21 +216,27 @@ finvizfinance>=1.3.0
 
 | Area | Confidence | Reason |
 |------|------------|--------|
-| finvizfinance as screener | MEDIUM | v1.3.0 Jan 2026, actively maintained, scraping-based = breakage risk |
-| yfinance.screen() as fallback | LOW | Broken size param as of Apr 2025, unofficial, fragile |
-| Sector ETF via yf.download() | HIGH | Existing proven pattern, just different tickers |
-| No new npm packages for MVP | HIGH | Pattern matches existing codebase; 20-50 rows needs no table library |
-| @tanstack/react-table if needed | HIGH | Industry standard, headless, v8 current and stable |
-| VENDOR_METHODS integration | HIGH | Pattern is established and tested across all existing data methods |
+| lightweight-charts 5.1.0 | HIGH | npm result confirmed "latest 3 months ago"; official TradingView library with active maintenance and documented v5 migration path |
+| alpaca-py 0.43.2 | HIGH | PyPI confirmed version; official Alpaca SDK with documented multi-leg options support and paper-Level 3 defaults |
+| SQLAlchemy 2.0.48 | HIGH | Official SQLAlchemy blog post confirmed Mar 2026 release; 2.0 series is production/stable |
+| aiosqlite 0.22.1 | HIGH | PyPI confirmed Dec 23, 2025 release; only async SQLite driver for SQLAlchemy 2.0 async engine |
+| Scoring system (no new deps) | HIGH | All metrics expressible with pandas (existing) and stdlib; no novel library needed |
+| Imperative chart pattern (no wrapper) | HIGH | Official TradingView docs show this exact pattern for React; avoids v5 wrapper lag |
 
 ---
 
 ## Sources
 
-- yfinance screener issue #2419 (broken size/offset, April 2025): https://github.com/ranaroussi/yfinance/issues/2419
-- yfinance screen() API reference: https://ranaroussi.github.io/yfinance/reference/api/yfinance.screen.html
-- finvizfinance PyPI (v1.3.0, January 2026): https://pypi.org/project/finvizfinance/
-- finvizfinance screener docs: https://finvizfinance.readthedocs.io/en/latest/screener.html
-- TanStack Table v8 sorting guide: https://tanstack.com/table/v8/docs/guide/sorting
-- Sector ETF momentum with yfinance (Kaggle): https://www.kaggle.com/code/guillemservera/downloading-sectors-etfs-with-yfinance
-- Yahoo Finance most actives (for validating predefined body names): https://finance.yahoo.com/markets/stocks/most-active/
+- [lightweight-charts npm](https://www.npmjs.com/package/lightweight-charts) — v5.1.0 confirmed
+- [lightweight-charts v5 announcement](https://www.tradingview.com/blog/en/tradingview-lightweight-charts-version-5-50837/) — series API revamp, 35kB, multi-pane
+- [From v4 to v5 migration guide](https://tradingview.github.io/lightweight-charts/docs/migrations/from-v4-to-v5) — breaking changes documented
+- [Basic React example — official](https://tradingview.github.io/lightweight-charts/tutorials/react/simple) — useRef + useEffect pattern
+- [Advanced React example — official](https://tradingview.github.io/lightweight-charts/tutorials/react/advanced) — multi-component imperative chart
+- [alpaca-py PyPI](https://pypi.org/project/alpaca-py/) — v0.43.2 confirmed
+- [Alpaca-py trading docs](https://alpaca.markets/sdks/python/trading.html) — TradingClient, order request classes
+- [Multi-leg Level 3 options in paper — Alpaca changelog](https://docs.alpaca.markets/changelog/multi-leg-level-3-options-trading-in-paper) — paper Level 3 default-enabled
+- [alpaca-py mleg example notebook](https://github.com/alpacahq/alpaca-py/blob/master/examples/options-trading-mleg.ipynb) — MLEG order format with OCC symbols
+- [SQLAlchemy 2.0.48](https://www.sqlalchemy.org/changelog/CHANGES_2_0_44) — 2.0 series stable, Mar 2026
+- [aiosqlite PyPI](https://pypi.org/project/aiosqlite/) — v0.22.1, Dec 2025
+- [FastAPI SQL databases guide](https://fastapi.tiangolo.com/tutorial/sql-databases/) — async SQLAlchemy + FastAPI Depends() pattern
+- [Recharts React 19 issue #4558](https://github.com/recharts/recharts/issues/4558) — peer dep conflict rationale for not using Recharts

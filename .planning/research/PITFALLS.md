@@ -1,195 +1,211 @@
-# Domain Pitfalls — Stock Recommendation / Screening System
+# Domain Pitfalls — Paper Trading, Charting, Scoring, and Track Record Dashboard
 
-**Domain:** AI-driven stock screening added to existing LLM-based trading framework
-**Researched:** 2026-04-02
-**Context:** Adding v1.1 screener to TradingAgents (LangGraph + FastAPI + React). Existing full
-analysis pipeline is compute-heavy and LLM-expensive. Pre-filter must gate LLM access.
+**Domain:** Adding TradingView charts, Alpaca paper trading, recommendation scoring, and track record dashboard to existing AI trading analysis system
+**Researched:** 2026-04-03
+**Confidence:** HIGH (Alpaca/charting), MEDIUM (scoring methodology), HIGH (integration patterns)
+**Context:** v1.2 features bolt onto existing LangGraph + FastAPI + React stack with JSON trade logs.
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, runaway LLM bills, or downstream corrupted analysis.
+Mistakes that cause rewrites, data corruption, or features that undermine user trust in AI recommendations.
 
 ---
 
-### Pitfall 1: Screener Directly Triggering the Full Analysis Pipeline
+### Pitfall 1: lightweight-charts v5 API Incompatibility With Existing React Patterns
 
-**What goes wrong:** The screener result surface (frontend tab, CLI output) includes a
-"Run Analysis" button that fires the full LangGraph pipeline for ALL screened picks
-automatically — or the screener agent is wired as a graph node that conditionally kicks off
-analysis without explicit user confirmation.
+**What goes wrong:**
+lightweight-charts v5 (released late 2024) has hard breaking changes from v4. The series creation API changed from type-specific methods (`chart.addLineSeries()`) to a unified method (`chart.addSeries(LineSeries, options)`). The watermark option was removed from `createChart` and moved to a separate plugin. The library dropped CommonJS support entirely and requires ES2020+. Community tutorial code and Stack Overflow answers are predominantly v4, so developers who copy examples from search results will get silent errors or runtime failures — the old API calls do not throw helpful errors, they just produce no output.
 
-**Why it happens:** It feels natural to wire screener output directly into analysis input.
-LangGraph's graph structure makes it easy to add an edge from the screener node to the
-`market_analyst` node, and developers do it "just to test" and forget to remove it.
+**Why it happens:**
+Most React + TradingView tutorials in circulation were written for v3 or v4. The npm package installs v5 by default (latest). A developer follows a 2023 tutorial, installs the current package, and finds the chart renders nothing. They add `console.log` but nothing obvious fails — `createChart` succeeds, `addLineSeries` is silently undefined in v5.
 
 **Consequences:**
-- 20-50 screened candidates × full pipeline = 20-50 LLM call chains per screener run
-- At ~30 LLM calls per analysis, that is 600-1500 API calls from one screener invocation
-- Cost spike can exceed daily OpenAI spend budgets in a single run
-- Pipeline was explicitly declared Out of Scope for auto-triggering in PROJECT.md
+- Silent rendering failure: chart container renders but is empty
+- React StrictMode (which Vite projects enable by default in development) double-invokes `useEffect`, and without proper cleanup, the chart is created twice — the second instance overwrites the first without removing it, causing memory leaks detectable only in production after hours of use
+- Primitives (annotations, markers) do not synchronize with chart position on scroll/resize in React — a confirmed v5.0.8 regression in React + Vite environments (GitHub issue #1920)
 
-**Prevention:**
-- The screener subgraph must have no outgoing edges to analysis nodes in StateGraph
-- The screener result must land in a separate `ScreenerState` or dedicated state field,
-  not in `AgentState` (which signals the analysis pipeline)
-- Frontend "Analyze" action requires an explicit per-ticker user click — no bulk action
-- Add a runtime guard in the API handler: if `screener_mode` and `tickers > 1`, reject
-  auto-analysis requests with HTTP 422
+**How to avoid:**
+- Pin exact version in `package.json`: `"lightweight-charts": "^5.0.0"` and always use the v5 migration guide
+- Use the pattern from official v5 React tutorial exactly: `useRef` for container, `useEffect` for `createChart`, return `chart.remove()` as cleanup — never create a chart outside a `useEffect`
+- Series creation: `import { createChart, CandlestickSeries } from 'lightweight-charts'` then `chart.addSeries(CandlestickSeries, options)`
+- In React StrictMode, verify cleanup runs by checking that no duplicate chart DOM nodes exist after mount
+- Do not use the community wrapper `kaktana-react-lightweight-charts` — it targets v3 and is unmaintained
 
-**Detection:** If a screener run takes more than 60 seconds, something is invoking the
-analysis pipeline. Normal screener pass should complete in 5-15 seconds.
+**Warning signs:**
+- Chart container is present in the DOM but visually empty with no console errors
+- Two canvas elements visible inside chart container div (double-mount not cleaned up)
+- `TypeError: chart.addLineSeries is not a function` — you have v5 with v4 code
 
-**Phase:** Pre-filter data layer + LLM screener agent wiring phases must enforce this boundary.
+**Phase to address:** TradingView charts integration phase, before any data wiring.
 
 ---
 
-### Pitfall 2: yfinance 429 Errors Silently Corrupting Screener Output
+### Pitfall 2: Alpaca Paper vs. Live API Key Environment Mismatch
 
-**What goes wrong:** When scanning 500-5000 tickers for pre-filter criteria (volume movers,
-unusual activity), yfinance returns HTTP 429 Too Many Requests. If the error is swallowed
-or the ticker is simply dropped from results, the screener silently produces an incomplete
-candidate list — tickers that would have passed the filter are missed, and the user has no
-indication the scan was partial.
+**What goes wrong:**
+Alpaca uses separate API key pairs for paper trading and live trading, served from different base URLs (`https://paper-api.alpaca.markets` vs `https://api.alpaca.markets`). Using paper keys against the live endpoint returns 401. Using live keys against the paper endpoint also fails. The error message is generic — it does not say "wrong environment." Developers who store both key sets in `.env` and switch between them by editing a variable often forget to change the base URL, or vice versa.
 
-**Why it happens:** yfinance is an unofficial scraper of Yahoo Finance endpoints. As of late
-2024, Yahoo tightened limits — users report hitting blocks after ~950 tickers in a single
-session. Bulk loops that were working in 2023 break in 2025. Common error handling patterns
-use `try/except` and `continue`, which drops the ticker without surfacing the failure.
+**Why it happens:**
+Single-key mental model from other services. Most APIs use the same key for staging and production, switching environments via URL only. Alpaca requires both key pair AND URL to match. The Python SDK `alpaca-py` does handle this if you pass `paper=True` to the client constructor, but if the client is initialized from raw environment variables, the guard is bypassed.
 
 **Consequences:**
-- Screener appears to work but misses entire sectors or index constituents that were rate-
-  limited during the scan window
-- LLM screener agent ranks a biased subset, producing structurally misleading picks
-- Hardest class of bug to diagnose because output looks valid
+- Attempted paper orders silently fail or return permission errors that look like account setup problems
+- Developer spends time debugging account status rather than the actual key/URL mismatch
+- If live keys are accidentally used in a "paper trading" test, real orders may be submitted
 
-**Prevention:**
-- Never iterate individual tickers in a loop. Use `yf.download(tickers_list, ...)` in
-  chunks of 80-100 tickers maximum with `threads=True` and `group_by='ticker'`
-- Add exponential backoff with jitter: initial 2s, max 60s, 3 retries per chunk
-- Track `fetch_attempted` vs `fetch_succeeded` per run; surface coverage percentage in
-  screener output metadata (`"coverage": "4731/5000 (94.6%)"`)
-- If coverage drops below a configurable threshold (default 80%), abort the run and
-  surface a warning rather than returning a partial result silently
-- Cache successful ticker data for the session window (not across market sessions)
+**How to avoid:**
+- Use `alpaca-py` (not the deprecated `alpaca-trade-api`) — it is the only officially supported Python SDK as of 2025
+- Always initialize the `TradingClient` with explicit `paper=True`: `TradingClient(api_key=key, secret_key=secret, paper=True)`
+- Store paper and live credentials in separate `.env` sections with explicit prefixes: `ALPACA_PAPER_KEY`, `ALPACA_PAPER_SECRET` — never `ALPACA_KEY` which is ambiguous
+- Add a startup assertion: if `ENVIRONMENT == "paper"` and `ALPACA_BASE_URL` does not contain `paper-api`, raise a configuration error before the server starts
+- Never commit `.env` with live keys; add both `.env` and `.env.live` to `.gitignore`
 
-**Detection:** Add a `screener_coverage` metric to the API response. Alert if `< 90%`.
+**Warning signs:**
+- HTTP 401 despite correct-looking credentials
+- HTTP 403 "insufficient permission" when account setup looks correct
+- Orders appear to be submitted but never show up in the paper account dashboard
 
-**Phase:** Pre-filter data layer phase must implement chunk-based fetching and coverage
-tracking before any LLM screener agent is built on top of it.
+**Phase to address:** Alpaca paper trading integration phase, specifically the environment setup and client initialization step.
 
 ---
 
-### Pitfall 3: Stale Pre-Filter Data Feeding the LLM Screener
+### Pitfall 3: Alpaca Options Multi-Leg Orders Are Not Fully Supported in Paper Trading
 
-**What goes wrong:** Screener pre-filter results are cached aggressively (or at all across
-market sessions). The LLM screener agent receives a candidate list that reflects
-yesterday's volume movers or last week's sector momentum. It produces confident-sounding
-rationale for picks that have already moved, reversed, or been halted.
+**What goes wrong:**
+The system's options agents build multi-leg strategies (spreads, straddles, iron condors). The user expects these to be executable via Alpaca paper trading. However, Alpaca does not support Bracket orders or OTO (One-Triggers-Other) orders for options contracts. While Alpaca added multi-leg options support in late 2024, the `complex_order_type` support for options is still limited compared to equities. A developer who tests with simple equity bracket orders will find paper trading works fine, then hits a hard API error when submitting a multi-leg options spread.
 
-**Why it happens:** Caching is added as a performance optimization after rate limit problems
-(see Pitfall 2). Developer sets a long TTL (hours or days) to reduce yfinance calls. The
-data feels "good enough" because tickers don't change — but prices and volume do.
+**Why it happens:**
+Options multi-leg support was added to Alpaca in stages. Documentation reflects what is planned or recently added but community forum threads reveal persistent gaps. Equity and options trading have different capability matrices in Alpaca's paper environment that are not clearly summarized in a single location.
 
 **Consequences:**
-- LLM narrative describes a momentum move that ended 18 hours ago as "current"
-- User acts on a pick that has already gapped up 8% and reversed
-- Hard to detect because picks often look plausible — names are real, narrative is coherent
+- The most valuable part of the system (options recommendations from the 7-agent options pipeline) cannot be auto-executed via paper trading without extra leg-by-leg decomposition logic
+- User discovers this limitation after the paper trading feature is already implemented and advertised as supporting the full options workflow
 
-**Prevention:**
-- Pre-filter cache TTL must be tied to market session boundaries, not wall-clock time:
-  - During market hours (9:30 AM - 4:00 PM ET): TTL = 15 minutes maximum
-  - After hours / pre-market: TTL = until next market open (data is exploratory only)
-  - Weekend: Surface explicit "markets closed" label in screener UI
-- Cache key must include the market session date, not just the date string
-- LLM screener prompt must include a `data_as_of` timestamp in the context block so
-  the model cannot confuse the data age
-- Screener results in frontend must display "Data as of: [timestamp]" prominently — not
-  buried in a tooltip
+**How to avoid:**
+- Explicitly scope paper trading execution for v1.2 to equity orders only (market and limit orders on the underlying stock)
+- Document in the UI that options execution via Alpaca is single-leg only and multi-leg strategies must be submitted individually
+- Design the execution layer as an abstraction so a future vendor with better options multi-leg support (Interactive Brokers, TD Ameritrade API) can be substituted
+- Test each order type in paper mode before writing execution code for it
 
-**Detection:** If screener results never change between two runs made 4+ hours apart during
-market hours, the cache is almost certainly misconfigured.
+**Warning signs:**
+- `422 Unprocessable Entity` or `400 Bad Request` with message about "complex orders not supported for options trading"
+- Order submission succeeds for equities but fails identically for options contracts
 
-**Phase:** Pre-filter data layer phase. TTL logic must be implemented before the LLM agent
-is written — the agent inherits whatever freshness the data layer provides.
+**Phase to address:** Alpaca paper trading integration phase, requirements definition step — clarify execution scope before building.
 
 ---
 
-### Pitfall 4: LLM Screener Running on Too Many Candidates
+### Pitfall 4: Blocking the FastAPI Event Loop With Synchronous Alpaca SDK Calls
 
-**What goes wrong:** The programmatic pre-filter passes 200-500 "candidates" to the LLM
-screener agent. The agent receives a large context window containing data for all candidates
-and is asked to rank them. This produces several failure modes simultaneously.
+**What goes wrong:**
+The existing FastAPI backend uses `async def` route handlers and SSE streaming. The `alpaca-py` SDK's trading client methods (`submit_order`, `get_order`, `get_all_positions`) are synchronous by default. Calling them directly inside an `async def` handler blocks the event loop for the duration of the HTTP request to Alpaca's API — typically 100-500ms. During that block, no SSE events can be dispatched to the frontend, the progress stepper freezes, and other concurrent requests stall.
 
-**Why it happens:** Developers set the pre-filter threshold too generously ("let the LLM
-decide") or fail to tune the filter criteria tightly enough. Volume filter set at 100K ADV
-instead of 500K passes too many mid-cap names. No hard cap on candidates entering the LLM
-step.
+**Why it happens:**
+Developers add `import alpaca_trade_api` or `from alpaca.trading.client import TradingClient`, call `client.submit_order(...)` inside an `async def` endpoint, and it works in local testing where no concurrent requests exist. The blocking nature is invisible under single-user conditions.
 
 **Consequences:**
-- Input tokens balloon: 200 candidates × ~150 tokens each = 30,000 input tokens per call
-  at GPT-4o pricing (~$0.15 per run × daily use = $54/month just for screener)
-- LLM reasoning degrades with very large candidate lists — attention diffusion causes
-  arbitrary ranking artifacts, not genuine analysis
-- Latency becomes unacceptable (30+ second screener calls undermine the UX)
-- Response may be truncated by context window limits, silently dropping candidates
+- SSE stream stalls visibly during order submission — the analysis progress stepper freezes for 100-500ms per Alpaca call
+- Under concurrent analysis runs (two browser tabs), Alpaca calls from one request delay SSE delivery to the other
+- If Alpaca's API is slow (timeouts), the entire FastAPI process becomes unresponsive
 
-**Prevention:**
-- Hard cap: Pre-filter MUST pass a maximum of 50 candidates to the LLM step. This is
-  a configuration constant, not a soft guideline
-- Pre-filter criteria must be tuned to produce 20-50 results from a 5000-ticker universe:
-  - Relative volume >= 2.0x 30-day average AND
-  - Price >= $5 (eliminates penny stocks) AND
-  - Market cap >= $500M (eliminates illiquid micro-caps) AND
-  - At least one of: unusual options activity, gap >= 2%, sector in top-3 momentum
-- If pre-filter produces > 50 results, apply secondary sort (by relative volume desc)
-  and truncate — do not pass all results to LLM
-- Token budget the screener prompt explicitly: measure output at design time, not runtime
+**How to avoid:**
+- Wrap all synchronous `alpaca-py` calls with `asyncio.to_thread()`: `await asyncio.to_thread(client.submit_order, order_request)`
+- Alternatively, implement a dedicated `AlpacaExecutor` class that runs on a `ThreadPoolExecutor` and exposes an `async` interface to the rest of the backend
+- Never use `asyncio.run()` inside a running event loop — this is a nested event loop crash
+- Test under concurrent SSE streams: open two browser tabs running analysis simultaneously; confirm SSE delivery does not stall when an order is submitted in one tab
 
-**Detection:** Log `input_token_count` for every screener LLM call. Alert if > 15,000
-tokens. Monitor LLM cost per screener run in observability layer.
+**Warning signs:**
+- SSE progress events have irregular timing gaps that correlate with order submission timing
+- FastAPI access log shows request durations that include Alpaca response times
+- Uvicorn warning: "Detected a call to a blocking function in a non-blocking context"
 
-**Phase:** LLM screener agent phase. The 50-candidate cap must be enforced in the pre-
-filter output contract, documented in the interface before the LLM agent is written.
+**Phase to address:** Alpaca paper trading integration phase, API client setup.
 
 ---
 
-### Pitfall 5: Screener AgentState Pollution Corrupting Analysis Runs
+### Pitfall 5: Recommendation Scoring System Built Around Win Rate Alone
 
-**What goes wrong:** The screener writes its candidate list and ranking rationale into the
-main `AgentState` dict. A subsequent analysis run for a different ticker reads stale
-screener fields from state and the LLM receives context contaminated with screener output
-about different tickers.
+**What goes wrong:**
+The recommendation scoring feature produces a win rate percentage as its primary headline metric (e.g., "AI recommendations: 67% win rate"). This number is prominently displayed on the track record dashboard and used as the primary indicator of system quality. The metric is mathematically incomplete and actively misleading: a 67% win rate with 0.5:1 risk-reward loses money; a 40% win rate with 3:1 risk-reward makes money. Users see a high win rate and become overconfident; users see a low win rate and dismiss a profitable system.
 
-**Why it happens:** `AgentState` is a shared dict in the existing system. It is tempting to
-add `screener_candidates`, `screener_ranking`, and `screener_rationale` fields directly to
-it because all other agent outputs live there. But the screener operates across many tickers
-simultaneously while analysis operates on one ticker at a time — they have different
-cardinality.
+**Why it happens:**
+Win rate is the most intuitive metric and the easiest to calculate from the existing JSON trade logs. It requires only counting `decision == "BUY"` entries where subsequent price moved up. Building a full expectancy calculation requires knowing exit prices and holding periods, which the current log schema may not capture.
 
 **Consequences:**
-- Fundamentals analyst receives context that includes screener rationale for NVDA while
-  analyzing AAPL
-- Risk manager sees "screener flag: unusual options activity" that belongs to a different
-  pick and inflates its risk score
-- These contamination bugs are intermittent and timing-dependent, making them very hard
-  to reproduce
+- Dashboard headline metric actively misleads user about AI system quality
+- A period where the system recommended many small winners (correct calls on low-conviction setups) followed by one large loss looks better in win rate than it actually was
+- Expectancy-negative results can masquerade as good performance for months if only win rate is tracked
 
-**Prevention:**
-- Screener must use a separate `ScreenerState` TypedDict, not `AgentState`
-- Screener results are stored as a separate endpoint response or dedicated Redux/Zustand
-  slice in frontend — they do not flow into the analysis pipeline state
-- Analysis pipeline state must be initialized fresh per ticker/run — never reused across
-  separate analysis invocations
-- Add an explicit field exclusion check: if `screener_*` keys appear in `AgentState` at
-  pipeline entry, raise a validation error
+**How to avoid:**
+- Primary metric must be expectancy: `(win rate × avg winner size) - (loss rate × avg loser size)`
+- Display these together: win rate, average winner, average loser, profit factor (gross profit / gross loss), and expectancy — never win rate alone
+- The JSON trade log schema must capture: `recommendation_direction`, `confidence_level`, `recommended_entry_price`, and `target_exit_price` — not just the decision
+- Add a data disclaimer on the dashboard: "Paper trading results do not reflect real-world slippage, market impact, or execution delays"
 
-**Detection:** If analysis outputs mention tickers not in the current run's input, state
-contamination has occurred.
+**Warning signs:**
+- Dashboard mockup shows only win/loss counts and a percentage
+- The scoring schema design starts with "count wins" before defining what a win means (exit conditions, time horizon)
+- Track record looks excellent in paper mode but the position sizing has never been defined
 
-**Phase:** Screener integration phase must define `ScreenerState` as a separate type
-before wiring any nodes.
+**Phase to address:** Recommendation scoring system phase, schema design step before any metrics are displayed.
+
+---
+
+### Pitfall 6: Paper Trading Performance Overstates Real-World Results Due to Perfect Fills
+
+**What goes wrong:**
+Alpaca paper trading fills orders at the exact bid/ask prices at the moment of submission with no slippage, no market impact, and instant execution. Real trading introduces slippage (especially on options), execution delays, and bid/ask spreads that erode edge. The track record dashboard will show paper trading results that are systematically better than what would be achieved in live trading — sometimes materially so for options strategies with wide spreads or low liquidity.
+
+**Why it happens:**
+This is an inherent limitation of paper trading simulation, not a bug. The issue is a design problem: if the track record dashboard presents paper results as a fair representation of what the AI system achieves in the market, users who transition to live trading will be disappointed and may lose confidence in the system.
+
+**Consequences:**
+- System appears to have a strong edge in paper mode; edge disappears in live trading
+- Options strategies with 0.10+ wide bid/ask spreads are particularly affected — a theoretical edge of $0.08 is eliminated entirely
+- If the track record is used to evaluate whether to deploy real capital, it will produce a biased recommendation
+
+**How to avoid:**
+- Display a persistent disclaimer on the track record dashboard: "Simulated performance. Paper fills assume zero slippage and instant execution. Real-world results will differ, especially for options."
+- Add an adjustable slippage estimate field in the track record settings (default: $0.02/share for equities, half the spread for options)
+- Track the spread at time of recommendation alongside the fill price so the dashboard can show "estimated real-world edge after spread" separately from "paper fill P&L"
+- Never use paper trading P&L as a proxy for live trading P&L in any summary or headline stat
+
+**Warning signs:**
+- Track record dashboard shows no mechanism to adjust for slippage
+- All paper orders show fills at exactly the mid-price
+- Dashboard summary says "profit" without any disclaimer about simulation limitations
+
+**Phase to address:** Track record dashboard phase, before any P&L display is designed.
+
+---
+
+### Pitfall 7: Trade Log JSON Schema Insufficient for Scoring and Track Record
+
+**What goes wrong:**
+The existing JSON trade logs record the AI's decision (`BUY`/`SELL`/`HOLD`) and the analysis date, but do not capture the information needed to score recommendation quality: the entry price at recommendation time, the target exit price or time horizon, or the actual outcome. Building a scoring system on top of logs that lack this data requires either retrofitting the schema (corrupting historical records), running a second price lookup for every past decision (expensive and error-prone for historical dates), or defining scoring criteria that don't actually measure prediction accuracy.
+
+**Why it happens:**
+The existing log format was designed for record-keeping and review, not for outcome measurement. Adding scoring requirements changes the log schema, and schema changes to historical files are destructive if not handled carefully.
+
+**Consequences:**
+- All historical decisions before v1.2 cannot be scored against the same methodology as future decisions — track record starts from zero at v1.2 launch
+- If the schema is patched retroactively with price data fetched from yfinance, the historical prices may differ from what was actually available at the time (ex-dividend adjustments, splits, data corrections)
+- Inconsistent schema between pre-v1.2 and post-v1.2 logs breaks any analytics query that spans the boundary
+
+**How to avoid:**
+- Define the v1.2 log schema before building any scoring feature — it must include: `ticker`, `decision_date`, `decision_direction`, `confidence_score`, `price_at_decision`, `recommended_target_price`, `recommended_stop_price`, `target_horizon_days`
+- Use versioned schema with a `schema_version` field in every log entry — v1.2 logs get `"schema_version": "1.2"`
+- Do not modify historical log files — store v1.2+ logs in a new file or directory, and clearly label the track record start date as the v1.2 deployment date
+- The scoring system must gracefully handle missing fields (pre-v1.2 logs) and exclude them from quantitative metrics while still showing them in the history view
+
+**Warning signs:**
+- Scoring feature mockup assumes `entry_price` field exists in historical logs
+- Track record dashboard shows historical decisions from before the paper trading feature was added
+- Schema for the log file has not been updated in a PR before any scoring code is written
+
+**Phase to address:** Recommendation scoring system phase, before writing any code — schema design is the critical first step.
 
 ---
 
@@ -197,151 +213,122 @@ before wiring any nodes.
 
 ---
 
-### Pitfall 6: Momentum vs. Mean-Reversion Signal Confusion
+### Pitfall 8: TradingView Chart Data and Analysis Timestamps Out of Sync
 
-**What goes wrong:** The pre-filter uses volume spike + price gap as the primary signal,
-which identifies short-term momentum candidates. The LLM screener is then prompted with
-generic language like "best stocks to analyze today" without specifying the regime. The
-LLM mixes momentum reasoning with mean-reversion reasoning in its rationale, producing
-inconsistent rankings.
+**What goes wrong:**
+The chart displays OHLCV data from yfinance or Tradier. The analysis result shown alongside the chart was generated at a specific point in time. When the user views the chart after market hours, the chart shows the most recent bar at the current time while the analysis vertical line or marker points to when the analysis was run (possibly hours or days earlier). The visual relationship between the charted price action and the AI decision annotation becomes confusing, especially if the price has moved significantly since the analysis.
 
-**Why it happens:** The signal type (momentum) is implicit in the filter criteria but never
-explicitly passed to the LLM. The LLM applies its training priors, which include both
-momentum and mean-reversion frameworks, and blends them arbitrarily.
+**Why it happens:**
+Chart data is fetched fresh each time the chart component mounts. Analysis results are loaded from the JSON log at the time the analysis was run. There is no coordination between the two time series.
 
-**Consequences:**
-- LLM recommends a stock that has already moved 15% as a "breakout play" (momentum framing)
-  alongside a stock that dropped 20% as a "value opportunity" (mean-reversion framing)
-  in the same ranked list, with no distinction made
-- User cannot assess which recommendation style to apply when running full analysis
+**How to avoid:**
+- Store the exact UTC timestamp of analysis completion in the trade log: `analysis_completed_at`
+- Chart component receives this timestamp and renders a vertical line at that point on the time axis with a tooltip showing "Analysis run: [timestamp]"
+- If the analysis timestamp is outside the chart's current view window, show a banner: "Analysis was run outside current chart range — click to navigate to that date"
+- Use the same data vendor (same price feed) for chart data and the price stored in the analysis log to avoid price discrepancies from different data sources
 
-**Prevention:**
-- Screener prompt must explicitly declare the signal regime: "The following candidates were
-  selected because they show unusual volume and price momentum. Rank them by momentum
-  continuation probability, not value or mean-reversion potential."
-- If the system later supports mean-reversion screening (e.g., oversold scanners), use
-  separate prompt templates per screener mode — never blend regimes in one prompt
-- The frontend "Screener Type" selector (momentum / unusual activity / fundamental) must
-  pass the selected mode into the LLM system prompt
+**Warning signs:**
+- Chart shows a price of $150 and the analysis says "recommended entry: $162" with no visual explanation of the time gap
+- Analysis markers on the chart are placed at the wrong bar because the log stores date-only, not datetime
 
-**Phase:** LLM screener agent phase — prompt engineering.
+**Phase to address:** TradingView charts integration phase, data alignment design.
 
 ---
 
-### Pitfall 7: Survivorship Bias in Screener Universe
+### Pitfall 9: Alpaca Order State Machine Not Handled — Stale "Pending" Orders
 
-**What goes wrong:** The ticker universe used for pre-filtering contains only currently
-active, listed stocks. Delisted, halted, or recently acquired tickers are absent. This
-does not corrupt today's picks but does corrupt any historical comparison the LLM makes
-("this pattern worked before") and causes subtle sector weighting errors.
+**What goes wrong:**
+When an order is submitted to Alpaca paper trading, it does not immediately become `filled`. Orders transition through states: `new` → `accepted` → `partially_filled` → `filled` (or `canceled`, `expired`, `rejected`). The backend submits an order and stores the `order_id`, but the frontend shows "Order Submitted" without ever polling for the final fill status. The track record dashboard never knows if the order was actually filled or was rejected, so all submitted orders are assumed to be executed.
 
-**Why it happens:** yfinance and most free data sources return only active tickers. There
-is no standard delisted-securities endpoint in yfinance. Developers use S&P 500, NASDAQ
-100, or Russell 2000 constituent lists without noting that these lists reflect current
-membership, not historical membership.
+**Why it happens:**
+Order submission is the easy, visible step. Order status polling is an asynchronous follow-up concern that is deferred and then forgotten. The Alpaca paper environment processes orders near-instantly during market hours, so in local testing the order appears to fill immediately — the polling gap is invisible.
 
 **Consequences:**
-- LLM narrative cites sector patterns that only appear valid because failures have been
-  removed from the reference universe
-- Sector momentum scores overstate the success rate of previous similar setups
-- Moderate in v1.1 because backtesting is Out of Scope — but will become critical in v1.2
-  when backtesting is added
+- Track record dashboard shows "executed" positions that were actually rejected or expired
+- P&L calculations are based on imaginary fills
+- If the user analyzes options orders (which have longer fill queues), the problem is visible: options orders in paper mode do not always fill instantly
 
-**Prevention:**
-- For v1.1: Add a disclaimer in the screener prompt and UI: "Universe: current active
-  listings only. Historical sector comparisons may reflect survivorship bias."
-- Document this explicitly as a v1.2 concern in phase retrospective
-- Do not let the LLM screener agent make historical pattern claims ("stocks like this
-  historically perform well") — restrict prompt to current-signal ranking only
+**How to avoid:**
+- Never mark an order as "executed" in the track record until Alpaca confirms `status == "filled"` or `status == "partially_filled"`
+- Implement a lightweight polling loop: after submission, poll `GET /v2/orders/{order_id}` every 5 seconds, up to 12 times (60 seconds), then mark as `timeout` if not filled
+- For market hours: orders should fill within 1-2 polls. For options or limit orders: surface the pending state in the UI explicitly
+- Store the Alpaca `order_id` in the trade log so orders can be re-queried later if needed
 
-**Phase:** LLM screener agent prompt design. Flag for v1.2 backtesting phase.
+**Warning signs:**
+- Track record shows all orders as filled immediately at submission time
+- No `order_id` field in the execution log schema
+- No `ORDER_STATUSES` state in frontend — UI only shows "submitted" with no transition to "filled" or "failed"
+
+**Phase to address:** Alpaca paper trading integration phase, order lifecycle management.
 
 ---
 
-### Pitfall 8: Tradier Rate Limits During Multi-Ticker Options Activity Scan
+### Pitfall 10: Track Record Dashboard Using Relative Returns Without Position Sizing
 
-**What goes wrong:** The pre-filter includes unusual options activity as one of its signals.
-For 50-200 candidate tickers, this requires individual Tradier API calls to check options
-volume. Tradier's production rate limit is 120 requests/minute. A naive sequential scan of
-200 tickers for options activity exhausts this limit in under 2 minutes, triggering 429
-errors on the options data portion of the scan.
+**What goes wrong:**
+The dashboard shows the AI's recommendations as a list of "correct" or "incorrect" calls without defining what position size was used. Two decisions — one on AAPL at 1% of portfolio and one on TSLA at 10% of portfolio — have very different impact on actual P&L but are counted equally on the track record. The win rate and even the average winner/loser metrics are distorted because they are calculated per-decision without weighting by position size.
 
-**Why it happens:** The existing system makes one Tradier call per analysis run (one ticker),
-so the rate limit was never a concern. The screener fundamentally changes the access pattern
-from single-ticker to multi-ticker.
+**Why it happens:**
+Position sizing is not currently part of the AI system — it makes directional calls but does not specify what percentage of capital to deploy. Without defined position sizes, a fair P&L calculation requires assuming equal-weight sizing, which is a simplification that the dashboard should make explicit.
 
-**Consequences:**
-- Options activity signal is missing for ~40% of candidates (those past the rate limit)
-- Pre-filter silently degrades: some tickers pass without options check, others fail
-- The existing Tradier abstraction layer has no rate-limit-aware pooling built in
+**How to avoid:**
+- All track record P&L calculations must assume a configurable fixed-dollar position size (e.g., $1,000 per recommendation as default) — make this explicit in the UI
+- Display: "Assuming $[X] per recommendation. Adjust in settings." 
+- Store the assumed position size alongside each execution record
+- Never claim "total portfolio return" without a complete, consistent position sizing model — instead show "total P&L assuming $X per trade"
 
-**Prevention:**
-- Options activity check in pre-filter should run AFTER basic volume/price/market-cap
-  filters have already reduced the universe to <= 50 candidates — never on the full 5000
-- Implement a request pool with a 120 req/min token bucket for Tradier calls in the
-  screener context (the existing single-ticker path does not need this)
-- If a Tradier options check fails with 429, fall back to yfinance options volume estimate
-  for that ticker rather than dropping it from candidates
-- Log Tradier usage per screener run: `tradier_calls_made`, `tradier_calls_failed`
+**Warning signs:**
+- Dashboard shows percentage gain/loss per trade without an assumed position size
+- "Total portfolio return" is displayed as a metric without a defined initial portfolio value
+- Recommendations on penny stocks and large-caps are treated as equivalent without normalization
 
-**Phase:** Pre-filter data layer phase, specifically when wiring the options activity signal.
+**Phase to address:** Track record dashboard phase, metrics definition.
 
 ---
 
-### Pitfall 9: Screener Results Not Timestamped in Frontend
+### Pitfall 11: Scoring System Optimized for LLM Confidence Instead of Outcome Accuracy
 
-**What goes wrong:** The screener results tab in the frontend displays picks without a
-visible "generated at" timestamp. The user runs the screener at 9:45 AM, leaves for a
-meeting, returns at 2:30 PM, and acts on picks that are now 5 hours stale — with the market
-having moved significantly in between.
+**What goes wrong:**
+The recommendation scoring feature measures how confident the AI's recommendation was (e.g., uses the `confidence_score` from the final decision node) as a proxy for recommendation quality. High-confidence recommendations get high scores. The system does not verify whether the high-confidence recommendations actually moved in the predicted direction. This creates a feedback loop where the scoring reinforces AI verbosity and certainty rather than accuracy.
 
-**Why it happens:** Timestamps are treated as a "nice to have" UI detail and deferred.
-The API response includes a timestamp field but the frontend component does not render it.
+**Why it happens:**
+Confidence scores are immediately available from existing data. Outcome data requires waiting for the market to move and then doing a price lookup — it requires a deferred evaluation that runs after the recommendation date, which is architecturally more complex.
 
-**Consequences:**
-- User acts on stale screener output believing it to be current
-- If picks have reversed, this creates a negative outcome directly attributable to the
-  product, not to user judgment
+**How to avoid:**
+- Score = outcome accuracy only. Confidence score is a secondary attribute that is displayed alongside the outcome, never as the primary score
+- Scoring requires deferred evaluation: schedule a background job (or manual trigger) that runs N trading days after each recommendation and fetches the price, computes the actual outcome, and writes it back to the log
+- The recommendation record must have two states: `pending_outcome` (within the evaluation window) and `scored` (outcome recorded)
+- Surface the pending/scored distinction clearly in the dashboard — never show a score for a recommendation that has not been evaluated yet
 
-**Prevention:**
-- Screener results component must display timestamp prominently (not in a tooltip):
-  "Screened at: 10:23 AM ET — refresh for current data"
-- Add a "stale" visual indicator if results are older than the cache TTL (15 min during
-  market hours)
-- The API endpoint must always include `screened_at` (ISO 8601) and `market_session`
-  ("open" / "pre-market" / "after-hours" / "closed") in the response envelope
+**Warning signs:**
+- Scoring job description says "use confidence score" or "AI certainty"
+- Track record shows scores for recommendations made today (outcome not yet knowable)
+- No deferred evaluation job or cron step is mentioned in the architecture
 
-**Phase:** Frontend screener UI phase.
+**Phase to address:** Recommendation scoring system phase, metrics definition step.
 
 ---
 
-### Pitfall 10: Overly Verbose LLM Screener Prompts
+### Pitfall 12: Charts Feature Adding a Second Data Vendor Path That Diverges From Analysis
 
-**What goes wrong:** The screener prompt includes the system context from the full analysis
-pipeline (trading philosophy, risk parameters, options strategy context, debate rules) as
-boilerplate preamble. This was copy-pasted from the existing agent prompt templates as a
-starting point and never trimmed.
+**What goes wrong:**
+The chart fetches OHLCV data via a dedicated chart API endpoint that calls yfinance directly. The analysis pipeline fetches price data via the existing `VENDOR_METHODS` abstraction in `interface.py`. If the chart endpoint bypasses the vendor abstraction and goes directly to yfinance, two separate data paths exist for the same data. When the primary vendor is switched (e.g., from yfinance to Polygon), the chart endpoint still fetches from yfinance, causing the chart price history to diverge from the prices recorded in the analysis logs.
 
-**Why it happens:** Existing agents use `quick_thinking_llm` / `deep_thinking_llm` with
-shared prompt scaffolding. It is natural to start from a working template.
+**Why it happens:**
+Chart data fetching looks simple — it is just OHLCV bars. Developers reach for `yfinance.download()` directly rather than routing through the abstraction layer, especially because the chart endpoint is a new React frontend concern and the developer does not connect it to the existing backend data layer.
 
-**Consequences:**
-- Options strategy context is irrelevant at the screening stage; it adds ~500-800 tokens
-  per call with zero ranking value
-- The screener runs on every system startup for fresh data; verbose prompts at 3000+ tokens
-  make this expensive at scale
-- Model may attempt to apply options strategy logic to screening decisions, producing
-  incoherent rationale
+**How to avoid:**
+- The chart OHLCV endpoint must call the same vendor abstraction used by the analysis agents: route through `interface.py`'s `VENDOR_METHODS` routing pattern
+- Add a `get_historical_ohlcv(ticker, period, interval)` method to the vendor interface and implement it for all current vendors (yfinance, Tradier)
+- The chart endpoint in FastAPI should call this interface method, not yfinance directly
+- Write a test that confirms chart data and analysis data for the same ticker/date return the same closing price
 
-**Prevention:**
-- The screener agent must have its own minimal prompt template — do not inherit from
-  existing agent templates
-- Screener system prompt should be <= 300 tokens: role (stock screener), signal type
-  (momentum), output format (ranked list of max 5, with one-sentence rationale each)
-- Measure token count at design time. If screener system prompt exceeds 300 tokens,
-  treat that as a build failure
+**Warning signs:**
+- `import yfinance as yf` appears in the chart router file without going through `interface.py`
+- Chart shows a different closing price for a past date than what is stored in the analysis log for the same ticker/date
+- Vendor switch test (changing `DATA_VENDOR` env var) does not affect the chart data source
 
-**Phase:** LLM screener agent phase — prompt design.
+**Phase to address:** TradingView charts integration phase, backend chart data endpoint design.
 
 ---
 
@@ -349,104 +336,192 @@ shared prompt scaffolding. It is natural to start from a working template.
 
 ---
 
-### Pitfall 11: Screener Tab Visible During Active Analysis Run
+### Pitfall 13: React Chart Component Causing Performance Degradation on Tab Switch
 
-**What goes wrong:** User runs full analysis for AAPL. While it is streaming, they switch
-to the Screener tab and trigger a new screener run. The SSE stream for the analysis run
-collides with the screener's API response in the frontend state, causing the progress
-stepper to either stall or show screener metadata as analysis progress events.
+**What goes wrong:**
+The TradingView chart component is mounted once on the Analysis tab and kept alive in the DOM as the user switches between tabs. The chart component holds a live `ResizeObserver` and redraws on every parent container resize event. In a tabbed layout where tabs are hidden via CSS (`display: none`), the chart may still receive resize events and attempt to redraw, consuming CPU in the background.
 
-**Prevention:**
-- Screener API calls must use a separate endpoint (`/api/screener`) with its own
-  response model — never share the SSE `/api/analyze` stream endpoint
-- Frontend must disable the "Run Screener" button while an analysis SSE stream is active
-- The two features must have completely isolated state slices in the frontend store
+**How to avoid:**
+- Unmount the chart component (not just hide it) when the user navigates away from the chart tab — use conditional rendering in React (`{activeTab === 'chart' && <ChartComponent />}`)
+- The `useEffect` cleanup must call `chart.remove()` on unmount — this releases the canvas and unregisters the `ResizeObserver`
+- Use `React.memo` or `useMemo` to avoid re-rendering the chart on unrelated state changes in parent components
 
-**Phase:** Frontend integration phase.
+**Phase to address:** TradingView charts integration phase, React component architecture.
 
 ---
 
-### Pitfall 12: User Overwhelm from Too Many Screener Picks
+### Pitfall 14: Alpaca Paper Trading Account Needing Manual Setup Steps Not in Code
 
-**What goes wrong:** The LLM screener returns 10-15 picks. The frontend displays all of
-them in a list with full rationale for each. The user cannot determine which is the single
-most actionable pick and feels pressure to analyze multiple tickers, defeating the purpose
-of the screener.
+**What goes wrong:**
+Alpaca paper trading accounts require manual activation via the dashboard before API access works. Options trading (even in paper mode) requires enabling "options trading" in the account settings separately from paper access. A developer who generates API keys but skips account configuration will receive cryptic `403` errors with messages like "account does not have the required feature enabled."
 
-**Prevention:**
-- Hard cap screener output at 5 picks maximum (3 is better for most users)
-- Display picks in a ranked card layout with a clear #1 / #2 / #3 ordering — not a flat
-  list
-- Show only the one-sentence rationale inline; full rationale is expandable on click
-- The "Analyze" CTA on each pick card should be visually prominent on the #1 pick and
-  subdued on lower-ranked picks to guide attention
+**How to avoid:**
+- Document the one-time manual setup steps in the developer setup guide: (1) create paper account, (2) enable options trading in account settings, (3) generate paper API keys from the paper section of the dashboard
+- Add a startup health check endpoint that calls `GET /v2/account` and verifies `options_trading_level >= 1` before the paper trading feature is enabled
+- Surface clear error messages: if the health check fails, the paper trading UI section should show "Alpaca account configuration required — see setup guide" rather than a generic error
 
-**Phase:** Frontend screener UI phase.
+**Phase to address:** Alpaca paper trading integration phase, developer setup.
 
 ---
 
-### Pitfall 13: Screener Criteria Not Configurable by User
+### Pitfall 15: Track Record Dashboard Mixing Options and Equity Recommendation Quality
 
-**What goes wrong:** Pre-filter thresholds (relative volume, minimum price, minimum market
-cap) are hardcoded constants. User with a different trading style (e.g., small-cap focus
-at $1-5 price range) cannot adapt the screener to their universe.
+**What goes wrong:**
+The track record dashboard aggregates all AI recommendations into a single win rate and expectancy score. Options recommendations (complex multi-leg strategies with defined max profit/loss) and equity directional calls (open-ended P&L) have fundamentally different return distributions. Mixing them into one aggregate score produces a metric that accurately describes neither category.
 
-**Prevention:**
-- Expose the 3-4 primary pre-filter thresholds as user-configurable parameters in the
-  frontend config sidebar (matching the pattern of existing config fields)
-- Provide sensible defaults (min price: $5, min market cap: $500M, min rel volume: 2.0x)
-- Validate input ranges server-side to prevent pathological configurations (e.g., min
-  price: $0 passing all 10,000 OTC tickers to the LLM)
+**How to avoid:**
+- Separate track record views for equity directional calls and options strategy recommendations
+- Each view uses metrics appropriate to the asset class: for equities, directional accuracy and P&L; for options, whether the trade expired in profit relative to max risk (risk-adjusted return)
+- The dashboard header must clearly label which category is displayed
 
-**Phase:** Frontend screener UI phase, after core screener is functional.
+**Phase to address:** Track record dashboard phase, UI design.
 
 ---
 
-## Phase-Specific Warnings
+## Technical Debt Patterns
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| Pre-filter data layer | yfinance 429 on bulk scan (Pitfall 2) | Chunk-based fetch (max 100 tickers/batch), exponential backoff, coverage tracking |
-| Pre-filter data layer | Stale cache across market sessions (Pitfall 3) | Session-boundary TTL, `data_as_of` field in all responses |
-| Pre-filter data layer | Tradier rate limit on options signal (Pitfall 8) | Apply options check only after volume/price filter; token bucket for Tradier |
-| LLM screener agent wiring | Auto-triggering analysis pipeline (Pitfall 1) | `ScreenerState` separate from `AgentState`; no graph edges to analysis nodes |
-| LLM screener agent wiring | State contamination (Pitfall 5) | Dedicated `ScreenerState` type; fresh `AgentState` init per analysis run |
-| LLM screener agent wiring | Too many candidates into LLM (Pitfall 4) | Hard cap: 50 candidate max before LLM step; enforce in pre-filter output contract |
-| LLM screener agent prompting | Verbose prompts (Pitfall 10) | Own minimal template; <= 300 token system prompt |
-| LLM screener agent prompting | Regime confusion (Pitfall 6) | Explicit signal-type declaration in prompt; separate templates per screener mode |
-| Frontend screener UI | No timestamp on results (Pitfall 9) | `screened_at` always in API envelope; stale indicator in UI |
-| Frontend screener UI | Too many picks / flat ranking (Pitfall 12) | 5-pick hard cap; ranked card layout; subdued CTAs on lower picks |
-| Frontend screener UI | SSE collision with analysis stream (Pitfall 11) | Separate endpoints; disable screener during active analysis |
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Polling order status instead of Alpaca WebSocket for fill confirmation | Simpler to implement, no persistent connection | Extra latency on fill detection; O(N) requests for N open orders | Acceptable for v1.2 (low order volume), revisit if orders per session exceed 10 |
+| Fetching chart data directly from yfinance in chart endpoint | Fast to build | Diverges from vendor abstraction; breaks on vendor swap | Never — route through interface.py always |
+| Using win rate as primary headline metric | Easy to calculate and explain | Misleads users; mathematically incomplete | Never as a standalone headline metric |
+| Storing paper trade outcomes in the same JSON file as analysis decisions | Single file to manage | Schema versioning complexity; concurrent write risk | Only if atomic write locking is implemented |
+| Hardcoding assumed position size ($1,000 per trade) | Removes a config surface | Wrong for users with different capital | Acceptable for v1.2 MVP if clearly labeled in UI |
+| alpaca-trade-api (old SDK) instead of alpaca-py | Existing tutorials and examples | Deprecated, no new features, community support declining | Never — migrate to alpaca-py |
+
+---
+
+## Integration Gotchas
+
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| Alpaca paper trading | Using live-environment base URL with paper keys | Initialize `TradingClient(paper=True)` explicitly; assert base URL at startup |
+| Alpaca paper trading | Calling sync `client.submit_order()` inside `async def` FastAPI route | Wrap with `asyncio.to_thread()` or run in a `ThreadPoolExecutor` |
+| Alpaca options | Submitting multi-leg bracket orders for options | Alpaca does not support bracket orders for options; submit legs individually or scope to equities only |
+| lightweight-charts v5 | Using v4 series creation API (`addLineSeries()`) | Use `chart.addSeries(CandlestickSeries, options)` — import series type from library |
+| lightweight-charts + React | Creating chart outside `useEffect` or missing cleanup | Always initialize in `useEffect`, always return `chart.remove()` as cleanup function |
+| lightweight-charts + React StrictMode | Double-mount creating two chart instances | Ensure `chart.remove()` cleanup runs before re-mount; check for duplicate canvas elements |
+| JSON trade log | Appending to log without file locking from multiple concurrent analysis runs | Use atomic write (write to temp file, rename) or a write-queue per ticker |
+| Track record scoring | Scoring recommendations on the day they are made | Scoring requires deferred evaluation after N trading days; store as `pending_outcome` until then |
+
+---
+
+## Performance Traps
+
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| lightweight-charts re-rendering on every parent state change | Chart flickers or redraws constantly; high CPU usage when filtering/searching | Wrap chart component in `React.memo`; separate chart state from analysis state | On any parent component state change if not memoized |
+| Fetching full OHLCV history for chart on every tab switch | Noticeable delay re-entering chart tab; repeated yfinance calls in network log | Cache chart data in component state or frontend store for the session; only re-fetch if ticker changes | After 2-3 tab switches with slow network |
+| Polling Alpaca for all open order statuses on every dashboard load | Track record dashboard slow to load; many Alpaca API requests per page view | Poll only `pending` orders; mark terminal-state orders (`filled`, `canceled`) as final in local store | When more than 5-10 open orders exist simultaneously |
+| Fetching price history for scoring all recommendations on dashboard load | Track record dashboard times out for users with many recommendations | Paginate recommendations; fetch outcome prices lazily on scroll or on-demand | After ~50+ recommendations in the log |
+
+---
+
+## Security Mistakes
+
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Alpaca live API keys stored in the same `.env` as paper keys | Accidental live order submission during development | Separate `.env.paper` and `.env.live`; default environment is always paper; live keys require explicit `ENV=live` override |
+| Alpaca API keys committed to version control | Unauthorized trading or account access | `.env` and all `*.env.*` variants in `.gitignore`; pre-commit hook to block credential patterns |
+| Chart endpoint exposing raw ticker price history without auth | Leaks portfolio positions if ticker is inferred from position logs | Chart endpoint should require the same session auth as the analysis endpoint; no unauthenticated price history |
+| Paper trading order history accessible to other users | Leaks trading strategy | If multi-user support is ever added, scope all Alpaca and log queries by user ID from the start |
+
+---
+
+## UX Pitfalls
+
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| Win rate as headline stat on track record | User misreads a 40% win rate system as losing when it may be profitable | Primary headline: Expectancy ($ per recommendation). Win rate shown as context only. |
+| Paper trading results labeled as "performance" without simulation disclaimer | User overestimates AI edge; disappointment when going live | Persistent banner: "Simulated performance — no slippage or execution delays." |
+| Chart without analysis decision annotation | User cannot connect AI recommendation to price action | Vertical marker on chart at analysis date; tooltip with decision, confidence, and target |
+| Track record showing recommendations with no defined outcome window | "Is this a 1-day call or a 3-month call?" — scoring becomes ambiguous | Every recommendation must show the evaluation horizon (e.g., "5-day outlook") set at analysis time |
+| Orders submitted to Alpaca with no visible confirmation or failure feedback | User doesn't know if paper trade was placed | Order status indicator in UI: Submitted → Accepted → Filled / Rejected with timestamp |
+
+---
+
+## "Looks Done But Isn't" Checklist
+
+- [ ] **TradingView chart:** Appears to render — verify `chart.remove()` cleanup runs on unmount and no duplicate canvas elements exist in StrictMode
+- [ ] **TradingView chart:** Data displays — verify chart timestamp aligns with analysis decision timestamp and uses the same data vendor as the analysis pipeline
+- [ ] **Alpaca paper trading:** Order submits without error — verify the order reaches `filled` status (not just `new`) before marking it as executed
+- [ ] **Alpaca paper trading:** Environment appears correct — verify `TradingClient` is initialized with `paper=True` and the base URL is `paper-api.alpaca.markets`
+- [ ] **Recommendation scoring:** Metrics are calculated — verify scores are NOT generated for recommendations made today (outcome is unknowable until after evaluation window)
+- [ ] **Recommendation scoring:** Schema looks correct — verify historical pre-v1.2 logs are excluded from scoring metrics, not just showing as zero-score entries
+- [ ] **Track record dashboard:** P&L is displayed — verify position size assumption is explicitly labeled in the UI and adjustable
+- [ ] **Track record dashboard:** Options and equity recommendations appear together — verify they are separated into distinct views with appropriate metrics per asset class
+- [ ] **Paper trading + SSE:** Order submission works locally — verify under concurrent SSE streams that Alpaca calls do not block SSE event delivery (test with two browser tabs)
+
+---
+
+## Recovery Strategies
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| lightweight-charts v4 API used throughout (wrong version) | MEDIUM | Migrate `addLineSeries` → `addSeries(LineSeries, opts)` per component; test each chart type |
+| Alpaca live keys accidentally used in development | HIGH | Immediately rotate both paper and live keys; audit order history for unintended submissions; add env guards |
+| Trade log schema missing fields needed for scoring | MEDIUM | Add `schema_version` field; new logs use v1.2 schema; run a one-time backfill script that adds `price_at_decision` from historical yfinance data with explicit "retroactively filled" flag; track record starts from v1.2 date |
+| Win rate used as primary metric already in production | LOW-MEDIUM | Add expectancy calculation without removing win rate; reorder display to make expectancy primary; add inline explanation of the difference |
+| Alpaca sync calls blocking event loop | MEDIUM | Wrap all `client.*` calls with `asyncio.to_thread()`; search codebase for `client.submit_order` without `await` |
+| Chart data vendor divergence from analysis vendor | LOW | Route chart endpoint through `interface.py`; add price consistency test |
+
+---
+
+## Pitfall-to-Phase Mapping
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| lightweight-charts v5 API incompatibility (P1) | Charts integration — chart component setup | Render a candle chart with v5 API in Vite + React StrictMode, confirm no duplicate canvas, confirm cleanup |
+| Chart-vendor divergence from analysis (P12) | Charts integration — backend chart data endpoint | Test: same ticker/date returns same closing price from chart endpoint and analysis log |
+| React StrictMode double-mount memory leak (P1) | Charts integration — component lifecycle | Open DevTools heap snapshot before and after mounting/unmounting chart 10 times; confirm no growth |
+| Alpaca key/URL environment mismatch (P2) | Alpaca integration — environment setup | Startup assertion test: wrong key type triggers config error, not silent 401 |
+| Alpaca options multi-leg limitation (P3) | Alpaca integration — requirements scope | Document equity-only scope in requirements before writing any order submission code |
+| FastAPI event loop blocking (P4) | Alpaca integration — API client design | Load test: concurrent SSE stream + order submission; confirm SSE delivery does not stall |
+| Order status not tracked to final state (P9) | Alpaca integration — order lifecycle | Test: submitted paper order reaches `filled` status in tracking log within 60 seconds |
+| Trade log schema insufficient (P7) | Scoring — schema design | Schema review: confirm v1.2 log includes `price_at_decision`, `target_horizon_days`, `schema_version` |
+| Win rate as sole primary metric (P5) | Scoring — metrics definition | Dashboard spec review: expectancy must be the primary headline stat |
+| Confidence score as proxy for accuracy (P11) | Scoring — metrics definition | Scoring calculation is based on outcome price comparison, not on `confidence_score` field |
+| Paper fills overstating real performance (P6) | Track record — display design | Dashboard has slippage disclaimer and shows "simulated" label before any P&L number |
+| Missing position size in P&L (P10) | Track record — display design | Every P&L figure in the dashboard has an associated position size assumption visible in the UI |
+| Equity and options metrics mixed (P15) | Track record — UI design | Separate dashboard views confirmed in component design before implementation |
 
 ---
 
 ## Confidence Assessment
 
-| Pitfall Area | Confidence | Source Basis |
-|--------------|------------|--------------|
-| yfinance rate limiting behavior | HIGH | GitHub issues #2128, #2422, #2614 confirm 429 at ~950 tickers post late 2024 |
-| Tradier rate limits (120 req/min) | HIGH | Official Tradier API documentation |
-| LLM cost at scale (token math) | HIGH | Official pricing + documented token counts |
-| Pipeline auto-trigger risk | HIGH | Inferred directly from PROJECT.md Out of Scope declaration |
-| State contamination pattern | MEDIUM | LangGraph shared state architecture docs + general multi-agent patterns |
-| Momentum/mean-reversion confusion | MEDIUM | Academic trading literature + general LLM prompt sensitivity findings |
-| Survivorship bias | HIGH | Quantified in backtesting literature (CAGR drop from 46% to 16% in one study) |
-| UX overload patterns | MEDIUM | Trading app UX research + general information overload literature |
-| Data freshness / stale cache | HIGH | Multiple financial data observability sources confirm session-boundary TTL necessity |
+| Area | Confidence | Source Basis |
+|------|------------|--------------|
+| lightweight-charts v5 breaking changes | HIGH | Official migration guide, GitHub issue #1791, confirmed v5 release notes |
+| Alpaca paper vs live environment separation | HIGH | Official Alpaca docs, community forum error reports |
+| Alpaca options multi-leg paper trading gap | HIGH | Official Alpaca support page, community forum issue #14241 |
+| FastAPI async event loop blocking | HIGH | Official FastAPI async documentation, multiple developer post-mortems |
+| Win rate as misleading metric | HIGH | Multiple quantitative trading sources (Edge Wonk, TradesViz, TradeZella) confirm unanimously |
+| Paper trading slippage overstatement | HIGH | Alpaca official post on paper vs live differences, Alpaca forum slippage thread |
+| LangGraph side effect pattern for execution | MEDIUM | General LangGraph state docs; no specific paper trading integration guidance found |
+| Deferred scoring evaluation architecture | MEDIUM | Derived from scoring methodology best practices; no direct source for this exact architecture |
 
 ---
 
 ## Sources
 
-- [yfinance Rate Limiting Issue #2128](https://github.com/ranaroussi/yfinance/issues/2128)
-- [yfinance YFRateLimitError Issue #2422](https://github.com/ranaroussi/yfinance/issues/2422)
-- [yfinance Bulk Download Rate Limit Issue #2614](https://github.com/ranaroussi/yfinance/issues/2614)
-- [Why yfinance Keeps Getting Blocked — Medium](https://medium.com/@trading.dude/why-yfinance-keeps-getting-blocked-and-what-to-use-instead-92d84bb2cc01)
-- [Rate Limiting and API Best Practices for yfinance — Sling Academy](https://www.slingacademy.com/article/rate-limiting-and-api-best-practices-for-yfinance/)
-- [Tradier Rate Limiting — Official Docs](https://docs.tradier.com/docs/rate-limiting)
-- [Survivorship Bias in Momentum Rotational Strategies — Price Action Lab](https://www.priceactionlab.com/Blog/2019/11/survivorship-bias-in-backtests-of-momentum-rotational-strategies/)
-- [LLM Cost Optimization: Token Strategies 2025 — SparkCo](https://sparkco.ai/blog/optimize-llm-api-costs-token-strategies-for-2025)
-- [Trading Platform UX Design No-Nos — DevExperts](https://devexperts.com/blog/trading-platform-ux-ui-design-no-nos/)
-- [Data Freshness and Business Decision-Making — OWOX](https://www.owox.com/blog/articles/data-freshness-and-business-decision-making)
-- [The Real Cost of Delayed Market Data — United Fintech](https://www.unitedfintech.com/blog/the-real-cost-of-delayed-market-data)
-- [LangGraph Multi-Agent Architecture 2025 — Latenode](https://latenode.com/blog/ai-frameworks-technical-infrastructure/langgraph-multi-agent-orchestration/langgraph-multi-agent-orchestration-complete-framework-guide-architecture-analysis-2025)
+- [Upgrading to lightweight-charts v5 — GitHub Issue #1791](https://github.com/tradingview/lightweight-charts/issues/1791)
+- [lightweight-charts v5 Migration Guide — Official Docs](https://tradingview.github.io/lightweight-charts/docs/migrations/from-v4-to-v5)
+- [Primitives not syncing in React — GitHub Issue #1920](https://github.com/tradingview/lightweight-charts/issues/1920)
+- [Advanced React Example — lightweight-charts Official Docs](https://tradingview.github.io/lightweight-charts/tutorials/react/advanced)
+- [Alpaca Paper Trading — Official Docs](https://docs.alpaca.markets/docs/paper-trading)
+- [Alpaca Common API Errors — Official Guide](https://alpaca.markets/learn/how-to-fix-common-trading-api-errors-at-alpaca)
+- [Bracket Order for Options Error — Alpaca Forum #14241](https://forum.alpaca.markets/t/bracket-order-for-option-error-complex-orders-not-supported-for-options-trading/14241)
+- [alpaca-py Getting Started — Official Docs](https://alpaca.markets/sdks/python/getting_started.html)
+- [Paper Trading vs Live Trading — Alpaca Official](https://alpaca.markets/learn/paper-trading-vs-live-trading-a-data-backed-guide-on-when-to-start-trading-real-money)
+- [Slippage: Paper vs Real Trading — Alpaca Forum](https://forum.alpaca.markets/t/slippage-paper-trading-vs-real-trading/2801)
+- [10 Async Pitfalls in FastAPI — Medium](https://medium.com/@bhagyarana80/10-async-pitfalls-in-fastapi-and-how-to-avoid-them-60d6c67ea48f)
+- [Top 7 FastAPI asyncio Best Practices — TechBuddies](https://www.techbuddies.io/2026/01/05/top-7-fastapi-asyncio-best-practices-for-non-blocking-web-apis/)
+- [Win Rate as a Vanity Metric — TradeZella](https://www.tradezella.com/blog/win-rate)
+- [Win Rate vs. Expectancy — UltraTrader](https://blog.ultratrader.app/the-1000000-mistake-why-your-win-rate-doesnt-matter-and-expectency-does/)
+- [Beyond Win Rate: R-Value and Profit Factor — TradesViz](https://www.tradesviz.com/blog/what-is-r-value-profit-factor/)
+- [Why Most Backtests Fail — Frontier Ledger](https://frontierledger.ai/foundations-core-concepts/why-most-backtests-fail-overfitting-look-ahead-bias-and-data-snooping)
+- [Look-Ahead Bias in AI Trading Signals — arxiv 2601.13770](https://arxiv.org/pdf/2601.13770)
+
+---
+*Pitfalls research for: TradingView charts, Alpaca paper trading, recommendation scoring, track record dashboard — added to existing LangGraph + FastAPI + React trading analysis system*
+*Researched: 2026-04-03*

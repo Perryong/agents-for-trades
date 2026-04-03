@@ -1,90 +1,98 @@
-# Feature Landscape: Stock Recommendation / Screening System
+# Feature Landscape: Paper Trading & Validation
 
-**Domain:** AI-driven stock screener layered on top of an existing multi-agent analysis pipeline
-**Researched:** 2026-04-02
-**Milestone scope:** v1.1 — NEW screening/recommendation features only; existing equity/options pipeline is unchanged
+**Domain:** Paper trade execution, interactive charting, recommendation scoring, and performance tracking layered on an existing AI multi-agent trading framework
+**Researched:** 2026-04-03
+**Milestone scope:** v1.2 — NEW features only; existing equity/options/screener pipeline is unchanged
 
 ---
 
 ## Table Stakes
 
-Features users expect from any screener. Missing = the system feels broken or unusable.
+Features users expect. Missing = product feels incomplete or broken.
 
 | Feature | Why Expected | Complexity | Existing Pipeline Dependency |
 |---------|--------------|------------|------------------------------|
-| Market universe pre-filter | Narrows ~8,000 US equities to ~20-50 candidates before LLM ranking; LLM ranking of thousands of tickers is cost-prohibitive | Low | Uses `get_YFin_data_online` / yfinance bulk fetch; no new data vendor needed |
-| Minimum volume threshold | Liquid stocks only; below ~500K avg daily volume options are illiquid and spreads are too wide for the options pipeline downstream | Low | yfinance `info` dict exposes `averageVolume`; stdlib calculation |
-| Minimum market cap filter | Avoids micro-cap/penny stocks that are noise-heavy and thin; screener results should be analyzable by the equity agents | Low | yfinance `info` dict exposes `marketCap` |
-| Relative volume signal (RVol) | Core momentum signal — volume today vs 20-day average; a stock moving on 3x+ RVol is a legitimate catalyst | Low | Derive from `get_YFin_data_online` price/volume history |
-| Price momentum filter (% change) | Captures stocks with recent directional move; primary reason a trader opens a screener | Low | Derive from daily close prices in existing data layer |
-| Sector / industry filter | Traders think in sector themes; needed to run sector-relative screening | Low | yfinance `info` dict exposes `sector`, `industry` |
-| LLM screener agent ranks candidates | Core differentiator of this system vs a raw screener; produces top 3-5 picks with rationale from filtered list | Medium | Uses existing `quick_thinking_llm` from config; same `create_*` agent factory pattern |
-| Ranked output with per-pick rationale | Users must understand WHY a ticker was ranked; "black box" outputs are not actionable | Medium | LLM agent output; structured prompt engineering |
-| Select-to-analyze integration | User selects a screener pick and it pre-populates the existing analysis form (ticker + date); one-click to full pipeline | Low | Frontend: populates `AnalyzeRequest.ticker`; no backend change needed |
-| CLI output for screener results | CLI is an existing primary interface (Typer + Rich); screener must work from CLI, not just frontend | Low | Extend existing CLI `main.py` patterns |
-| Backend endpoint for screener | Frontend needs a REST endpoint; screener must be callable from API the same way `/api/analyze` works | Medium | New FastAPI route in `api/routes.py`; new schema in `api/schemas.py` |
+| **TradingView Lightweight Charts — candlestick view** | Any stock analysis tool surfaces a price chart; users orient themselves visually before reading agent reports | Medium | Needs historical OHLCV data — yfinance already fetched in analysis pipeline; chart reads from same data |
+| **TradingView — volume bars** | Volume is co-displayed with price on every professional chart; absence feels like a regression | Low | Same OHLCV payload; volume series is a second chart pane |
+| **TradingView — trade entry/exit markers** | When Alpaca executes a paper trade, its fill price must be visible on the chart as an overlay marker; otherwise "did it execute?" is unanswerable | Medium | Alpaca fill price feeds back into chart marker data; requires connecting order response to chart state |
+| **Alpaca paper trading — submit equity order** | Core v1.2 requirement; auto-execute the agent's BUY/SELL decision as a simulated trade | Medium | Agent final decision JSON (already logged to `analysis_history/`) provides ticker, direction, size; Alpaca `alpaca-py` SDK submits `MarketOrderRequest` with `paper=True` |
+| **Alpaca paper trading — order status display** | User must confirm whether order was accepted/filled/rejected; silent execution is untrustworthy | Low | Poll `TradingClient.get_order_by_id()` or use order event; display in frontend alongside analysis result |
+| **Alpaca paper trading — separate API keys config** | Paper account uses different keys from live account; must be configurable in environment/config without code changes | Low | Add `ALPACA_PAPER_KEY`, `ALPACA_PAPER_SECRET`, `ALPACA_PAPER=true` to existing `.env` / config pattern |
+| **Recommendation scoring — per-decision outcome field** | Every logged trade decision needs a place to record whether the call was correct; without it, accuracy cannot be computed | Low | Extend existing `analysis_history/TICKER/DATE.json` schema with `outcome` field (WIN/LOSS/OPEN) and `pnl_pct` |
+| **Recommendation scoring — win rate calculation** | Most fundamental accuracy metric; without it the system has no feedback loop | Low | Pure Python aggregation over logged JSON files; no new infrastructure |
+| **Track record dashboard — summary statistics** | Win rate, total trades, P&L, avg gain/loss are the minimum a user expects when asking "how is this system doing?" | Medium | Aggregation over `analysis_history/` JSON files; new API endpoint returns summary dict |
+| **Track record dashboard — trade history table** | Chronological list of past decisions with outcome; users expect to drill into individual calls | Low | Read from existing JSON log files; format for frontend table component |
 
 ---
 
 ## Differentiators
 
-Features that separate this system from commodity screeners. Not expected, but increase value.
+Features that set this system apart. Not expected, but add meaningful value.
 
 | Feature | Value Proposition | Complexity | Existing Pipeline Dependency |
 |---------|-------------------|------------|------------------------------|
-| LLM-generated per-pick rationale | Explains WHICH signals drove the ranking and how they connect (e.g., "high RVol + RSI breakout + bullish sector momentum") — most screeners give raw scores without narrative | Medium | LLM agent reads signal summary dict and produces prose; grounded in retrieved data, not model memory |
-| Composite signal scoring (0-100) | Normalized score aggregating volume, momentum, and fundamental signals; enables sorting and visual ranking bar | Medium | Pure Python calculation on pre-filter output; no new vendor needed |
-| Confidence flag per pick | LLM marks each pick HIGH / MEDIUM / LOW confidence based on signal alignment; LOW confidence = "worth watching but weak setup" | Low | Agent output field; structured JSON prompt |
-| Sector momentum context | Pre-filter identifies which sectors are running today and weights candidates from those sectors higher | Medium | Aggregate price changes across sector ETF proxies using yfinance |
-| Options-readiness flag | For each screener pick, surface whether it has liquid options (volume/OI above threshold) before user clicks Analyze with options enabled; avoids expensive failed options analysis runs | Medium | Uses existing `get_yfinance_options_chain` to check chain availability |
-| SSE streaming for screener progress | Pre-filter and LLM ranking can take 10-30 seconds; streaming progress prevents "is it frozen?" frustration, consistent with existing analysis UX | Medium | Reuse existing `ProgressCallbackHandler` / `EventSourceResponse` pattern from `api/progress.py` |
-| Screener results in frontend tab | Dedicated "Screener" tab in the React frontend alongside the existing report tabs; results persist across analysis runs | Medium | New React component; extend `App.tsx` tab state |
+| **TradingView — agent signal overlay** | Annotate the chart with which agents were bullish/bearish at the decision point; turns a price chart into an explainability view | High | Requires storing per-agent signal summaries keyed to date; existing `AgentState` fields contain this already |
+| **TradingView — multi-timeframe toggle** | Daily / weekly / monthly views on same chart; traders make decisions across timeframes | Medium | yfinance supports multiple interval/period combos; same OHLCV schema |
+| **Alpaca paper trading — multi-leg options order** | The options pipeline already produces a complete legs builder output (strategy, strikes, sides, ratios); auto-executing the legs via Alpaca `mleg` order class closes the loop from analysis to simulated execution | High | Alpaca Level 3 paper trading supports `order_class=mleg`; maps directly to existing `OptionsLegsBuilderReport` in `AgentState`; requires new translation layer from legs JSON to Alpaca legs array |
+| **Recommendation scoring — per-agent accuracy** | Track which individual agents (technical, social, news, fundamentals, volatility, flow) had the most accurate signals over time; allows disabling consistently wrong agents | High | Requires storing individual agent votes (bull/bear/hold + conviction) per decision — partially available in existing reports |
+| **Recommendation scoring — confidence-calibration view** | Compare agent's stated confidence level vs actual outcome rate; a well-calibrated system should have 80%-confident calls succeed ~80% of the time | High | Requires extracting confidence scores from final decision JSON; existing `FinalDecision` schema has `confidence` field |
+| **Track record dashboard — equity curve chart** | Running P&L plotted over time using paper trade fills; shows whether the system is improving or degrading over the live paper period | Medium | Aggregate filled order P&L from Alpaca paper account via `TradingClient.get_portfolio_history()`; render with Lightweight Charts |
+| **Track record dashboard — per-ticker breakdown** | Show accuracy per ticker; identifies whether system performs better on familiar names vs new picks | Low | Group `analysis_history/` JSON files by ticker; pure Python aggregation |
+| **Track record dashboard — options vs equity split** | Separate win rate for pure equity decisions vs options decisions; options have different success criteria (directional correct + magnitude + timing) | Medium | `analysis_history/` JSON files already record whether options pipeline ran; filter on that field |
+| **Trade outcome auto-close on Alpaca** | After N days, query Alpaca paper account to compute position P&L and auto-mark the logged decision as WIN/LOSS/OPEN | Medium | Alpaca `TradingClient.get_all_positions()` returns current unrealized P&L; compare to entry fill price |
 
 ---
 
 ## Anti-Features
 
-Features to explicitly NOT build in v1.1. Each has a principled reason.
+Features to explicitly NOT build in v1.2.
 
 | Anti-Feature | Why Avoid | What to Do Instead |
 |--------------|-----------|-------------------|
-| Running full analysis pipeline on all screener results automatically | LLM cost is multiplicative: 5 picks x ~20 agent calls = ~100 LLM calls per screener run; prohibitive | Let user select which pick to send to full pipeline; explicit one-at-a-time |
-| Real-time / streaming market scanning (intraday tick data) | Existing pipeline is batch/on-demand; adding tick-by-tick scanning requires a streaming data vendor (Polygon, Alpaca) not in the current stack | Stick to EOD or near-EOD snapshot data via yfinance |
-| Saving screener results to persistent database | Adds infrastructure (DB schema, migrations, persistence layer) with no existing DB in the project | Log to JSON files same as existing analysis history pattern in `analysis_history/` |
-| Custom filter builder UI (drag-and-drop, formula editor) | High frontend complexity; screener is a decision-support tool, not a general-purpose filter platform | Expose a small fixed set of well-chosen pre-filters with sensible defaults configurable via CLI/API params |
-| Backtesting screener effectiveness | Deferred to v1.2 per PROJECT.md; options backtesting has data availability issues | Accumulate logged decisions first; backtest later |
-| Portfolio tracking / open position awareness | No persistent portfolio state in the system; requires broker integration | Screener recommends fresh opportunities; position tracking out of scope |
-| Natural language filter input ("show me cheap growth stocks") | LLM parsing of freeform filter criteria is fragile and slow; adds a translation layer before actual filtering | Fixed pre-filter parameters with sane defaults; LLM role is ranking, not filter parsing |
-| Social/news sentiment in pre-filter | Adds N API calls in the pre-filter stage (before LLM ranking); too slow for bulk candidate generation | Social/news analysis happens inside the full pipeline after user selects a pick |
+| **Full TradingView Advanced Charting Library** | Requires application to TradingView for private access; proprietary, requires server-side data connector, 100kB+ overhead, and bespoke build pipeline; overkill for a companion chart | Use TradingView Lightweight Charts (MIT, 35kB, OSS, no application needed) |
+| **TradingView embed widget (iframe)** | Iframe widget displays TradingView's own data, not the project's yfinance data; cannot overlay agent signals or paper trade markers; no programmatic control from React | Use `lightweight-charts` npm package directly — full programmatic control |
+| **Live / real-money Alpaca trading** | Real-money execution requires regulatory compliance, additional account verification, and substantially higher risk surface; not the goal of this milestone | Paper-only; separate `ALPACA_PAPER=true` flag; live path never implemented in v1.2 |
+| **Custom backtesting against historical paper trades** | Backtesting deferred to v1.3+ per PROJECT.md; options backtesting has data availability issues | Accumulate paper trade history in v1.2; backtest engine is separate milestone |
+| **Portfolio rebalancing / position sizing engine** | No persistent portfolio model in the system; adding one is a distinct product requiring portfolio theory implementation | Paper orders use fixed size (configurable dollar amount or share count); no dynamic position sizing |
+| **Broker integration other than Alpaca** | Multiple broker integrations multiply maintenance surface; Alpaca has the best free paper trading API in the space for algorithmic use | Alpaca only for v1.2; vendor-abstract the execution interface so future brokers can be added |
+| **Real-time P&L ticker / WebSocket streaming** | Existing SSE streaming covers analysis progress, not live portfolio state; adding WebSocket introduces a second real-time protocol | Poll Alpaca REST for position updates on user action; no persistent WebSocket connection needed |
+| **Social comparison / leaderboard** | No multi-user architecture; each instance tracks its own paper account | Single-account track record only |
+| **Natural language outcome entry ("it went up 3%")** | Fragile LLM parsing for a task that is trivially solved by fetching actual price data from yfinance | Auto-compute outcomes from price history on a scheduled basis |
 
 ---
 
 ## Feature Dependencies
 
 ```
-yfinance bulk data fetch
-  └── Volume pre-filter (avg volume > threshold)
-  └── Market cap pre-filter (market cap > threshold)
-  └── Relative volume calculation (today vol / 20d avg)
-  └── Price momentum calculation (% change N-day)
-  └── Sector grouping (sector field from yfinance info)
+Existing: analysis_history/TICKER/DATE.json (final decision JSON per analysis run)
+  └── Recommendation scoring
+        └── Outcome field added to JSON schema (WIN/LOSS/OPEN, pnl_pct)
+        └── Win rate aggregation endpoint  GET /api/track-record/summary
+        └── Trade history endpoint          GET /api/track-record/trades
+              └── Track record dashboard — summary stats
+              └── Track record dashboard — trade history table
+              └── Track record dashboard — per-ticker breakdown
+              └── Track record dashboard — equity curve (needs filled P&L from Alpaca)
 
-Pre-filter output (~20-50 candidates)
-  └── Composite signal scoring (pure Python)
-        └── LLM screener agent (reads scored candidates dict)
-              └── Ranked output (top 3-5 picks + rationale + confidence)
-                    └── Frontend screener tab (displays ranked list)
-                    └── CLI rich table output
-                    └── "Analyze this pick" button → populates AnalyzeRequest.ticker
+Existing: AgentState final decision (ticker, direction, confidence)
+  └── Alpaca paper trading
+        └── TradingClient(paper=True)  — alpaca-py SDK
+              └── MarketOrderRequest → submit_order()  (equity)
+              └── Mleg OrderRequest → submit_order()   (options, maps from OptionsLegsBuilderReport)
+              └── Order fill response (fill price, fill time)
+                    └── Chart marker overlay (TradingView series.setMarkers())
+                    └── Outcome computation (Alpaca positions API for unrealized P&L)
 
-Options-readiness check (parallel to LLM ranking)
-  └── get_yfinance_options_chain (check chain availability per candidate)
-        └── Boolean flag attached to each ranked pick
+Existing: yfinance OHLCV data (already fetched in analysis pipeline)
+  └── TradingView Lightweight Charts
+        └── createChart() + addCandlestickSeries()  (React useRef + useEffect)
+        └── Volume bars  (addHistogramSeries(), priceScaleId: 'volume')
+        └── Trade markers overlay (series.setMarkers(), depends on Alpaca fill data)
+        └── Multi-timeframe toggle (re-fetch yfinance with different interval param)
 
-New API endpoint POST /api/screen
-  └── ScreenRequest schema (filters as params, llm config passthrough)
-  └── SSE stream for progress (reuse ProgressCallbackHandler)
-  └── ScreenResult schema (list of ranked picks)
+Alpaca paper account portfolio history
+  └── Track record equity curve (GET /api/track-record/equity-curve)
+        └── Lightweight Charts line series in track record dashboard
 ```
 
 ---
@@ -93,28 +101,51 @@ New API endpoint POST /api/screen
 
 Prioritize in this order:
 
-1. **Programmatic pre-filter** — volume + market cap + RVol + momentum + sector in pure Python against yfinance data; produces a ranked-by-signal candidate list without any LLM calls; delivers immediate value and is testable in isolation
-2. **LLM screener agent** — single `create_screener_agent` following existing factory pattern; takes scored candidates dict, returns top 3-5 with rationale and confidence; uses `quick_thinking_llm` (not `deep_thinking_llm` — cost control)
-3. **CLI output** — Rich table showing ranked picks with score, rationale, confidence; consistent with existing CLI experience
-4. **Backend endpoint + SSE** — `POST /api/screen` + SSE stream; mirrors existing `POST /api/analyze` pattern closely
-5. **Frontend screener tab** — New "Screener" tab with ranked card list; each card has ticker, score, confidence, rationale snippet, and "Analyze" button that pre-fills ticker in the config sidebar
+1. **TradingView Lightweight Charts — candlestick + volume** — Direct value, zero broker dependency, renders using data already in the pipeline. OHLCV payload is available from yfinance. Simple `useRef` + `createChart()` pattern in React. Delivers professional chart appearance immediately.
 
-Defer to a follow-up phase:
-- **Options-readiness flag** — Useful but adds N options chain fetches per screener run; add after core flow is stable
-- **Sector momentum context** — ETF proxy approach requires additional design; add after basic sector filter works
-- **Composite score normalization** — Can start with simple rank ordering and add normalized 0-100 score later
+2. **Alpaca paper trading — equity order submission** — `TradingClient(paper=True)` + `MarketOrderRequest`; triggered after the full analysis pipeline completes and user confirms "Execute Paper Trade." Writes fill response back to the analysis JSON log. Foundation for everything else in the milestone.
+
+3. **Recommendation scoring — outcome field + win rate endpoint** — Extend JSON log schema; add `GET /api/track-record/summary` returning aggregate stats. Pure Python, no new infrastructure. Enables the track record dashboard.
+
+4. **Track record dashboard — summary stats + trade history table** — New React tab ("Track Record") reading from `/api/track-record/summary` and `/api/track-record/trades`. Uses existing table/card component patterns.
+
+5. **TradingView — paper trade markers** — Once Alpaca fill price is available (step 2), annotate the chart. Closes the loop between execution and visualization.
+
+Defer to follow-up phases within v1.2:
+
+- **Options multi-leg paper order** — Alpaca mleg support is available, but the translation layer from `OptionsLegsBuilderReport` to Alpaca legs array requires careful mapping; tackle after equity orders are stable.
+- **Equity curve chart** — Requires Alpaca portfolio history accumulation over time; meaningful only after several paper trades have been made.
+- **Per-agent accuracy scoring** — Requires extracting individual agent votes from existing report text (not fully structured); add after core win rate works.
+
+---
+
+## Complexity Notes
+
+| Feature Area | Complexity Driver | Risk |
+|---|---|---|
+| TradingView chart | Low-to-medium; pure frontend, well-documented OSS library, data already exists | Chart imperative API vs React declarative model requires useEffect cleanup discipline |
+| Alpaca equity paper trade | Medium; SDK is straightforward but order lifecycle (submitted → filled → rejected) must be handled | Paper fills are simulated and may lag real quotes; fill price ≠ current quote in fast markets |
+| Alpaca options multi-leg | High; requires mapping from existing `OptionsLegsBuilderReport` (strategy + legs dict) to Alpaca's `legs` array format with `symbol` (OCC format), `side`, `ratio_qty` | OCC option symbol format (e.g., `AAPL250117C00150000`) must be constructed from strike/expiry/type stored in existing legs output |
+| Recommendation scoring | Low; pure Python aggregation over JSON files that already exist | Outcome determination timing matters — "was the call right?" is ambiguous without a defined close rule (e.g., 5-day hold period) |
+| Track record dashboard | Medium; new React tab with table + stats cards; API aggregation logic in Python | Performance at scale if `analysis_history/` grows large; add simple in-memory aggregation cache |
 
 ---
 
 ## Sources
 
-- [8 Best Stock Screeners of 2026 — Koyfin](https://www.koyfin.com/blog/best-stock-screeners/)
-- [Stock Screener Key Features — Simply Wall St](https://support.simplywall.st/hc/en-us/articles/10543502387727-Stock-Screener-Key-Features-and-How-to-s)
-- [Top AI-Driven Stock Screener Tools 2026](https://www.oloumbohout.com/en/2026/03/top-ai-stock-screeners-algorithmic-trading.html)
-- [Best AI Stock Screeners 2026 — AlphaLog](https://alphalog.ai/blog/best-ai-stock-screeners-2026)
-- [Real-Time Stock Screener: 14 Strategies — TradesViz](https://www.tradesviz.com/blog/real-time-stock-screener/watchlist-integration/)
-- [Deepvue — Smart Screener ALL/ANY Logic](https://deepvue.com/screener/smart-stock-screeners-all-any-logic/)
-- [Momentum Trading with MACD and RSI — yfinance Python](https://medium.com/analytics-vidhya/momentum-trading-with-macd-and-rsi-yfinance-python-e5203d2e1a8a)
-- [15 Essential Volume Indicators in Python](https://datadave1.medium.com/15-essential-volume-indicators-and-using-them-in-python-5e681a9285bd)
-- [AI in Investment Analysis: LLMs for Equity Stock Ratings — ACM](https://dl.acm.org/doi/10.1145/3677052.3698694)
-- [LangGraph in 2026: Build Multi-Agent AI Systems — DEV Community](https://dev.to/ottoaria/langgraph-in-2026-build-multi-agent-ai-systems-that-actually-work-3h5)
+- [TradingView Lightweight Charts — Official Library Page](https://www.tradingview.com/lightweight-charts/)
+- [Lightweight Charts v5 Release Notes — TradingView Blog](https://www.tradingview.com/blog/en/tradingview-lightweight-charts-version-5-50837/)
+- [Lightweight Charts React Basic Tutorial](https://tradingview.github.io/lightweight-charts/tutorials/react/simple)
+- [Lightweight Charts React Advanced Tutorial](https://tradingview.github.io/lightweight-charts/tutorials/react/advanced)
+- [Lightweight Charts Series Types](https://tradingview.github.io/lightweight-charts/docs/series-types)
+- [TradingView Widget vs Library Product Comparison](https://www.tradingview.com/charting-library-docs/latest/getting_started/product-comparison/)
+- [Alpaca Paper Trading — Official Docs](https://docs.alpaca.markets/docs/paper-trading)
+- [Alpaca Options Trading — Official Docs](https://docs.alpaca.markets/docs/options-trading)
+- [Alpaca Multi-Leg Options Level 3 Trading — Official Docs](https://docs.alpaca.markets/docs/options-level-3-trading)
+- [Alpaca Multi-Leg Level 3 in Paper Changelog](https://docs.alpaca.markets/changelog/multi-leg-level-3-options-trading-in-paper)
+- [alpaca-py Python SDK — GitHub](https://github.com/alpacahq/alpaca-py)
+- [alpaca-py SDK Trading Reference](https://alpaca.markets/sdks/python/trading.html)
+- [Trading Performance Metrics — Babypips](https://www.babypips.com/trading/trading-performance-metrics)
+- [Top 5 Metrics for Evaluating Trading Strategies — LuxAlgo](https://www.luxalgo.com/blog/top-5-metrics-for-evaluating-trading-strategies/)
+- [Complete Guide to Trading Performance Tracking — TradeFundrr](https://tradefundrr.com/trading-performance-tracking/)
+- [AI Trading Tool That Keeps Score — DEV Community](https://dev.to/tradehorde/we-built-an-ai-trading-tool-that-actually-keeps-score-53ap)
