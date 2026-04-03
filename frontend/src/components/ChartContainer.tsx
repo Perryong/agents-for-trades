@@ -1,14 +1,16 @@
 import { useRef, useEffect } from 'react';
-import { createChart, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
-import type { IChartApi, CandlestickData, HistogramData } from 'lightweight-charts';
+import { createChart, CandlestickSeries, HistogramSeries, createSeriesMarkers, LineStyle } from 'lightweight-charts';
+import type { IChartApi, CandlestickData, HistogramData, Time } from 'lightweight-charts';
+import type { ChartOverlay } from '../types';
 
 interface ChartContainerProps {
   data: CandlestickData[];
   volumeData: HistogramData[];
   dark: boolean;
+  overlay?: ChartOverlay | null;
 }
 
-export function ChartContainer({ data, volumeData, dark }: ChartContainerProps) {
+export function ChartContainer({ data, volumeData, dark, overlay }: ChartContainerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
@@ -65,6 +67,62 @@ export function ChartContainer({ data, volumeData, dark }: ChartContainerProps) 
     });
     volumeSeries.setData(volumeData);
 
+    // --- Overlay annotations (active mode per D-16) ---
+    if (overlay) {
+      // 1. Take-profit horizontal dashed line (green)
+      if (overlay.take_profit !== null) {
+        candleSeries.createPriceLine({
+          price: overlay.take_profit,
+          color: '#22c55e',
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: 'TP',
+        });
+      }
+
+      // 2. Stop-loss horizontal dashed line (red)
+      if (overlay.stop_loss !== null) {
+        candleSeries.createPriceLine({
+          price: overlay.stop_loss,
+          color: '#ef4444',
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: 'SL',
+        });
+      }
+
+      // 3. Entry marker dot (blue circle at analysis date)
+      // Only render if entry_price is known — don't fake a price
+      if (overlay.entry_price !== null) {
+        createSeriesMarkers(candleSeries, [
+          {
+            time: overlay.analysis_date as Time,
+            position: 'belowBar',
+            color: '#3b82f6',
+            shape: 'circle',
+            text: overlay.strategy_name ?? overlay.signal,
+            size: 2,
+          },
+        ]);
+      }
+
+      // 4. Expiry marker (amber arrowDown above bar at expiry date)
+      if (overlay.expiry_date !== null) {
+        createSeriesMarkers(candleSeries, [
+          {
+            time: overlay.expiry_date as Time,
+            position: 'aboveBar',
+            color: '#f59e0b',
+            shape: 'arrowDown',
+            text: 'Expiry',
+            size: 1,
+          },
+        ]);
+      }
+    }
+
     chart.timeScale().fitContent();
 
     // Resize observer
@@ -79,7 +137,7 @@ export function ChartContainer({ data, volumeData, dark }: ChartContainerProps) 
       window.removeEventListener('resize', handleResize);
       chart.remove();
     };
-  }, [data, volumeData, dark]);
+  }, [data, volumeData, dark, overlay]);
 
   return <div ref={containerRef} className="w-full h-full" />;
 }

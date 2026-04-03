@@ -1,22 +1,56 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { ChartTimeframe } from '../types';
 import { TIMEFRAME_CONFIG } from '../types';
 import { useChartData } from '../hooks/useChartData';
+import { useOverlay } from '../hooks/useOverlay';
 import { ChartContainer } from './ChartContainer';
 import { ChartTickerPicker } from './ChartTickerPicker';
+import { ChartActionPanel } from './ChartActionPanel';
 
 const TIMEFRAMES: ChartTimeframe[] = ['1D', '1M', '3M', '6M', '1Y'];
 
 interface ChartScreenProps {
   dark: boolean;
+  initialTicker?: string;
+  onViewAnalysis?: () => void;
 }
 
-export function ChartScreen({ dark }: ChartScreenProps) {
-  const [ticker, setTicker] = useState('');
+export function ChartScreen({ dark, initialTicker, onViewAnalysis }: ChartScreenProps) {
+  const [ticker, setTicker] = useState(initialTicker ?? '');
   // Default to 6M per D-25 passive mode
   const [timeframe, setTimeframe] = useState<ChartTimeframe>('6M');
+  const hasSetSmartDefault = useRef(false);
+
+  // Sync ticker when initialTicker prop changes (e.g. auto-navigate from Analysis)
+  useEffect(() => {
+    if (initialTicker && initialTicker !== ticker) {
+      setTicker(initialTicker);
+      // Reset smart default flag so it recalculates for the new ticker
+      hasSetSmartDefault.current = false;
+    }
+  }, [initialTicker]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { bars, volumeData, loading, error } = useChartData(ticker, timeframe);
+  const { overlay } = useOverlay(ticker);
+
+  const isActiveMode = overlay !== null;
+
+  // Smart default timeframe in active mode (per D-25)
+  useEffect(() => {
+    if (overlay && !hasSetSmartDefault.current) {
+      hasSetSmartDefault.current = true;
+      const entryDate = new Date(overlay.analysis_date);
+      const now = new Date();
+      const daysDiff = Math.floor((now.getTime() - entryDate.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysDiff < 14) {
+        setTimeframe('1M');
+      } else if (daysDiff < 42) {
+        setTimeframe('3M');
+      } else {
+        setTimeframe('6M');
+      }
+    }
+  }, [overlay]);
 
   return (
     <div className="flex flex-col h-full">
@@ -62,9 +96,17 @@ export function ChartScreen({ dark }: ChartScreenProps) {
             </div>
           </div>
         ) : bars && volumeData ? (
-          <ChartContainer data={bars} volumeData={volumeData} dark={dark} />
+          <ChartContainer data={bars} volumeData={volumeData} dark={dark} overlay={overlay} />
         ) : null}
       </div>
+
+      {/* Action panel — pinned bottom, only in active mode */}
+      {isActiveMode && overlay && (
+        <ChartActionPanel
+          overlay={overlay}
+          onViewAnalysis={onViewAnalysis ?? (() => {})}
+        />
+      )}
     </div>
   );
 }
