@@ -82,6 +82,8 @@ class TradeRequest(BaseModel):
     strike: Optional[float] = None
     expiry: Optional[str] = None
     contract_type: Optional[str] = None    # "call" | "put"
+    # Scoring fields (Phase 15 — SCORE-01)
+    confidence_text: Optional[str] = None  # full prose for confidence/target/stop extraction
 
 
 class TradeResponse(BaseModel):
@@ -94,6 +96,7 @@ class TradeResponse(BaseModel):
     quantity: int
     fill_price: Optional[float] = None
     fill_time: Optional[str] = None
+    confidence: Optional[float] = None
 
 
 class TradeStatusResponse(BaseModel):

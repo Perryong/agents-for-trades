@@ -57,6 +57,67 @@ def get_client() -> TradingClient:
 
 
 # ---------------------------------------------------------------------------
+# Confidence / price extraction helpers (Phase 15 — SCORE-01)
+# ---------------------------------------------------------------------------
+
+def _extract_confidence(text: str) -> float | None:
+    """Extract confidence percentage from prose text.
+
+    Tries two patterns in order:
+    1. "Confidence: 85%" / "Overall Confidence Level: 78%" / "confidence level: 72.5%"
+    2. "85% confidence"
+
+    Returns float 0-100 or None if no match.
+    """
+    patterns = [
+        r"(?:overall\s+)?confidence(?:\s+level)?[:\s]*(\d+(?:\.\d+)?)\s*%",
+        r"(\d+(?:\.\d+)?)\s*%\s*confiden",
+    ]
+    for pat in patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            try:
+                return float(m.group(1))
+            except ValueError:
+                continue
+    return None
+
+
+def _extract_target_price(text: str) -> float | None:
+    """Extract target / take-profit price from prose text."""
+    label = r"target|take.profit|tp"
+    patterns = [
+        rf"(?:{label})\s*(?:price)?[:\s]*\$?([\d,.]+)",
+        rf"\$?([\d,.]+)\s*(?:{label})",
+    ]
+    for pat in patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            try:
+                return float(m.group(1).replace(",", ""))
+            except ValueError:
+                continue
+    return None
+
+
+def _extract_stop_price(text: str) -> float | None:
+    """Extract stop-loss price from prose text."""
+    label = r"stop.loss|stop|sl"
+    patterns = [
+        rf"(?:{label})\s*(?:price)?[:\s]*\$?([\d,.]+)",
+        rf"\$?([\d,.]+)\s*(?:{label})",
+    ]
+    for pat in patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            try:
+                return float(m.group(1).replace(",", ""))
+            except ValueError:
+                continue
+    return None
+
+
+# ---------------------------------------------------------------------------
 # OCC symbol helpers (EXEC-04)
 # ---------------------------------------------------------------------------
 
@@ -187,6 +248,10 @@ async def submit_trade(request: TradeRequest, session: SessionDep):
         occ_symbol=occ_symbol,
         legs_json=request.options_legs,
     )
+    if request.confidence_text:
+        trade.confidence = _extract_confidence(request.confidence_text)
+        trade.target_price = _extract_target_price(request.confidence_text)
+        trade.stop_price = _extract_stop_price(request.confidence_text)
     session.add(trade)
     await session.commit()
     await session.refresh(trade)
@@ -201,6 +266,7 @@ async def submit_trade(request: TradeRequest, session: SessionDep):
         quantity=trade.quantity,
         fill_price=trade.fill_price,
         fill_time=trade.fill_time.isoformat() if trade.fill_time else None,
+        confidence=trade.confidence,
     )
 
 

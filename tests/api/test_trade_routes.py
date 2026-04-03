@@ -312,6 +312,76 @@ async def test_poll_order_status_includes_close_time(app_with_db, test_session_f
     assert data["pnl_pct"] == 5.0
 
 
+# ---------------------------------------------------------------------------
+# Unit tests: _extract_confidence (TDD — Task 1, Phase 15-01)
+# ---------------------------------------------------------------------------
+
+def test_extract_confidence_explicit_percent():
+    """_extract_confidence("Confidence: 85%") returns 85.0."""
+    from api.trade_routes import _extract_confidence
+    assert _extract_confidence("Confidence: 85%") == 85.0
+
+
+def test_extract_confidence_level_percent():
+    """_extract_confidence("confidence level: 72.5%") returns 72.5."""
+    from api.trade_routes import _extract_confidence
+    assert _extract_confidence("confidence level: 72.5%") == 72.5
+
+
+def test_extract_confidence_overall_level():
+    """_extract_confidence("Overall Confidence Level: 78%") returns 78.0."""
+    from api.trade_routes import _extract_confidence
+    assert _extract_confidence("Overall Confidence Level: 78%") == 78.0
+
+
+def test_extract_confidence_no_match():
+    """_extract_confidence("no confidence here") returns None."""
+    from api.trade_routes import _extract_confidence
+    assert _extract_confidence("no confidence here") is None
+
+
+def test_trade_request_accepts_confidence_text():
+    """TradeRequest with confidence_text field passes Pydantic validation."""
+    from api.schemas import TradeRequest
+    req = TradeRequest(
+        ticker="AAPL",
+        direction="BUY",
+        confidence_text="Confidence: 85%",
+    )
+    assert req.confidence_text == "Confidence: 85%"
+
+
+@pytest.mark.asyncio
+async def test_submit_trade_stores_confidence(app_with_db, test_session_factory):
+    """POST /api/trades with confidence_text stores extracted confidence in DB."""
+    order_id = str(uuid.uuid4())
+    mock_order = make_mock_order(order_id=order_id, status="submitted")
+    mock_client = MagicMock()
+    mock_client.submit_order.return_value = mock_order
+
+    with patch("api.trade_routes.get_client", return_value=mock_client):
+        async with AsyncClient(
+            transport=ASGITransport(app=app_with_db), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/api/trades",
+                json={
+                    "ticker": "AAPL",
+                    "direction": "BUY",
+                    "trade_type": "equity",
+                    "confidence_text": "Overall Confidence Level: 78%",
+                },
+            )
+
+    assert resp.status_code == 200, resp.text
+
+    async with test_session_factory() as session:
+        result = await session.execute(select(Trade).where(Trade.order_id == order_id))
+        saved = result.scalar_one_or_none()
+    assert saved is not None
+    assert saved.confidence == 78.0
+
+
 @pytest.mark.asyncio
 async def test_auto_close_after_n_days(app_with_db, test_session_factory):
     """Filled trade with fill_time 10+ days ago gets closed by check-autoclose."""

@@ -33,4 +33,7 @@ class Trade(Base):
     contract_type: Mapped[str | None] = mapped_column(String, nullable=True)
     occ_symbol: Mapped[str | None] = mapped_column(String, nullable=True)
     legs_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    target_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    stop_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
