@@ -3,14 +3,23 @@ import { createChart, CandlestickSeries, HistogramSeries, createSeriesMarkers, L
 import type { IChartApi, CandlestickData, HistogramData, Time } from 'lightweight-charts';
 import type { ChartOverlay } from '../types';
 
+interface TradeMarker {
+  fillDate: string;
+  fillPrice: number;
+  direction: string;
+  closeDate?: string;
+  closePrice?: number;
+}
+
 interface ChartContainerProps {
   data: CandlestickData[];
   volumeData: HistogramData[];
   dark: boolean;
   overlay?: ChartOverlay | null;
+  tradeMarker?: TradeMarker | null;
 }
 
-export function ChartContainer({ data, volumeData, dark, overlay }: ChartContainerProps) {
+export function ChartContainer({ data, volumeData, dark, overlay, tradeMarker }: ChartContainerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
@@ -123,6 +132,35 @@ export function ChartContainer({ data, volumeData, dark, overlay }: ChartContain
       }
     }
 
+    // --- Trade fill / exit markers (CHART-03) ---
+    if (tradeMarker) {
+      const markers = [];
+
+      // Entry marker — green arrowUp for BUY, red arrowDown for SELL
+      markers.push({
+        time: tradeMarker.fillDate as Time,
+        position: tradeMarker.direction === 'BUY' ? 'belowBar' as const : 'aboveBar' as const,
+        color: tradeMarker.direction === 'BUY' ? '#22c55e' : '#ef4444',
+        shape: tradeMarker.direction === 'BUY' ? 'arrowUp' as const : 'arrowDown' as const,
+        text: `FILL $${tradeMarker.fillPrice.toFixed(2)}`,
+        size: 2,
+      });
+
+      // Exit marker (purple square above bar at close date)
+      if (tradeMarker.closeDate && tradeMarker.closePrice) {
+        markers.push({
+          time: tradeMarker.closeDate as Time,
+          position: 'aboveBar' as const,
+          color: '#a855f7',
+          shape: 'square' as const,
+          text: `CLOSE $${tradeMarker.closePrice.toFixed(2)}`,
+          size: 2,
+        });
+      }
+
+      createSeriesMarkers(candleSeries, markers);
+    }
+
     chart.timeScale().fitContent();
 
     // Resize observer
@@ -137,7 +175,7 @@ export function ChartContainer({ data, volumeData, dark, overlay }: ChartContain
       window.removeEventListener('resize', handleResize);
       chart.remove();
     };
-  }, [data, volumeData, dark, overlay]);
+  }, [data, volumeData, dark, overlay, tradeMarker]);
 
   return <div ref={containerRef} className="w-full h-full" />;
 }

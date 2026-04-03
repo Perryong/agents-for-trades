@@ -5,6 +5,7 @@ import { useChartData } from '../hooks/useChartData';
 import { useOverlay } from '../hooks/useOverlay';
 import { useTrade } from '../hooks/useTrade';
 import { useTradeStatus } from '../hooks/useTradeStatus';
+import { useTradeMarker } from '../hooks/useTradeMarker';
 import { ChartContainer } from './ChartContainer';
 import { ChartTickerPicker } from './ChartTickerPicker';
 import { ChartActionPanel } from './ChartActionPanel';
@@ -41,6 +42,17 @@ export function ChartScreen({ dark, initialTicker, onViewAnalysis }: ChartScreen
   const { overlay } = useOverlay(ticker);
   const { submitTrade, isSubmitting } = useTrade();
   const tradeStatus = useTradeStatus(ticker, currentOrderId);
+
+  // Auto-close check: fires once on mount per D-09 (fire-and-forget)
+  useEffect(() => {
+    fetch('/api/trades/check-autoclose', { method: 'POST' }).catch(() => {});
+  }, []);
+
+  // Derive trade fill/exit markers from tradeStatus for chart rendering
+  const tradeMarker = useTradeMarker(
+    tradeStatus,
+    overlay?.signal ?? 'BUY',
+  );
 
   const isActiveMode = overlay !== null;
 
@@ -151,7 +163,7 @@ export function ChartScreen({ dark, initialTicker, onViewAnalysis }: ChartScreen
             </div>
           </div>
         ) : bars && volumeData ? (
-          <ChartContainer data={bars} volumeData={volumeData} dark={dark} overlay={overlay} />
+          <ChartContainer data={bars} volumeData={volumeData} dark={dark} overlay={overlay} tradeMarker={tradeMarker} />
         ) : null}
       </div>
 
