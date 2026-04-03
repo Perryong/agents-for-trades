@@ -27,7 +27,7 @@ DEFAULT_CONFIG = {
         "technical_pattern": "yfinance",     # Options: yfinance
         "fundamental_data": "yfinance",      # Options: alpha_vantage, yfinance
         "news_data": "yfinance",             # Options: alpha_vantage, yfinance
-        "options_data": "tradier",           # Options: tradier, yfinance
+        "options_data": "yfinance",          # Options: tradier, yfinance
         "screener_data": "yfinance",         # Options: yfinance
     },
     # Tool-level configuration (takes precedence over category-level)
@@ -36,7 +36,7 @@ DEFAULT_CONFIG = {
     },
     # Options configuration
     "enable_options": False,            # Off by default — additive, non-breaking
-    "options_vendor": "tradier",        # Primary vendor for options data
+    "options_vendor": "yfinance",        # Primary vendor for options data (tradier needs API key)
     "options_delta_target": 0.30,       # Target delta for contract selection (Phase 3)
     "options_dte_window": [21, 45],     # DTE range [min, max] for contract selection
     "options_min_oi": 100,              # Minimum open interest filter

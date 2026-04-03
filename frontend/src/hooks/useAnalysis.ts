@@ -93,6 +93,16 @@ export function useAnalysis() {
       dispatch({ type: 'NODE_END', node: data.node });
     });
 
+    // LLM-level heartbeat events keep the stream alive and show activity
+    es.addEventListener('llm_start', (e: MessageEvent) => {
+      const data = JSON.parse(e.data);
+      dispatch({ type: 'NODE_START', node: `LLM call (${data.node})` });
+    });
+
+    es.addEventListener('llm_end', () => {
+      // Don't dispatch NODE_END for LLM events — just let the next event update
+    });
+
     es.addEventListener('complete', (e: MessageEvent) => {
       const data = JSON.parse(e.data);
       const result: AnalysisResult = {

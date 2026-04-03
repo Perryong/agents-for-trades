@@ -117,7 +117,7 @@ class GraphSetup:
                 self.quick_thinking_llm
             )
             delete_nodes["technical"] = create_msg_delete()
-            tool_nodes["technical"] = self.tool_nodes["technical"]
+            # Technical analyst pre-fetches data — no tool-calling loop needed
 
         if "social" in selected_analysts:
             analyst_nodes["social"] = create_social_media_analyst(
@@ -169,7 +169,8 @@ class GraphSetup:
             workflow.add_node(
                 f"Msg Clear {analyst_type.capitalize()}", delete_nodes[analyst_type]
             )
-            workflow.add_node(f"tools_{analyst_type}", tool_nodes[analyst_type])
+            if analyst_type in tool_nodes:
+                workflow.add_node(f"tools_{analyst_type}", tool_nodes[analyst_type])
 
         # Add other nodes
         workflow.add_node("Bull Researcher", bull_researcher_node)
@@ -191,6 +192,9 @@ class GraphSetup:
 
         first_equity = f"{first_analyst.capitalize()} Analyst"
 
+        # Build list of all parallel branch entry points (equity analysts)
+        equity_entries = [f"{a.capitalize()} Analyst" for a in selected_analysts]
+
         if enable_options:
             # Add all 7 options nodes with graceful error wrapping
             for node_name, factory_fn in OPTIONS_NODES:
@@ -207,39 +211,51 @@ class GraphSetup:
             # Fan-in: last options node -> Bull Researcher
             workflow.add_edge("Options - Greeks Monitor", "Bull Researcher")
 
-            # Conditional fan-out from START to both branches
+            # Fan-out from START to all equity analysts + options branch in parallel
+            all_branches = equity_entries + ["Options - Volatility Analyst"]
+
             def route_from_start(state):
-                return [first_equity, "Options - Volatility Analyst"]
+                return all_branches
 
             workflow.add_conditional_edges(
                 START,
                 route_from_start,
-                [first_equity, "Options - Volatility Analyst"],
+                all_branches,
             )
         else:
-            # Equity-only: single edge from START
-            workflow.add_edge(START, first_equity)
+            # Fan-out from START to all equity analysts in parallel
+            def route_equity_start(state):
+                return equity_entries
 
-        # Connect analysts in sequence
-        for i, analyst_type in enumerate(selected_analysts):
+            workflow.add_conditional_edges(
+                START,
+                route_equity_start,
+                equity_entries,
+            )
+
+        # Analysts that pre-fetch data and don't need tool-calling loops
+        no_tool_analysts = {"technical"}
+
+        # Connect each analyst's edges and fan-in to Bull Researcher
+        for analyst_type in selected_analysts:
             current_analyst = f"{analyst_type.capitalize()} Analyst"
-            current_tools = f"tools_{analyst_type}"
             current_clear = f"Msg Clear {analyst_type.capitalize()}"
 
-            # Add conditional edges for current analyst
-            workflow.add_conditional_edges(
-                current_analyst,
-                getattr(self.conditional_logic, f"should_continue_{analyst_type}"),
-                [current_tools, current_clear],
-            )
-            workflow.add_edge(current_tools, current_analyst)
-
-            # Connect to next analyst or to Bull Researcher if this is the last analyst
-            if i < len(selected_analysts) - 1:
-                next_analyst = f"{selected_analysts[i+1].capitalize()} Analyst"
-                workflow.add_edge(current_clear, next_analyst)
+            if analyst_type in no_tool_analysts:
+                # Direct: analyst -> clear (no tool loop)
+                workflow.add_edge(current_analyst, current_clear)
             else:
-                workflow.add_edge(current_clear, "Bull Researcher")
+                # Tool-calling loop: analyst -> tools -> analyst -> clear
+                current_tools = f"tools_{analyst_type}"
+                workflow.add_conditional_edges(
+                    current_analyst,
+                    getattr(self.conditional_logic, f"should_continue_{analyst_type}"),
+                    [current_tools, current_clear],
+                )
+                workflow.add_edge(current_tools, current_analyst)
+
+            # All analysts fan-in to Bull Researcher
+            workflow.add_edge(current_clear, "Bull Researcher")
 
         # Add remaining edges
         workflow.add_conditional_edges(

@@ -68,9 +68,32 @@ Guidelines for Decision-Making:
 4. **Learn from Past Mistakes**: Use lessons from **{past_memory_str}** to address prior misjudgments and improve the decision you are making now to make sure you don't make a wrong BUY/SELL/HOLD call that loses money.
 5. **Technical Alignment Check**: Validate the final recommendation against the Technical Analyst report. If you diverge, provide a concrete reason and risk mitigation.
 
-Deliverables:
-- A clear and actionable recommendation: Buy, Sell, or Hold.
+Deliverables — your output MUST include ALL of these sections:
+
+## Recommendation
+- Signal: BUY / SELL / HOLD
+- Conviction: High / Medium / Low
 - Detailed reasoning anchored in the debate and past reflections.
+
+## Equity Trade Plan
+- Entry price (specific price or range)
+- Stop loss level (with reasoning — e.g., below support)
+- Profit target(s) (T1 and T2 if applicable)
+- Risk/reward ratio
+- Position sizing suggestion (% of portfolio)
+
+## Options Trade Plan (include ONLY if options data is available above)
+- Recommended strategy (e.g., bull call spread, protective put)
+- Specific legs: strike(s), expiry, type (call/put), buy/sell
+- Entry price per contract (debit or credit)
+- Max profit / max loss / breakeven
+- Exit rules: when to take profit, when to cut loss
+- Greeks snapshot at entry (delta, theta, vega)
+- Key risk: what kills this trade (e.g., IV crush, time decay, gap down)
+
+## Risk Summary
+- What could go wrong (top 2-3 scenarios)
+- Hedging suggestion if applicable
 
 ---
 

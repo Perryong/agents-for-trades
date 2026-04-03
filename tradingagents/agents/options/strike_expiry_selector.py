@@ -114,31 +114,75 @@ def _select_contract(
     """Select best matching contract for a single leg.
 
     For put legs, uses abs(delta) to handle negative sign convention.
+    Falls back to moneyness-based selection when delta is unavailable (yfinance).
 
     Args:
         delta_offset: applied to delta_target for spread sell legs
     """
     adjusted_target = delta_target + delta_offset
-    lo = adjusted_target - delta_tolerance
-    hi = adjusted_target + delta_tolerance
 
     type_df = chain_df[chain_df["option_type"] == option_type].copy()
     if type_df.empty:
         return None
 
-    if option_type == "put":
-        type_df["_abs_delta"] = type_df["delta"].abs()
-        mask = type_df["_abs_delta"].between(lo, hi) & (type_df["open_interest"] >= min_oi)
-        candidates = type_df[mask].copy()
-        if candidates.empty:
-            return None
-        candidates["_dist"] = (candidates["_abs_delta"] - adjusted_target).abs()
+    # Check if delta data is available
+    has_delta = (
+        "delta" in type_df.columns
+        and type_df["delta"].notna().any()
+        and (type_df["delta"] != 0).any()
+    )
+
+    if has_delta:
+        # Delta-based selection (Tradier or other providers with Greeks)
+        lo = adjusted_target - delta_tolerance
+        hi = adjusted_target + delta_tolerance
+
+        if option_type == "put":
+            type_df["_abs_delta"] = type_df["delta"].abs()
+            mask = type_df["_abs_delta"].between(lo, hi) & (type_df["open_interest"] >= min_oi)
+            candidates = type_df[mask].copy()
+            if candidates.empty:
+                return None
+            candidates["_dist"] = (candidates["_abs_delta"] - adjusted_target).abs()
+        else:
+            mask = type_df["delta"].between(lo, hi) & (type_df["open_interest"] >= min_oi)
+            candidates = type_df[mask].copy()
+            if candidates.empty:
+                return None
+            candidates["_dist"] = (candidates["delta"] - adjusted_target).abs()
     else:
-        mask = type_df["delta"].between(lo, hi) & (type_df["open_interest"] >= min_oi)
+        # Moneyness-based fallback (yfinance — no Greeks available)
+        # Approximate delta from strike vs current price using mid of bid/ask
+        # delta ~0.30 call ≈ ~7-10% OTM, delta ~0.30 put ≈ ~7-10% OTM
+        type_df["_mid"] = (type_df["bid"] + type_df["ask"]) / 2
+        # Estimate current price from ATM options (highest mid for calls near strikes)
+        atm_price = type_df.loc[type_df["_mid"].idxmax(), "strike"] if not type_df.empty else 0
+
+        # For the fallback, use moneyness ratio to approximate delta
+        # delta_target 0.30 ≈ strike/price ratio of ~1.07 for calls, ~0.93 for puts
+        otm_pct = 0.5 - adjusted_target  # 0.30 delta → 0.20 = 20% OTM approx
+        # Clamp: very low delta targets shouldn't go beyond 30% OTM
+        otm_pct = max(0.02, min(otm_pct, 0.30))
+
+        if option_type == "call":
+            target_strike = atm_price * (1 + otm_pct)
+        else:
+            target_strike = atm_price * (1 - otm_pct)
+
+        # Filter by OI (use lower threshold for yfinance since OI data may be sparse)
+        effective_min_oi = max(1, min_oi // 10)  # Relax OI for yfinance
+        mask = type_df["open_interest"] >= effective_min_oi
         candidates = type_df[mask].copy()
         if candidates.empty:
-            return None
-        candidates["_dist"] = (candidates["delta"] - adjusted_target).abs()
+            # Last resort: just pick by closest strike, ignore OI
+            candidates = type_df.copy()
+        candidates["_dist"] = (candidates["strike"] - target_strike).abs()
+        # Estimate delta for display purposes
+        if atm_price > 0:
+            if option_type == "call":
+                candidates["delta"] = (1 - (candidates["strike"] - atm_price).clip(lower=0) / atm_price).clip(0.05, 0.95)
+            else:
+                candidates["delta"] = (-1 + (atm_price - candidates["strike"]).clip(lower=0) / atm_price).clip(-0.95, -0.05)
 
     return candidates.nsmallest(1, "_dist").iloc[0]
 
@@ -150,11 +194,17 @@ def _select_contract(
 def _format_leg(leg_num: int, action: str, option_type: str, ticker: str,
                 expiry: str, row: pd.Series) -> str:
     strike = row["strike"]
-    delta_val = abs(row["delta"]) if option_type == "put" else row["delta"]
-    oi = int(row["open_interest"])
+    delta_raw = row.get("delta")
+    if delta_raw is not None and not (isinstance(delta_raw, float) and pd.isna(delta_raw)):
+        delta_val = abs(float(delta_raw)) if option_type == "put" else float(delta_raw)
+        delta_str = f"delta={delta_val:.2f}"
+    else:
+        delta_str = "delta=est"
+    oi = int(row.get("open_interest", 0))
+    oi_status = "PASS" if oi >= 10 else "LOW_OI"
     return (
         f"LEG {leg_num}: {action} {option_type.upper()} {ticker} "
-        f"{expiry} ${strike} delta={delta_val:.2f} OI={oi} [PASS]"
+        f"{expiry} ${strike} {delta_str} OI={oi} [{oi_status}]"
     )
 
 

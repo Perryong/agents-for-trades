@@ -55,3 +55,18 @@ class ProgressCallbackHandler(BaseCallbackHandler):
         """Emit a node_end event when a chain/node finishes execution."""
         name = kwargs.get("name", "unknown")
         self._put({"type": "node_end", "node": name})
+
+    def on_llm_start(
+        self, serialized: Dict[str, Any], prompts: Any, **kwargs: Any
+    ) -> None:
+        """Emit a heartbeat event when an LLM call begins.
+
+        LLM-level callbacks fire even when graph-level callbacks are not
+        attached, providing a fallback to keep the SSE stream alive.
+        """
+        model = serialized.get("id", ["unknown"])[-1] if serialized.get("id") else "unknown"
+        self._put({"type": "llm_start", "node": model})
+
+    def on_llm_end(self, response: Any, **kwargs: Any) -> None:
+        """Emit a heartbeat event when an LLM call completes."""
+        self._put({"type": "llm_end", "node": "llm"})

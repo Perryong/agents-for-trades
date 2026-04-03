@@ -1196,17 +1196,21 @@ def analyze():
 def screen(
     max_picks: int = typer.Option(5, "--max-picks", min=1, max=10, help="Number of top picks to display (1-10)"),
     json_output: bool = typer.Option(False, "--json", help="Output results as JSON"),
+    provider: str = typer.Option("google", "--provider", help="LLM provider (openai, google, anthropic)"),
+    model: str = typer.Option("gemini-2.5-flash", "--model", help="Model name for screening"),
 ):
     """Run the stock screener and display ranked picks."""
     config = DEFAULT_CONFIG.copy()
     config["screener_n_picks"] = max_picks
+    config["llm_provider"] = provider
+    config["quick_think_llm"] = model
 
     try:
         with console.status("[bold cyan]Screening market...", spinner="dots"):
             llm_client = create_llm_client(
-                provider=config["llm_provider"],
-                model=config["quick_think_llm"],
-                base_url=config.get("backend_url"),
+                provider=provider,
+                model=model,
+                base_url=None if provider != "openai" else config.get("backend_url"),
             )
             result = run_screener(config, llm_client)
 

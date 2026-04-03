@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { AnalyzeRequest } from '../types';
+import { TickerAutocomplete } from './TickerAutocomplete';
 
 interface ConfigSidebarProps {
   onAnalyze: (request: AnalyzeRequest) => void;
@@ -14,6 +15,30 @@ const ANALYST_OPTIONS = [
   { id: 'news', label: 'News' },
   { id: 'fundamentals', label: 'Fundamentals' },
 ];
+
+const PROVIDER_MODELS: Record<string, { deep: string[]; quick: string[]; defaultDeep: string; defaultQuick: string; label: string }> = {
+  openai: {
+    label: 'OpenAI',
+    deep: ['gpt-5.2', 'gpt-5', 'gpt-4.1', 'o4-mini', 'o3', 'o3-mini'],
+    quick: ['gpt-5-mini', 'gpt-4.1-mini', 'gpt-4.1-nano', 'o4-mini', 'o3-mini'],
+    defaultDeep: 'gpt-5.2',
+    defaultQuick: 'gpt-5-mini',
+  },
+  google: {
+    label: 'Google',
+    deep: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'],
+    quick: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'],
+    defaultDeep: 'gemini-2.5-pro',
+    defaultQuick: 'gemini-2.5-flash',
+  },
+  anthropic: {
+    label: 'Anthropic',
+    deep: ['claude-sonnet-4-5-20250514', 'claude-opus-4-20250514'],
+    quick: ['claude-haiku-4-5-20251001', 'claude-sonnet-4-5-20250514'],
+    defaultDeep: 'claude-sonnet-4-5-20250514',
+    defaultQuick: 'claude-haiku-4-5-20251001',
+  },
+};
 
 function todayISODate(): string {
   return new Date().toISOString().slice(0, 10);
@@ -33,12 +58,19 @@ export function ConfigSidebar({ onAnalyze, isRunning, prefillTicker }: ConfigSid
   const [llmProvider, setLlmProvider] = useState('openai');
   const [deepThinkLlm, setDeepThinkLlm] = useState('gpt-5.2');
   const [quickThinkLlm, setQuickThinkLlm] = useState('gpt-5-mini');
-
   useEffect(() => {
     if (prefillTicker) {
       setTicker(prefillTicker.toUpperCase());
     }
   }, [prefillTicker]);
+
+  useEffect(() => {
+    const models = PROVIDER_MODELS[llmProvider];
+    if (models) {
+      setDeepThinkLlm(models.defaultDeep);
+      setQuickThinkLlm(models.defaultQuick);
+    }
+  }, [llmProvider]);
 
   function toggleAnalyst(id: string) {
     setAnalysts(prev =>
@@ -68,11 +100,9 @@ export function ConfigSidebar({ onAnalyze, isRunning, prefillTicker }: ConfigSid
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Ticker Symbol
         </label>
-        <input
-          type="text"
-          placeholder="e.g. AAPL"
+        <TickerAutocomplete
           value={ticker}
-          onChange={e => setTicker(e.target.value.toUpperCase())}
+          onChange={setTicker}
           className={inputClass}
         />
       </div>
@@ -129,9 +159,9 @@ export function ConfigSidebar({ onAnalyze, isRunning, prefillTicker }: ConfigSid
           onChange={e => setLlmProvider(e.target.value)}
           className={inputClass}
         >
-          <option value="openai">OpenAI</option>
-          <option value="google">Google</option>
-          <option value="anthropic">Anthropic</option>
+          {Object.entries(PROVIDER_MODELS).map(([key, { label }]) => (
+            <option key={key} value={key}>{label}</option>
+          ))}
         </select>
       </div>
 
@@ -140,12 +170,15 @@ export function ConfigSidebar({ onAnalyze, isRunning, prefillTicker }: ConfigSid
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Deep Think Model
         </label>
-        <input
-          type="text"
+        <select
           value={deepThinkLlm}
           onChange={e => setDeepThinkLlm(e.target.value)}
           className={inputClass}
-        />
+        >
+          {(PROVIDER_MODELS[llmProvider]?.deep ?? []).map(model => (
+            <option key={model} value={model}>{model}</option>
+          ))}
+        </select>
       </div>
 
       {/* Quick Think Model */}
@@ -153,12 +186,15 @@ export function ConfigSidebar({ onAnalyze, isRunning, prefillTicker }: ConfigSid
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Quick Think Model
         </label>
-        <input
-          type="text"
+        <select
           value={quickThinkLlm}
           onChange={e => setQuickThinkLlm(e.target.value)}
           className={inputClass}
-        />
+        >
+          {(PROVIDER_MODELS[llmProvider]?.quick ?? []).map(model => (
+            <option key={model} value={model}>{model}</option>
+          ))}
+        </select>
       </div>
 
       {/* Analyze Button */}

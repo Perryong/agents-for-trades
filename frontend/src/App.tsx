@@ -23,6 +23,8 @@ function App() {
   const [dark, setDark] = useState(getInitialDark);
   const [mainSection, setMainSection] = useState<'analysis' | 'screener'>('analysis');
   const [prefillTicker, setPrefillTicker] = useState<string | undefined>(undefined);
+  const [llmProvider, setLlmProvider] = useState('google');
+  const [quickModel, setQuickModel] = useState('gemini-2.5-flash');
 
   const { state: screenerState, runScreen } = useScreener();
 
@@ -39,6 +41,8 @@ function App() {
 
   const handleAnalyze = (request: AnalyzeRequest) => {
     setEnableOptions(request.enable_options);
+    setLlmProvider(request.llm_provider);
+    setQuickModel(request.quick_think_llm);
     startAnalysis(request);
   };
 
@@ -158,7 +162,7 @@ function App() {
               picks={screenerState.picks}
               screenedAt={screenerState.screenedAt}
               errorMsg={screenerState.errorMsg}
-              onRefresh={runScreen}
+              onRefresh={() => runScreen(llmProvider, quickModel)}
               onAnalyze={handleAnalyzePick}
             />
           </div>

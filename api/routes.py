@@ -64,7 +64,7 @@ async def stream_progress(run_id: str):
             return
         try:
             while True:
-                event = await asyncio.wait_for(q.get(), timeout=300)
+                event = await asyncio.wait_for(q.get(), timeout=1800)
                 if event is None:
                     break
                 yield {"data": json.dumps(event), "event": event["type"]}

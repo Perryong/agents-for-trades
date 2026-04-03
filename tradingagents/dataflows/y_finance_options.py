@@ -1,15 +1,53 @@
-"""yfinance-based options data fallback module.
+"""yfinance-based options data module.
 
 Provides the same three function signatures as tradier_utils.py using yfinance
-as the data source. Greeks columns (delta, gamma, theta, vega) are explicitly
-None because yfinance does not supply greeks.
+as the data source. Greeks are calculated via Black-Scholes using the IV that
+yfinance provides per contract.
 """
 from __future__ import annotations
+
+from datetime import date
 
 import yfinance as yf
 import pandas as pd
 
+import math
+
 from .yfinance_cache import get_cached_text
+
+
+def _norm_cdf(x: float) -> float:
+    return (1.0 + math.erf(x / math.sqrt(2.0))) / 2.0
+
+
+def _norm_pdf(x: float) -> float:
+    return math.exp(-0.5 * x * x) / math.sqrt(2.0 * math.pi)
+
+
+def _bs_greeks(S: float, K: float, T: float, r: float, sigma: float,
+               option_type: str) -> dict:
+    """Inline Black-Scholes Greeks to avoid circular import with agents."""
+    if T <= 0 or sigma <= 0 or S <= 0 or K <= 0:
+        return {"delta": None, "gamma": None, "theta": None, "vega": None}
+    sqrt_T = math.sqrt(T)
+    d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * sqrt_T)
+    d2 = d1 - sigma * sqrt_T
+    pdf_d1 = _norm_pdf(d1)
+    exp_rT = math.exp(-r * T)
+    gamma = pdf_d1 / (S * sigma * sqrt_T)
+    vega = S * pdf_d1 * sqrt_T / 100.0
+    if option_type == "call":
+        delta = _norm_cdf(d1)
+        theta = (-S * pdf_d1 * sigma / (2 * sqrt_T) - r * K * exp_rT * _norm_cdf(d2)) / 365.0
+    else:
+        delta = -_norm_cdf(-d1)
+        theta = (-S * pdf_d1 * sigma / (2 * sqrt_T) + r * K * exp_rT * _norm_cdf(-d2)) / 365.0
+    return {
+        "delta": round(delta, 4),
+        "gamma": round(gamma, 4),
+        "theta": round(theta, 4),
+        "vega": round(vega, 4),
+    }
 
 OPTIONS_CHAIN_CACHE_TTL_SECONDS = 6 * 60 * 60
 HISTORICAL_IV_CACHE_TTL_SECONDS = 6 * 60 * 60
@@ -72,11 +110,35 @@ def get_options_chain(symbol: str, expiration: str) -> str:
         # Add expiration date column
         combined["expiration_date"] = expiration
 
-        # Add None columns for greeks (yfinance has no greeks)
-        combined["delta"] = None
-        combined["gamma"] = None
-        combined["theta"] = None
-        combined["vega"] = None
+        # Calculate Greeks via Black-Scholes using yfinance IV
+        spot = ticker.fast_info.get("lastPrice", 0) or 0
+        r = 0.043  # ~US 10Y yield as risk-free rate approximation
+        q = 0.0    # dividend yield (simplified)
+        exp_date = date.fromisoformat(expiration)
+        today = date.today()
+        T = max((exp_date - today).days / 365.0, 1 / 365.0)
+
+        deltas, gammas, thetas, vegas = [], [], [], []
+        for _, row in combined.iterrows():
+            iv = row.get("iv") or row.get("impliedVolatility")
+            strike = row.get("strike", 0)
+            opt_type = row.get("option_type", "call")
+            if spot > 0 and strike > 0 and iv and iv > 0:
+                g = _bs_greeks(spot, strike, T, r, float(iv), opt_type)
+                deltas.append(g["delta"])
+                gammas.append(g["gamma"])
+                thetas.append(g["theta"])
+                vegas.append(g["vega"])
+            else:
+                deltas.append(None)
+                gammas.append(None)
+                thetas.append(None)
+                vegas.append(None)
+
+        combined["delta"] = deltas
+        combined["gamma"] = gammas
+        combined["theta"] = thetas
+        combined["vega"] = vegas
 
         # Select only the target columns
         output_columns = [

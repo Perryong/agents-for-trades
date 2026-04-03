@@ -87,6 +87,7 @@ def get_sp500_tickers() -> list[str]:
         tables = pd.read_html(
             "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
             attrs={"id": "constituents"},
+            storage_options={"User-Agent": "Mozilla/5.0"},
         )
         df = tables[0]
         symbol_col = "Symbol" if "Symbol" in df.columns else df.columns[0]

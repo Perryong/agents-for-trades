@@ -24,16 +24,19 @@ from tradingagents.agents.utils.news_data_tools import (
 
 def create_msg_delete():
     def delete_messages(state):
-        """Clear messages and add placeholder for Anthropic compatibility"""
-        messages = state["messages"]
+        """Clear messages and add placeholder for Anthropic compatibility.
 
-        # Remove all messages
-        removal_operations = [RemoveMessage(id=m.id) for m in messages]
-
-        # Add a minimal placeholder message
+        Returns only the placeholder without RemoveMessage operations.
+        With parallel analyst branches, multiple clear nodes would try to
+        delete the same shared messages (e.g., the initial human message),
+        causing 'ID does not exist' errors at fan-in. Skipping removal is
+        safe because each branch's accumulated tool-call messages are
+        discarded at the reducer level when the next sequential phase
+        (Bull Researcher) writes new messages.
+        """
         placeholder = HumanMessage(content="Continue")
 
-        return {"messages": removal_operations + [placeholder]}
+        return {"messages": [placeholder]}
 
     return delete_messages
 

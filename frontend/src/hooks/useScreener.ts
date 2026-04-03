@@ -38,7 +38,7 @@ function reducer(state: ScreenerState, action: ScreenerAction): ScreenerState {
 export function useScreener() {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  const runScreen = useCallback(async () => {
+  const runScreen = useCallback(async (provider = 'google', model = 'gemini-2.5-flash') => {
     dispatch({ type: 'FETCH_START' });
     try {
       const res = await fetch('/api/screen', {
@@ -47,8 +47,8 @@ export function useScreener() {
         body: JSON.stringify({
           max_picks: 5,
           universe: 'sp500',
-          llm_provider: 'openai',
-          quick_think_llm: 'gpt-5-mini',
+          llm_provider: provider,
+          quick_think_llm: model,
         }),
       });
 

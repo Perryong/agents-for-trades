@@ -298,6 +298,10 @@ def run_screener(config: dict, llm) -> ScreenerResult:
         max_candidates=config.get("screener_max_candidates", 50)
     )
 
+    # Unwrap BaseLLMClient wrappers to get the LangChain-compatible LLM
+    if hasattr(llm, "get_llm"):
+        llm = llm.get_llm()
+
     agent = create_screener_agent(llm)
     result = agent(candidates, config)
 
