@@ -17,11 +17,11 @@ Requirements for Paper Trading & Validation milestone. Each maps to roadmap phas
 
 ### Execution (Alpaca Paper Trading)
 
-- [ ] **EXEC-01**: User can configure Alpaca paper trading API keys via environment variables
-- [ ] **EXEC-02**: User can auto-execute an equity BUY/SELL order from the agent's final decision
-- [ ] **EXEC-03**: User can see order status (submitted/filled/rejected) in the frontend
-- [ ] **EXEC-04**: User can auto-execute multi-leg options orders from the options legs builder output
-- [ ] **EXEC-05**: System auto-closes paper positions after N days and computes outcome (WIN/LOSS/OPEN)
+- [x] **EXEC-01**: User can configure Alpaca paper trading API keys via environment variables
+- [x] **EXEC-02**: User can auto-execute an equity BUY/SELL order from the agent's final decision
+- [x] **EXEC-03**: User can see order status (submitted/filled/rejected) in the frontend
+- [x] **EXEC-04**: User can auto-execute multi-leg options orders from the options legs builder output
+- [x] **EXEC-05**: System auto-closes paper positions after N days and computes outcome (WIN/LOSS/OPEN)
 
 ### Scoring (Recommendation Scoring)
 
@@ -76,11 +76,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CHART-03 | Phase 14 | Pending |
 | CHART-04 | Phase 13 | Complete |
 | CHART-05 | Phase 13 | Complete |
-| EXEC-01 | Phase 14 | Pending |
-| EXEC-02 | Phase 14 | Pending |
-| EXEC-03 | Phase 14 | Pending |
-| EXEC-04 | Phase 14 | Pending |
-| EXEC-05 | Phase 14 | Pending |
+| EXEC-01 | Phase 14 | Complete |
+| EXEC-02 | Phase 14 | Complete |
+| EXEC-03 | Phase 14 | Complete |
+| EXEC-04 | Phase 14 | Complete |
+| EXEC-05 | Phase 14 | Complete |
 | SCORE-01 | Phase 15 | Pending |
 | SCORE-02 | Phase 15 | Pending |
 | SCORE-03 | Phase 15 | Pending |

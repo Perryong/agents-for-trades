@@ -72,9 +72,9 @@ Plans:
   3. After a paper equity order fills, user sees a trade entry marker pinned at the fill price on the candlestick chart
   4. User can submit a single-leg options paper order from the options legs builder output and see the order status reflected in the frontend
   5. After N trading days, the system auto-closes the paper position and records the outcome as WIN, LOSS, or OPEN
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 Plans:
-- [ ] 14-01-PLAN.md — Backend DB layer, Trade model, Alpaca SDK integration, trade routes + tests
+- [x] 14-01-PLAN.md — Backend DB layer, Trade model, Alpaca SDK integration, trade routes + tests
 - [ ] 14-02-PLAN.md — Frontend execution UX: action panel activation, confirmation modal, status polling
 - [ ] 14-03-PLAN.md — CHART-03 trade fill/exit markers on chart + auto-close trigger on load
 
@@ -107,7 +107,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 13. TradingView Chart Integration | 3/3 | Complete    | 2026-04-03 |
-| 14. Alpaca Paper Trading Execution | 0/3 | Planning complete | - |
+| 14. Alpaca Paper Trading Execution | 1/3 | In Progress|  |
 | 15. Recommendation Scoring | 0/? | Not started | - |
 | 16. Track Record Dashboard | 0/? | Not started | - |
 
