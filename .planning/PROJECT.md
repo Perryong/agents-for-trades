@@ -26,6 +26,15 @@ The trader receives a complete, executable options recommendation — strategy, 
 - ✓ CLI interface (Typer + Rich) — existing
 - ✓ Post-trade reflection and memory update — existing
 
+*(v1.1 Stock Recommendation System — shipped 2026-04-03)*
+
+- ✓ Programmatic pre-filter narrows market universe to ~20-50 candidates (volume movers, unusual activity, sector momentum) — v1.1
+- ✓ LLM screener agent ranks filtered candidates, produces top 3-5 picks with rationale — v1.1
+- ✓ User can select recommended picks to run through the full analysis pipeline — v1.1
+- ✓ Screener results displayed in frontend (new tab/section) and CLI — v1.1
+- ✓ POST /api/screen endpoint independent from analysis SSE stream — v1.1
+- ✓ Market-session-aware cache with 15-min TTL prevents stale data — v1.1
+
 *(v1.0 Options Pipeline — shipped 2026-04-02)*
 
 - ✓ Volatility analyst agent: IV rank, IV percentile, IV vs HV, skew, term structure, regime summary — v1.0
@@ -45,12 +54,9 @@ The trader receives a complete, executable options recommendation — strategy, 
 
 ### Active
 
-*(v1.1 Stock Recommendation System — defining)*
+*(Next milestone — to be defined via `/gsd:new-milestone`)*
 
-- [ ] Programmatic pre-filter narrows market universe to ~20-50 candidates (volume movers, unusual activity, sector momentum)
-- [ ] LLM screener agent ranks filtered candidates, produces top 3-5 picks with rationale
-- [ ] User can select recommended picks to run through the full analysis pipeline
-- [ ] Screener results displayed in frontend (new tab/section) and CLI
+No active requirements — start next milestone to define.
 
 ### Out of Scope
 
@@ -62,7 +68,7 @@ The trader receives a complete, executable options recommendation — strategy, 
 
 ## Context
 
-**Current state (post v1.0):** 13,581 Python LOC + 733 TypeScript LOC. 174 tests passing. Frontend builds to 201kB JS + 14kB CSS. 7 options agents wired as parallel branch in StateGraph. Tradier + yfinance vendor abstraction. FastAPI backend with SSE streaming. React frontend with config sidebar, progress stepper, tabbed reports, dark mode.
+**Current state (post v1.1):** ~20,000 Python LOC + ~1,000 TypeScript LOC. 203 tests passing. Frontend builds to 209kB JS + 19kB CSS. Stock screener pipeline: yfinance bulk fetch → composite scoring → LLM ranking → API endpoint → React screener tab → CLI screen command. 7 options agents wired as parallel branch in StateGraph. Tradier + yfinance vendor abstraction. FastAPI backend with SSE streaming + screener JSON endpoint. React frontend with analysis view, screener tab, config sidebar, progress stepper, tabbed reports, dark mode.
 
 **Architecture:** LangGraph `StateGraph` with `AgentState` as shared state dict. All agents are factory functions (`create_*`) returning closures. Data layer uses `VENDOR_METHODS` dict in `interface.py` for routing. Options agents run as parallel branch alongside equity agents, both completing before Risk Judge synthesizes unified decision.
 
@@ -86,6 +92,10 @@ The trader receives a complete, executable options recommendation — strategy, 
 | Stdlib-only Black-Scholes (math.erf) | Eliminates scipy dependency entirely | ✓ Good — within 1% of benchmark, lighter install |
 | React + FastAPI + Tailwind v4 frontend | Modern stack, SSE for real-time streaming, Vite for fast dev | ✓ Good — 201kB bundle, clean TypeScript |
 | LangGraph dash separator for node names | LangGraph reserves ':' in node names | ✓ Good — "Options - X" pattern works cleanly |
+| S&P 500 universe with equal-weight scoring | Standard screener baseline for v1.1 | ✓ Good — extensible to other universes |
+| JSON mode + Pydantic for LLM screener output | Reliable structured output with retry/degradation | ✓ Good — handles malformed JSON gracefully |
+| Separate APIRouter for screener | SSE independence from analysis stream | ✓ Good — zero coupling confirmed by AST test |
+| Direct import over VENDOR_METHODS for screener agent | Screener owns its data pipeline; routing table exists for future consumers | — Revisit if adding alternative data vendors |
 
 ## Evolution
 
@@ -105,4 +115,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-02 after v1.0 milestone*
+*Last updated: 2026-04-03 after v1.1 milestone*

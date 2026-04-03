@@ -1,5 +1,20 @@
 # Milestones
 
+## v1.1 Stock Recommendation System (Shipped: 2026-04-03)
+
+**Phases completed:** 5 phases, 7 plans, 9 tasks
+
+**Key accomplishments:**
+
+- Screener data layer with chunked yfinance bulk fetch, rate-limit backoff, composite scoring (volume/momentum/unusual activity), and NYSE session-boundary cache with 15-min TTL
+- LLM screener agent with Pydantic-validated structured output, retry/degradation on malformed JSON, and AgentState isolation guard
+- POST /api/screen endpoint with async execution, independent from analysis SSE stream, partial/error response handling
+- React screener tab with WatchlistPanel, PickCard score bars, stale indicator, and select-to-analyze prefill flow
+- CLI `screen` subcommand with Rich table, --max-picks/--json flags, spinner, and error panel
+- 15/15 requirements satisfied, 29 tests across 5 phases, all cross-phase integrations verified
+
+---
+
 ## v1.0 Options Pipeline (Shipped: 2026-04-02)
 
 **Phases completed:** 7 phases, 20 plans
