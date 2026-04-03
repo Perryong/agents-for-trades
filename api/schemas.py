@@ -52,3 +52,16 @@ class ScreenResponse(BaseModel):
     status: str           # "success" | "partial" | "error"
     data: Dict[str, Any]  # ScreenerResult.model_dump(mode="json") or error dict
     screened_at: str       # ISO 8601 UTC — empty string on hard error
+
+
+class ChartOverlayResponse(BaseModel):
+    ticker: str
+    analysis_date: str                    # 'YYYY-MM-DD'
+    signal: str                           # 'BUY' | 'SELL' | 'HOLD'
+    entry_price: Optional[float] = None   # None if not parseable from prose
+    take_profit: Optional[float] = None
+    stop_loss: Optional[float] = None
+    expiry_date: Optional[str] = None     # 'YYYY-MM-DD' from options metadata
+    strategy_name: Optional[str] = None   # e.g. 'Bull Call Spread'
+    options_legs: str = ""                # raw string for action panel display
+    final_trade_decision: str = ""        # full text for Analysis back-link

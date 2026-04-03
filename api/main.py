@@ -21,6 +21,8 @@ app.add_middleware(
 app.include_router(router)
 from .screener_routes import screener_router
 app.include_router(screener_router)
+from .chart_routes import chart_router
+app.include_router(chart_router)
 
 # Production: serve Vite dist if it exists
 DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
