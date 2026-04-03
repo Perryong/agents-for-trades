@@ -65,3 +65,44 @@ class ChartOverlayResponse(BaseModel):
     strategy_name: Optional[str] = None   # e.g. 'Bull Call Spread'
     options_legs: str = ""                # raw string for action panel display
     final_trade_decision: str = ""        # full text for Analysis back-link
+
+
+# ---------------------------------------------------------------------------
+# Trade execution schemas (Phase 14 — EXEC-01..05)
+# ---------------------------------------------------------------------------
+
+class TradeRequest(BaseModel):
+    ticker: str
+    direction: str                          # "BUY" | "SELL"
+    trade_type: str = "equity"              # "equity" | "option"
+    strategy_name: Optional[str] = None
+    analysis_date: Optional[str] = None
+    # Options fields (nullable for equity per D-16)
+    options_legs: Optional[str] = None
+    strike: Optional[float] = None
+    expiry: Optional[str] = None
+    contract_type: Optional[str] = None    # "call" | "put"
+
+
+class TradeResponse(BaseModel):
+    id: int
+    order_id: str
+    status: str
+    ticker: str
+    direction: str
+    trade_type: str
+    quantity: int
+    fill_price: Optional[float] = None
+    fill_time: Optional[str] = None
+
+
+class TradeStatusResponse(BaseModel):
+    status: str
+    fill_price: Optional[float] = None
+    fill_time: Optional[str] = None
+    close_time: Optional[str] = None        # REQUIRED for CHART-03 exit marker
+    rejection_reason: Optional[str] = None
+    order_id: Optional[str] = None
+    close_price: Optional[float] = None
+    pnl_pct: Optional[float] = None
+    outcome: Optional[str] = None

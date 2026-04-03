@@ -33,6 +33,8 @@ dependencies = [
     "exchange-calendars>=4.13.2",
     "fastapi>=0.135.3",
     "sse-starlette>=3.3.4",
+    "alpaca-py==0.43.2",
+    "aiosqlite>=0.22.1",
 ]
 
 [project.scripts]
