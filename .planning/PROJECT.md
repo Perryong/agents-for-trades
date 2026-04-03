@@ -54,14 +54,16 @@ The trader receives a complete, executable options recommendation — strategy, 
 
 ### Active
 
-*(Next milestone — to be defined via `/gsd:new-milestone`)*
+*(v1.2 Paper Trading & Validation — defining requirements)*
 
-No active requirements — start next milestone to define.
+- [ ] TradingView charts integration
+- [ ] Alpaca paper trading auto-execution
+- [ ] Recommendation scoring system
+- [ ] Track record dashboard
 
 ### Out of Scope
 
-- Live order execution / broker API integration — analysis and order generation only; no automated submission
-- Backtesting engine — deferred to v1.2 when logged decisions accumulate; options backtesting has data availability issues
+- Backtesting engine — deferred to v1.3+; options backtesting has data availability issues
 - Real-time streaming data — batch/on-demand analysis only, same as existing equity flow
 - Portfolio management / position tracking UI — Greeks monitor outputs state, no persistent portfolio tracker
 - Auto-running full pipeline on all screened picks — LLM cost prohibitive; user selects which to analyze
@@ -115,4 +117,15 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-03 after v1.1 milestone*
+## Current Milestone: v1.2 Paper Trading & Validation
+
+**Goal:** Enable paper trading execution via Alpaca and performance tracking with TradingView charts, recommendation scoring, and a track record dashboard.
+
+**Target features:**
+- TradingView charts integration
+- Alpaca paper trading auto-execution
+- Recommendation scoring system
+- Track record dashboard
+
+---
+*Last updated: 2026-04-03 after v1.2 milestone start*
