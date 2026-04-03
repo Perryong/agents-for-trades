@@ -52,14 +52,16 @@ The trader receives a complete, executable options recommendation — strategy, 
 - ✓ React + FastAPI visual frontend with SSE streaming — v1.0
 - ✓ Dark mode with localStorage persistence — v1.0
 
+*(v1.2 Paper Trading & Validation — shipped 2026-04-03)*
+
+- ✓ TradingView charts integration (lightweight-charts v5, Alpaca bars API, 5 timeframe presets, agent signal overlays) — v1.2
+- ✓ Alpaca paper trading auto-execution (equity + single-leg options, confirmation modal, 5-state status display, auto-close after 5 trading days) — v1.2
+- ✓ Recommendation scoring system (win rate, expectancy, profit factor, confidence-calibration chart) — v1.2
+- ✓ Track record dashboard (summary stats, equity curve, trade history table, per-ticker drill-down, equity vs options split) — v1.2
+
 ### Active
 
-*(v1.2 Paper Trading & Validation — defining requirements)*
-
-- [ ] TradingView charts integration
-- [ ] Alpaca paper trading auto-execution
-- [ ] Recommendation scoring system
-- [ ] Track record dashboard
+*(No active milestone — run /gsd:new-milestone to start v1.3)*
 
 ### Out of Scope
 
@@ -70,7 +72,7 @@ The trader receives a complete, executable options recommendation — strategy, 
 
 ## Context
 
-**Current state (post v1.1):** ~20,000 Python LOC + ~1,000 TypeScript LOC. 203 tests passing. Frontend builds to 209kB JS + 19kB CSS. Stock screener pipeline: yfinance bulk fetch → composite scoring → LLM ranking → API endpoint → React screener tab → CLI screen command. 7 options agents wired as parallel branch in StateGraph. Tradier + yfinance vendor abstraction. FastAPI backend with SSE streaming + screener JSON endpoint. React frontend with analysis view, screener tab, config sidebar, progress stepper, tabbed reports, dark mode.
+**Current state (post v1.2):** ~18,000 Python LOC + ~3,500 TypeScript LOC. 80+ tests passing. Frontend: 4-screen app (Analysis, Screener, Chart, Track Record) with lightweight-charts v5 charting, Alpaca paper trading execution, scoring metrics + calibration chart, and full track record dashboard. Backend: FastAPI with SSE streaming, chart overlay, trade execution (Alpaca SDK), scoring, and dashboard endpoints. SQLite trade persistence via SQLAlchemy 2.0 async. Paper trades auto-close after 5 trading days with WIN/LOSS outcome computation.
 
 **Architecture:** LangGraph `StateGraph` with `AgentState` as shared state dict. All agents are factory functions (`create_*`) returning closures. Data layer uses `VENDOR_METHODS` dict in `interface.py` for routing. Options agents run as parallel branch alongside equity agents, both completing before Risk Judge synthesizes unified decision.
 
@@ -117,15 +119,9 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-## Current Milestone: v1.2 Paper Trading & Validation
+## Current Milestone: None (v1.2 shipped)
 
-**Goal:** Enable paper trading execution via Alpaca and performance tracking with TradingView charts, recommendation scoring, and a track record dashboard.
-
-**Target features:**
-- TradingView charts integration
-- Alpaca paper trading auto-execution
-- Recommendation scoring system
-- Track record dashboard
+v1.2 Paper Trading & Validation shipped 2026-04-03. All 18 requirements satisfied. Run `/gsd:new-milestone` to start v1.3.
 
 ---
-*Last updated: 2026-04-03 after v1.2 milestone start*
+*Last updated: 2026-04-03 after v1.2 milestone completion*

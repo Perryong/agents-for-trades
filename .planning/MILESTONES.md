@@ -1,5 +1,23 @@
 # Milestones
 
+## v1.2 Paper Trading & Validation (Shipped: 2026-04-03)
+
+**Phases completed:** 4 phases, 10 plans, 14 tasks
+
+**Key accomplishments:**
+
+- FastAPI GET /api/chart/{ticker}/overlay endpoint with regex signal extraction, ChartOverlayResponse Pydantic schema, and 15 passing unit tests
+- useOverlay.ts
+- SQLite trade persistence + Alpaca paper trading integration with equity/options submit, status polling, and 5-trading-day auto-close via three FastAPI REST endpoints
+- Trade execution flow wired into Chart Screen: Execute Paper Trade button, confirmation modal, useTrade POST hook, useTradeStatus polling hook, and idle/submitted/filled/rejected/error status display in action panel
+- Candlestick chart trade fill/exit markers via createSeriesMarkers plus fire-and-forget auto-close check on chart mount
+- Task 1 — Trade model extension + confidence extraction:
+- Status:
+- Three FastAPI dashboard endpoints with Pydantic schemas: /summary (full metric suite), /trades (filtered history with legacy detection), /equity-curve (cumulative P&L data points for lightweight-charts)
+- Complete React dashboard screen with summary stats cards, lightweight-charts equity curve, trade history table with ticker drill-down filtering, asset-class toggle, and paper trading disclaimer — added as 4th nav tab in App.tsx
+
+---
+
 ## v1.1 Stock Recommendation System (Shipped: 2026-04-03)
 
 **Phases completed:** 5 phases, 7 plans, 9 tasks
