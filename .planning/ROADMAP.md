@@ -41,7 +41,7 @@ See: `.planning/milestones/v1.1-ROADMAP.md` for full details.
 - [x] **Phase 13: TradingView Chart Integration** — Candlestick, volume, timeframe, and agent signal charts rendered in the frontend (completed 2026-04-03)
 - [x] **Phase 14: Alpaca Paper Trading Execution** — Equity and options order submission, status display, trade markers, and auto-close (completed 2026-04-03)
 - [x] **Phase 15: Recommendation Scoring** — Trade outcome storage, win rate, expectancy, and confidence-calibration metrics (completed 2026-04-03)
-- [ ] **Phase 16: Track Record Dashboard** — Summary stats, trade history table, equity curve, per-ticker breakdown, and options vs equity split
+- [x] **Phase 16: Track Record Dashboard** — Summary stats, trade history table, equity curve, per-ticker breakdown, and options vs equity split (completed 2026-04-03)
 
 ---
 
@@ -101,10 +101,10 @@ Plans:
   3. User can see an equity curve chart that plots running P&L over time across all paper trades
   4. User can click into a per-ticker view and see win rate and P&L breakdown isolated to that ticker
   5. User can switch between equity-only and options-only performance views, each showing metrics appropriate to that asset class
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [x] 16-01-PLAN.md — Backend: dashboard API endpoints (summary, trades, equity-curve) with filtering
-- [ ] 16-02-PLAN.md — Frontend: TrackRecordScreen, data hooks, nav tab, equity curve chart
+- [x] 16-02-PLAN.md — Frontend: TrackRecordScreen, data hooks, nav tab, equity curve chart
 
 ---
 
@@ -115,7 +115,7 @@ Plans:
 | 13. TradingView Chart Integration | 3/3 | Complete    | 2026-04-03 |
 | 14. Alpaca Paper Trading Execution | 3/3 | Complete    | 2026-04-03 |
 | 15. Recommendation Scoring | 2/2 | Complete    | 2026-04-03 |
-| 16. Track Record Dashboard | 1/2 | In Progress|  |
+| 16. Track Record Dashboard | 2/2 | Complete   | 2026-04-03 |
 
 ---
 
