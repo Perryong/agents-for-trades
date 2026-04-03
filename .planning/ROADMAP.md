@@ -40,7 +40,7 @@ See: `.planning/milestones/v1.1-ROADMAP.md` for full details.
 
 - [x] **Phase 13: TradingView Chart Integration** — Candlestick, volume, timeframe, and agent signal charts rendered in the frontend (completed 2026-04-03)
 - [x] **Phase 14: Alpaca Paper Trading Execution** — Equity and options order submission, status display, trade markers, and auto-close (completed 2026-04-03)
-- [ ] **Phase 15: Recommendation Scoring** — Trade outcome storage, win rate, expectancy, and confidence-calibration metrics
+- [x] **Phase 15: Recommendation Scoring** — Trade outcome storage, win rate, expectancy, and confidence-calibration metrics (completed 2026-04-03)
 - [ ] **Phase 16: Track Record Dashboard** — Summary stats, trade history table, equity curve, per-ticker breakdown, and options vs equity split
 
 ---
@@ -86,10 +86,10 @@ Plans:
   1. Each paper trade record stores outcome (WIN/LOSS/OPEN) and P&L percentage alongside fill price, target price, stop price, and decision date
   2. User can view win rate, expectancy, average winner, average loser, and profit factor together — never win rate as a standalone figure
   3. User can view a confidence-calibration chart that plots stated AI confidence against actual outcome rate across all scored trades
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [x] 15-01-PLAN.md — Backend: Trade model scoring columns, confidence extraction, summary + calibration endpoints
-- [ ] 15-02-PLAN.md — Frontend: scoring metrics card, calibration chart, ChartActionPanel integration
+- [x] 15-02-PLAN.md — Frontend: scoring metrics card, calibration chart, ChartActionPanel integration
 
 ### Phase 16: Track Record Dashboard
 **Goal**: Users can open a Track Record tab and see a complete, self-contained view of system performance — summary stats, chronological trade history, equity curve, per-ticker breakdown, and equity vs options split
@@ -111,7 +111,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 13. TradingView Chart Integration | 3/3 | Complete    | 2026-04-03 |
 | 14. Alpaca Paper Trading Execution | 3/3 | Complete    | 2026-04-03 |
-| 15. Recommendation Scoring | 1/2 | In Progress|  |
+| 15. Recommendation Scoring | 2/2 | Complete   | 2026-04-03 |
 | 16. Track Record Dashboard | 0/? | Not started | - |
 
 ---
