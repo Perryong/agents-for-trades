@@ -107,7 +107,7 @@ Plans:
 | 9. LLM Screener Agent | 1/1 | Complete   | 2026-04-02 |
 | 10. Backend API Endpoint | 1/1 | Complete    | 2026-04-02 |
 | 11. Frontend Screener Tab | 2/2 | Complete    | 2026-04-02 |
-| 12. CLI Integration | 1/1 | Complete   | 2026-04-03 |
+| 12. CLI Integration | 1/1 | Complete    | 2026-04-03 |
 
 ---
 
