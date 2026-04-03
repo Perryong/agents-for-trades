@@ -28,7 +28,7 @@ export function ChartContainer({ data, volumeData, dark, overlay, tradeMarker }:
 
     // Remove previous chart instance to prevent memory leak
     if (chartRef.current) {
-      chartRef.current.remove();
+      try { chartRef.current.remove(); } catch { /* already disposed (React Strict Mode) */ }
       chartRef.current = null;
     }
 
@@ -173,7 +173,7 @@ export function ChartContainer({ data, volumeData, dark, overlay, tradeMarker }:
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      chart.remove();
+      try { chart.remove(); } catch { /* already disposed (React Strict Mode) */ }
     };
   }, [data, volumeData, dark, overlay, tradeMarker]);
 
