@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAnalysis } from './hooks/useAnalysis';
 import { useScreener } from './hooks/useScreener';
 import { ConfigSidebar } from './components/ConfigSidebar';
@@ -26,6 +26,10 @@ function App() {
   const [prefillTicker, setPrefillTicker] = useState<string | undefined>(undefined);
   const [llmProvider, setLlmProvider] = useState('google');
   const [quickModel, setQuickModel] = useState('gemini-2.5-flash');
+  const [chartTicker, setChartTicker] = useState<string>('');
+
+  // Track the ticker being analyzed for auto-navigation (D-04)
+  const lastAnalyzedTicker = useRef<string>('');
 
   const { state: screenerState, runScreen } = useScreener();
 
@@ -40,10 +44,21 @@ function App() {
     }
   }, [dark]);
 
+  // Auto-navigate to Chart screen when analysis completes (D-04)
+  useEffect(() => {
+    if (state.status === 'done' && state.result) {
+      if (lastAnalyzedTicker.current) {
+        setChartTicker(lastAnalyzedTicker.current);
+        setMainSection('chart');
+      }
+    }
+  }, [state.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleAnalyze = (request: AnalyzeRequest) => {
     setEnableOptions(request.enable_options);
     setLlmProvider(request.llm_provider);
     setQuickModel(request.quick_think_llm);
+    lastAnalyzedTicker.current = request.ticker;
     startAnalysis(request);
   };
 
@@ -166,6 +181,23 @@ function App() {
                 Signal: {state.result.signal}
               </div>
             )}
+
+            {/* View Chart cross-link — shown after analysis completes (D-05) */}
+            {state.status === 'done' && (
+              <div className="px-6 py-2 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={() => {
+                    if (lastAnalyzedTicker.current) {
+                      setChartTicker(lastAnalyzedTicker.current);
+                      setMainSection('chart');
+                    }
+                  }}
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  View Chart →
+                </button>
+              </div>
+            )}
           </>
         ) : mainSection === 'screener' ? (
           <div className="flex-1 overflow-auto p-6 bg-gray-50 dark:bg-gray-900">
@@ -180,7 +212,11 @@ function App() {
           </div>
         ) : (
           <div className="flex-1 flex flex-col overflow-hidden">
-            <ChartScreen dark={dark} />
+            <ChartScreen
+              dark={dark}
+              initialTicker={chartTicker}
+              onViewAnalysis={() => setMainSection('analysis')}
+            />
           </div>
         )}
       </main>
