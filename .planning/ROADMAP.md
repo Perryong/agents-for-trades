@@ -70,9 +70,13 @@ Plans:
   1. User can configure Alpaca paper API keys via environment variables and the app starts without errors when keys are valid
   2. After analysis completes on an equity ticker, user can click "Execute Paper Trade" and see the order status change to submitted, filled, or rejected
   3. After a paper equity order fills, user sees a trade entry marker pinned at the fill price on the candlestick chart
-  4. User can submit a multi-leg options paper order from the options legs builder output and see the order status reflected in the frontend
+  4. User can submit a single-leg options paper order from the options legs builder output and see the order status reflected in the frontend
   5. After N trading days, the system auto-closes the paper position and records the outcome as WIN, LOSS, or OPEN
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 14-01-PLAN.md — Backend DB layer, Trade model, Alpaca SDK integration, trade routes + tests
+- [ ] 14-02-PLAN.md — Frontend execution UX: action panel activation, confirmation modal, status polling
+- [ ] 14-03-PLAN.md — CHART-03 trade fill/exit markers on chart + auto-close trigger on load
 
 ### Phase 15: Recommendation Scoring
 **Goal**: Users can see quantitative evidence of system performance — win rate, expectancy, profit factor, and a confidence-calibration chart — derived from scored paper trade records
@@ -103,7 +107,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 13. TradingView Chart Integration | 3/3 | Complete    | 2026-04-03 |
-| 14. Alpaca Paper Trading Execution | 0/? | Not started | - |
+| 14. Alpaca Paper Trading Execution | 0/3 | Planning complete | - |
 | 15. Recommendation Scoring | 0/? | Not started | - |
 | 16. Track Record Dashboard | 0/? | Not started | - |
 
