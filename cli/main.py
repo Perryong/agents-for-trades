@@ -23,8 +23,12 @@ from rich import box
 from rich.align import Align
 from rich.rule import Rule
 
+import json as json_lib
+
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
+from tradingagents.agents.screener.screener_agent import run_screener
+from tradingagents.llm_clients.factory import create_llm_client
 from cli.models import AnalystType
 from cli.utils import *
 from cli.announcements import fetch_announcements, display_announcements
@@ -1186,6 +1190,89 @@ def run_analysis():
 @app.command()
 def analyze():
     run_analysis()
+
+
+@app.command()
+def screen(
+    max_picks: int = typer.Option(5, "--max-picks", min=1, max=10, help="Number of top picks to display (1-10)"),
+    json_output: bool = typer.Option(False, "--json", help="Output results as JSON"),
+):
+    """Run the stock screener and display ranked picks."""
+    config = DEFAULT_CONFIG.copy()
+    config["screener_n_picks"] = max_picks
+
+    try:
+        with console.status("[bold cyan]Screening market...", spinner="dots"):
+            llm_client = create_llm_client(
+                provider=config["llm_provider"],
+                model=config["quick_think_llm"],
+                base_url=config.get("backend_url"),
+            )
+            result = run_screener(config, llm_client)
+
+        if json_output:
+            output = {
+                "picks": [p.model_dump(mode="json") for p in result.picks],
+                "screened_at": result.screened_at.isoformat(),
+                "candidate_count": result.candidate_count,
+                "model_used": result.model_used,
+            }
+            if result.error:
+                output["error"] = result.error
+            console.print(json_lib.dumps(output, indent=2))
+            return
+
+        # Rich table output
+        table = Table(
+            title="Stock Screener Results",
+            box=box.ROUNDED,
+            show_lines=True,
+            title_style="bold magenta",
+        )
+        table.add_column("Ticker", style="bold cyan", justify="center")
+        table.add_column("Score", justify="center")
+        table.add_column("Confidence", justify="center")
+        table.add_column("Rationale", max_width=60)
+        table.add_column("Volume", justify="right")
+        table.add_column("Momentum", justify="right")
+        table.add_column("Sector", justify="center")
+
+        for pick in result.picks:
+            rationale = pick.rationale
+            if len(rationale) > 60:
+                rationale = rationale[:57] + "..."
+            volume = str(pick.key_metrics.get("volume_ratio", pick.key_metrics.get("volume_score", "N/A")))
+            momentum = str(pick.key_metrics.get("momentum_5d", pick.key_metrics.get("momentum_score", "N/A")))
+            sector = pick.sector or "N/A"
+
+            table.add_row(
+                pick.ticker,
+                f"{pick.score:.2f}",
+                f"{pick.confidence:.2f}",
+                rationale,
+                volume,
+                momentum,
+                sector,
+            )
+
+        console.print()
+        console.print(table)
+        console.print(
+            f"\n[dim]Screened {result.candidate_count} candidates at "
+            f"{result.screened_at.strftime('%Y-%m-%d %H:%M UTC')} "
+            f"using {result.model_used}[/dim]"
+        )
+        if result.error:
+            console.print(f"[yellow]Warning: {result.error}[/yellow]")
+
+    except Exception as exc:
+        console.print(Panel(
+            f"[red bold]Error:[/red bold] {exc}\n\n"
+            "[dim]Suggestion: Check your API key and network connection. "
+            "Ensure OPENAI_API_KEY is set in your .env file.[/dim]",
+            title="Screener Error",
+            border_style="red",
+        ))
 
 
 if __name__ == "__main__":
