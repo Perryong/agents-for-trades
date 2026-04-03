@@ -203,3 +203,30 @@ export interface ScreenerState {
   screenedAt: string | null;
   errorMsg: string | null;
 }
+
+// --- Scoring types (Phase 15) ---
+
+export interface ScoreSummary {
+  win_rate: number;
+  expectancy: number;
+  avg_winner: number;
+  avg_loser: number;
+  profit_factor: number;
+  total_trades: number;
+  total_closed: number;
+  disclaimer: string | null;
+}
+
+export interface CalibrationBucket {
+  bucket_label: string;
+  bucket_min: number;
+  bucket_max: number;
+  actual_win_rate: number;
+  trade_count: number;
+}
+
+export interface CalibrationData {
+  buckets: CalibrationBucket[];
+  total_scored: number;
+  message: string | null;
+}
