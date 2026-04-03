@@ -56,10 +56,10 @@ See: `.planning/milestones/v1.1-ROADMAP.md` for full details.
   2. User sees volume bars displayed below the candlestick chart on the same component
   3. User can click daily, weekly, or monthly toggle buttons and the chart re-renders to the selected timeframe
   4. User can see per-agent bull/bear signal annotations pinned at the decision date on the chart
-**Plans:** 3 plans
+**Plans:** 2/3 plans executed
 Plans:
-- [ ] 13-01-PLAN.md — Backend chart overlay endpoint + Pydantic schema + tests
-- [ ] 13-02-PLAN.md — Frontend chart screen with candlestick + volume + timeframes
+- [x] 13-01-PLAN.md — Backend chart overlay endpoint + Pydantic schema + tests
+- [x] 13-02-PLAN.md — Frontend chart screen with candlestick + volume + timeframes
 - [ ] 13-03-PLAN.md — Overlay annotations, active mode, action panel, cross-navigation
 
 ### Phase 14: Alpaca Paper Trading Execution
@@ -102,7 +102,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 13. TradingView Chart Integration | 0/3 | Planned | - |
+| 13. TradingView Chart Integration | 2/3 | In Progress|  |
 | 14. Alpaca Paper Trading Execution | 0/? | Not started | - |
 | 15. Recommendation Scoring | 0/? | Not started | - |
 | 16. Track Record Dashboard | 0/? | Not started | - |
