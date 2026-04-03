@@ -107,6 +107,42 @@ export const REPORT_TABS: ReportTab[] = [
   { id: 'decision', label: 'Final Decision', stateKey: 'final_trade_decision' },
 ];
 
+// --- Chart types (Phase 13) ---
+
+export type ChartTimeframe = '1D' | '1M' | '3M' | '6M' | '1Y';
+
+export interface AlpacaBar {
+  t: string;  // ISO timestamp
+  o: number;  // open
+  h: number;  // high
+  l: number;  // low
+  c: number;  // close
+  v: number;  // volume
+  n: number;  // number of trades
+  vw: number; // volume-weighted average price
+}
+
+export interface ChartOverlay {
+  ticker: string;
+  analysis_date: string;
+  signal: string;
+  entry_price: number | null;
+  take_profit: number | null;
+  stop_loss: number | null;
+  expiry_date: string | null;
+  strategy_name: string | null;
+  options_legs: string;
+  final_trade_decision: string;
+}
+
+export const TIMEFRAME_CONFIG: Record<ChartTimeframe, { alpacaTimeframe: string; daysBack: number; label: string }> = {
+  '1D': { alpacaTimeframe: '15Min', daysBack: 0, label: '1D' },
+  '1M': { alpacaTimeframe: '1Day', daysBack: 30, label: '1M' },
+  '3M': { alpacaTimeframe: '1Day', daysBack: 90, label: '3M' },
+  '6M': { alpacaTimeframe: '1Day', daysBack: 180, label: '6M' },
+  '1Y': { alpacaTimeframe: '1Day', daysBack: 365, label: '1Y' },
+};
+
 // --- Screener types ---
 
 export interface ScreenerPick {
