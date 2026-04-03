@@ -111,7 +111,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 13. TradingView Chart Integration | 3/3 | Complete    | 2026-04-03 |
 | 14. Alpaca Paper Trading Execution | 3/3 | Complete    | 2026-04-03 |
-| 15. Recommendation Scoring | 2/2 | Complete   | 2026-04-03 |
+| 15. Recommendation Scoring | 2/2 | Complete    | 2026-04-03 |
 | 16. Track Record Dashboard | 0/? | Not started | - |
 
 ---
