@@ -1,4 +1,6 @@
-import type { ChartOverlay, TradeStatus } from '../types';
+import type { ChartOverlay, TradeStatus, ScoreSummary, CalibrationData } from '../types';
+import { ScoringCard } from './ScoringCard';
+import { CalibrationChart } from './CalibrationChart';
 
 interface ChartActionPanelProps {
   overlay: ChartOverlay;
@@ -7,6 +9,8 @@ interface ChartActionPanelProps {
   onExecute: () => void;
   tradeStatus: TradeStatus | null;
   canExecuteOptions: boolean;
+  scoreSummary: ScoreSummary | null;
+  calibration: CalibrationData | null;
 }
 
 function SignalBadge({ signal }: { signal: string }) {
@@ -44,6 +48,8 @@ export function ChartActionPanel({
   onExecute,
   tradeStatus,
   canExecuteOptions,
+  scoreSummary,
+  calibration,
 }: ChartActionPanelProps) {
   const legsText = overlay.options_legs
     ? overlay.options_legs.length > 60
@@ -169,6 +175,15 @@ export function ChartActionPanel({
           </button>
         </div>
       </div>
+
+      {/* Performance scoring section — only shown when there are closed trades */}
+      {scoreSummary && scoreSummary.total_closed > 0 && (
+        <div className="mt-3 border-t border-gray-700 pt-3">
+          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Performance</h4>
+          <ScoringCard summary={scoreSummary} />
+          {calibration && <CalibrationChart calibration={calibration} />}
+        </div>
+      )}
     </div>
   );
 }

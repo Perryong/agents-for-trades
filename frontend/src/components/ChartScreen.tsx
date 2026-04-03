@@ -6,6 +6,7 @@ import { useOverlay } from '../hooks/useOverlay';
 import { useTrade } from '../hooks/useTrade';
 import { useTradeStatus } from '../hooks/useTradeStatus';
 import { useTradeMarker } from '../hooks/useTradeMarker';
+import { useScoreSummary, useCalibration } from '../hooks/useScores';
 import { ChartContainer } from './ChartContainer';
 import { ChartTickerPicker } from './ChartTickerPicker';
 import { ChartActionPanel } from './ChartActionPanel';
@@ -42,6 +43,8 @@ export function ChartScreen({ dark, initialTicker, onViewAnalysis }: ChartScreen
   const { overlay } = useOverlay(ticker);
   const { submitTrade, isSubmitting } = useTrade();
   const tradeStatus = useTradeStatus(ticker, currentOrderId);
+  const { summary: scoreSummary } = useScoreSummary();
+  const { calibration } = useCalibration();
 
   // Auto-close check: fires once on mount per D-09 (fire-and-forget)
   useEffect(() => {
@@ -176,6 +179,8 @@ export function ChartScreen({ dark, initialTicker, onViewAnalysis }: ChartScreen
           onExecute={handleExecute}
           tradeStatus={isSubmitting ? { ...tradeStatus, status: 'submitted' } : tradeStatus}
           canExecuteOptions={canExecuteOptions}
+          scoreSummary={scoreSummary}
+          calibration={calibration}
         />
       )}
     </div>
