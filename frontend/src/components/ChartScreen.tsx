@@ -3,9 +3,12 @@ import type { ChartTimeframe } from '../types';
 import { TIMEFRAME_CONFIG } from '../types';
 import { useChartData } from '../hooks/useChartData';
 import { useOverlay } from '../hooks/useOverlay';
+import { useTrade } from '../hooks/useTrade';
+import { useTradeStatus } from '../hooks/useTradeStatus';
 import { ChartContainer } from './ChartContainer';
 import { ChartTickerPicker } from './ChartTickerPicker';
 import { ChartActionPanel } from './ChartActionPanel';
+import { TradeConfirmModal } from './TradeConfirmModal';
 
 const TIMEFRAMES: ChartTimeframe[] = ['1D', '1M', '3M', '6M', '1Y'];
 
@@ -21,6 +24,10 @@ export function ChartScreen({ dark, initialTicker, onViewAnalysis }: ChartScreen
   const [timeframe, setTimeframe] = useState<ChartTimeframe>('6M');
   const hasSetSmartDefault = useRef(false);
 
+  // Trade execution state
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
+
   // Sync ticker when initialTicker prop changes (e.g. auto-navigate from Analysis)
   useEffect(() => {
     if (initialTicker && initialTicker !== ticker) {
@@ -32,8 +39,15 @@ export function ChartScreen({ dark, initialTicker, onViewAnalysis }: ChartScreen
 
   const { bars, volumeData, loading, error } = useChartData(ticker, timeframe);
   const { overlay } = useOverlay(ticker);
+  const { submitTrade, isSubmitting } = useTrade();
+  const tradeStatus = useTradeStatus(ticker, currentOrderId);
 
   const isActiveMode = overlay !== null;
+
+  // Determine if options execution is possible: check for "LEG 1:" pattern in options_legs
+  const canExecuteOptions = overlay
+    ? /LEG\s+1:/i.test(overlay.options_legs)
+    : false;
 
   // Smart default timeframe in active mode (per D-25)
   useEffect(() => {
@@ -52,8 +66,49 @@ export function ChartScreen({ dark, initialTicker, onViewAnalysis }: ChartScreen
     }
   }, [overlay]);
 
+  const handleExecute = () => {
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmTrade = async () => {
+    if (!overlay) return;
+    setShowConfirmModal(false);
+
+    try {
+      const response = await submitTrade({
+        ticker: overlay.ticker,
+        direction: overlay.signal,
+        trade_type: 'equity',
+        strategy_name: overlay.strategy_name ?? undefined,
+        analysis_date: overlay.analysis_date,
+      });
+      setCurrentOrderId(response.order_id);
+    } catch (err) {
+      console.error('Trade submission failed:', err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleCancelModal = () => {
+    setShowConfirmModal(false);
+  };
+
   return (
     <div className="flex flex-col h-full">
+      {/* Trade confirmation modal */}
+      {overlay && (
+        <TradeConfirmModal
+          open={showConfirmModal}
+          onConfirm={handleConfirmTrade}
+          onCancel={handleCancelModal}
+          ticker={overlay.ticker}
+          direction={overlay.signal}
+          quantity={100}
+          orderType="Market"
+          tradeType="equity"
+          strategyName={overlay.strategy_name ?? undefined}
+        />
+      )}
+
       {/* Top bar: ticker picker + timeframe presets */}
       <div className="flex items-start justify-between gap-4 px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
         <ChartTickerPicker value={ticker} onChange={setTicker} />
@@ -105,6 +160,10 @@ export function ChartScreen({ dark, initialTicker, onViewAnalysis }: ChartScreen
         <ChartActionPanel
           overlay={overlay}
           onViewAnalysis={onViewAnalysis ?? (() => {})}
+          ticker={overlay.ticker}
+          onExecute={handleExecute}
+          tradeStatus={isSubmitting ? { ...tradeStatus, status: 'submitted' } : tradeStatus}
+          canExecuteOptions={canExecuteOptions}
         />
       )}
     </div>

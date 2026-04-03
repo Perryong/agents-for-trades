@@ -107,6 +107,46 @@ export const REPORT_TABS: ReportTab[] = [
   { id: 'decision', label: 'Final Decision', stateKey: 'final_trade_decision' },
 ];
 
+// --- Trade types (Phase 14) ---
+
+export type OrderStatus = 'idle' | 'submitted' | 'filled' | 'rejected' | 'error';
+
+export interface TradeStatus {
+  status: OrderStatus;
+  fill_price: number | null;
+  fill_time: string | null;
+  close_time: string | null;         // REQUIRED: Plan 03 reads this for exit marker
+  rejection_reason: string | null;
+  order_id: string | null;
+  close_price: number | null;
+  pnl_pct: number | null;
+  outcome: string | null;
+}
+
+export interface TradeRequest {
+  ticker: string;
+  direction: string;
+  trade_type: 'equity' | 'option';
+  strategy_name?: string;
+  analysis_date?: string;
+  options_legs?: string;
+  strike?: number;
+  expiry?: string;
+  contract_type?: string;
+}
+
+export interface TradeResponse {
+  id: number;
+  order_id: string;
+  status: string;
+  ticker: string;
+  direction: string;
+  trade_type: string;
+  quantity: number;
+  fill_price: number | null;
+  fill_time: string | null;
+}
+
 // --- Chart types (Phase 13) ---
 
 export type ChartTimeframe = '1D' | '1M' | '3M' | '6M' | '1Y';
