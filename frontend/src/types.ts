@@ -230,3 +230,44 @@ export interface CalibrationData {
   total_scored: number;
   message: string | null;
 }
+
+// --- Dashboard types (Phase 16) ---
+
+export interface DashboardSummary {
+  total_trades: number;
+  total_closed: number;
+  win_rate: number;
+  expectancy: number;
+  avg_winner: number;
+  avg_loser: number;
+  profit_factor: number;
+  aggregate_pnl: number;
+  disclaimer: string | null;
+}
+
+export interface DashboardTradeItem {
+  id: number;
+  ticker: string;
+  direction: string;
+  trade_type: string;
+  entry_date: string | null;
+  outcome: string | null;
+  pnl_pct: number | null;
+  strategy_name: string | null;
+  is_legacy: boolean;
+}
+
+export interface DashboardTradesData {
+  trades: DashboardTradeItem[];
+  total: number;
+}
+
+export interface EquityCurvePoint {
+  time: string;
+  value: number;
+}
+
+export interface EquityCurveData {
+  points: EquityCurvePoint[];
+  total_trades: number;
+}

@@ -7,6 +7,7 @@ import { ProgressStepper } from './components/ProgressStepper';
 import { ReportTabs } from './components/ReportTabs';
 import { ReportPane } from './components/ReportPane';
 import { ChartScreen } from './components/ChartScreen';
+import { TrackRecordScreen } from './components/TrackRecordScreen';
 import { REPORT_TABS } from './types';
 import type { AnalyzeRequest } from './types';
 
@@ -22,7 +23,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('market');
   const [enableOptions, setEnableOptions] = useState(false);
   const [dark, setDark] = useState(getInitialDark);
-  const [mainSection, setMainSection] = useState<'analysis' | 'screener' | 'chart'>('analysis');
+  const [mainSection, setMainSection] = useState<'analysis' | 'screener' | 'chart' | 'trackrecord'>('analysis');
   const [prefillTicker, setPrefillTicker] = useState<string | undefined>(undefined);
   const [llmProvider, setLlmProvider] = useState('google');
   const [quickModel, setQuickModel] = useState('gemini-2.5-flash');
@@ -129,6 +130,16 @@ function App() {
           >
             Chart
           </button>
+          <button
+            onClick={() => setMainSection('trackrecord')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              mainSection === 'trackrecord'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
+          >
+            Track Record
+          </button>
         </div>
 
         {mainSection === 'analysis' ? (
@@ -210,13 +221,17 @@ function App() {
               onAnalyze={handleAnalyzePick}
             />
           </div>
-        ) : (
+        ) : mainSection === 'chart' ? (
           <div className="flex-1 flex flex-col overflow-hidden">
             <ChartScreen
               dark={dark}
               initialTicker={chartTicker}
               onViewAnalysis={() => setMainSection('analysis')}
             />
+          </div>
+        ) : (
+          <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-900">
+            <TrackRecordScreen dark={dark} onNavigateChart={() => setMainSection('chart')} />
           </div>
         )}
       </main>
