@@ -54,7 +54,7 @@ def _extract_price(text: str, label: str) -> float | None:
     ]
     for pat in patterns:
         m = re.search(pat, text, re.IGNORECASE)
-        if m:
+        if m and m.group(1):
             try:
                 return float(m.group(1).replace(",", ""))
             except ValueError:
