@@ -39,7 +39,7 @@ See: `.planning/milestones/v1.1-ROADMAP.md` for full details.
 ### v1.2 Paper Trading & Validation
 
 - [x] **Phase 13: TradingView Chart Integration** — Candlestick, volume, timeframe, and agent signal charts rendered in the frontend (completed 2026-04-03)
-- [ ] **Phase 14: Alpaca Paper Trading Execution** — Equity and options order submission, status display, trade markers, and auto-close
+- [x] **Phase 14: Alpaca Paper Trading Execution** — Equity and options order submission, status display, trade markers, and auto-close (completed 2026-04-03)
 - [ ] **Phase 15: Recommendation Scoring** — Trade outcome storage, win rate, expectancy, and confidence-calibration metrics
 - [ ] **Phase 16: Track Record Dashboard** — Summary stats, trade history table, equity curve, per-ticker breakdown, and options vs equity split
 
@@ -72,11 +72,11 @@ Plans:
   3. After a paper equity order fills, user sees a trade entry marker pinned at the fill price on the candlestick chart
   4. User can submit a single-leg options paper order from the options legs builder output and see the order status reflected in the frontend
   5. After N trading days, the system auto-closes the paper position and records the outcome as WIN, LOSS, or OPEN
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 Plans:
 - [x] 14-01-PLAN.md — Backend DB layer, Trade model, Alpaca SDK integration, trade routes + tests
 - [x] 14-02-PLAN.md — Frontend execution UX: action panel activation, confirmation modal, status polling
-- [ ] 14-03-PLAN.md — CHART-03 trade fill/exit markers on chart + auto-close trigger on load
+- [x] 14-03-PLAN.md — CHART-03 trade fill/exit markers on chart + auto-close trigger on load
 
 ### Phase 15: Recommendation Scoring
 **Goal**: Users can see quantitative evidence of system performance — win rate, expectancy, profit factor, and a confidence-calibration chart — derived from scored paper trade records
@@ -107,7 +107,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 13. TradingView Chart Integration | 3/3 | Complete    | 2026-04-03 |
-| 14. Alpaca Paper Trading Execution | 2/3 | In Progress|  |
+| 14. Alpaca Paper Trading Execution | 3/3 | Complete   | 2026-04-03 |
 | 15. Recommendation Scoring | 0/? | Not started | - |
 | 16. Track Record Dashboard | 0/? | Not started | - |
 

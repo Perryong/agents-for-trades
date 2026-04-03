@@ -11,7 +11,7 @@ Requirements for Paper Trading & Validation milestone. Each maps to roadmap phas
 
 - [x] **CHART-01**: User can view candlestick price chart for any analyzed ticker
 - [x] **CHART-02**: User can view volume bars below the candlestick chart
-- [ ] **CHART-03**: User can see paper trade entry/exit markers overlaid on the chart
+- [x] **CHART-03**: User can see paper trade entry/exit markers overlaid on the chart
 - [x] **CHART-04**: User can toggle between daily, weekly, and monthly timeframes
 - [x] **CHART-05**: User can see per-agent bull/bear signal annotations at the decision point on the chart
 
@@ -73,7 +73,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | CHART-01 | Phase 13 | Complete |
 | CHART-02 | Phase 13 | Complete |
-| CHART-03 | Phase 14 | Pending |
+| CHART-03 | Phase 14 | Complete |
 | CHART-04 | Phase 13 | Complete |
 | CHART-05 | Phase 13 | Complete |
 | EXEC-01 | Phase 14 | Complete |
