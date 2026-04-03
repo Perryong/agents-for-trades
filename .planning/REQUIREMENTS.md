@@ -31,11 +31,11 @@ Requirements for Paper Trading & Validation milestone. Each maps to roadmap phas
 
 ### Dashboard (Track Record)
 
-- [ ] **DASH-01**: User can view summary statistics (win rate, total trades, P&L, avg gain/loss)
-- [ ] **DASH-02**: User can view chronological trade history table with outcomes
-- [ ] **DASH-03**: User can view equity curve chart showing running P&L over time
-- [ ] **DASH-04**: User can view per-ticker accuracy breakdown
-- [ ] **DASH-05**: User can view separate win rates for options vs equity decisions
+- [x] **DASH-01**: User can view summary statistics (win rate, total trades, P&L, avg gain/loss)
+- [x] **DASH-02**: User can view chronological trade history table with outcomes
+- [x] **DASH-03**: User can view equity curve chart showing running P&L over time
+- [x] **DASH-04**: User can view per-ticker accuracy breakdown
+- [x] **DASH-05**: User can view separate win rates for options vs equity decisions
 
 ## v1.3+ Requirements
 
@@ -84,11 +84,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SCORE-01 | Phase 15 | Complete |
 | SCORE-02 | Phase 15 | Complete |
 | SCORE-03 | Phase 15 | Complete |
-| DASH-01 | Phase 16 | Pending |
-| DASH-02 | Phase 16 | Pending |
-| DASH-03 | Phase 16 | Pending |
-| DASH-04 | Phase 16 | Pending |
-| DASH-05 | Phase 16 | Pending |
+| DASH-01 | Phase 16 | Complete |
+| DASH-02 | Phase 16 | Complete |
+| DASH-03 | Phase 16 | Complete |
+| DASH-04 | Phase 16 | Complete |
+| DASH-05 | Phase 16 | Complete |
 
 **Coverage:**
 - v1.2 requirements: 18 total
