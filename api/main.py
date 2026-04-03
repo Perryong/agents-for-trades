@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 load_dotenv()
 from fastapi import FastAPI
@@ -6,8 +7,19 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import router
+from .db import engine, Base
 
-app = FastAPI(title="TradingAgents API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Create DB tables on startup; release engine on shutdown."""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    await engine.dispose()
+
+
+app = FastAPI(title="TradingAgents API", lifespan=lifespan)
 
 # Dev: allow Vite dev server origin
 app.add_middleware(
@@ -23,6 +35,8 @@ from .screener_routes import screener_router
 app.include_router(screener_router)
 from .chart_routes import chart_router
 app.include_router(chart_router)
+from .trade_routes import trade_router
+app.include_router(trade_router)
 
 # Production: serve Vite dist if it exists
 DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
