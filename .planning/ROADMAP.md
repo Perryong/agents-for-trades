@@ -101,7 +101,10 @@ Plans:
   3. User can see an equity curve chart that plots running P&L over time across all paper trades
   4. User can click into a per-ticker view and see win rate and P&L breakdown isolated to that ticker
   5. User can switch between equity-only and options-only performance views, each showing metrics appropriate to that asset class
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 16-01-PLAN.md — Backend: dashboard API endpoints (summary, trades, equity-curve) with filtering
+- [ ] 16-02-PLAN.md — Frontend: TrackRecordScreen, data hooks, nav tab, equity curve chart
 
 ---
 
@@ -112,7 +115,7 @@ Plans:
 | 13. TradingView Chart Integration | 3/3 | Complete    | 2026-04-03 |
 | 14. Alpaca Paper Trading Execution | 3/3 | Complete    | 2026-04-03 |
 | 15. Recommendation Scoring | 2/2 | Complete    | 2026-04-03 |
-| 16. Track Record Dashboard | 0/? | Not started | - |
+| 16. Track Record Dashboard | 0/2 | In Progress | - |
 
 ---
 
