@@ -225,6 +225,36 @@ def create_strike_expiry_selector(llm):
             Does NOT write to state["messages"].
     """
 
+    # Multi-timeframe DTE buckets
+    DTE_BUCKETS = [
+        {"label": "Short-term (0-5 DTE)", "min": 0, "max": 5, "tag": "SHORT"},
+        {"label": "Weekly (5-14 DTE)", "min": 5, "max": 14, "tag": "WEEKLY"},
+        {"label": "Monthly (14-45 DTE)", "min": 14, "max": 45, "tag": "MONTHLY"},
+        {"label": "Longer-term (45-90 DTE)", "min": 45, "max": 90, "tag": "LONGER"},
+    ]
+
+    def _build_legs_for_expiry(
+        ticker, expiry_str, dte, chain_df, leg_types, delta_target, delta_tolerance, min_oi
+    ):
+        """Build leg lines for a single expiry. Returns list of formatted strings or None."""
+        legs = []
+        leg_num = 1
+        for leg in leg_types:
+            action = leg["action"]
+            opt_type = leg["type"]
+            delta_offset = -0.15 if action == "SELL" and len(leg_types) > 1 else 0.0
+
+            row = _select_contract(
+                chain_df, opt_type, delta_target, delta_tolerance, min_oi,
+                delta_offset=delta_offset,
+            )
+            if row is None:
+                return None
+
+            legs.append(_format_leg(leg_num, action, opt_type, ticker, expiry_str, row))
+            leg_num += 1
+        return legs
+
     def strike_expiry_selector_node(state: dict) -> dict:
         ticker: str = state["company_of_interest"]
         trade_date_str: str = state.get("trade_date", str(date.today()))
@@ -237,11 +267,8 @@ def create_strike_expiry_selector(llm):
         # ------------------------------------------------------------------
         config = get_config()
         delta_target: float = float(config.get("options_delta_target", 0.30))
-        dte_window: list = config.get("options_dte_window", [21, 45])
         min_oi: int = int(config.get("options_min_oi", 100))
         delta_tolerance = 0.05
-        dte_min, dte_max = dte_window[0], dte_window[1]
-        dte_center = (dte_min + dte_max) / 2.0
 
         # ------------------------------------------------------------------
         # Fetch expirations
@@ -250,88 +277,98 @@ def create_strike_expiry_selector(llm):
 
         if not expirations:
             return {
-                "options_legs": (
-                    f"No contracts satisfy delta={delta_target} +/-{delta_tolerance} "
-                    f"within DTE [{dte_min},{dte_max}] with OI>{min_oi}. [LIQUIDITY FAIL]"
-                )
+                "options_legs": "No options expirations available for this ticker. [NO DATA]"
             }
 
         # ------------------------------------------------------------------
-        # Filter expirations by DTE window, pick closest to center
+        # Map expirations to DTE buckets
         # ------------------------------------------------------------------
-        valid_expiries = []
+        exp_with_dte = []
         for exp_str in expirations:
             try:
                 exp_date = date.fromisoformat(exp_str)
                 dte = (exp_date - trade_date).days
-                if dte_min <= dte <= dte_max:
-                    valid_expiries.append((exp_str, dte))
+                if dte >= 0:
+                    exp_with_dte.append((exp_str, dte))
             except (ValueError, TypeError):
                 continue
 
-        if not valid_expiries:
-            return {
-                "options_legs": (
-                    f"No contracts satisfy delta={delta_target} +/-{delta_tolerance} "
-                    f"within DTE [{dte_min},{dte_max}] with OI>{min_oi}. [LIQUIDITY FAIL]"
-                )
-            }
-
-        selected_expiry = min(valid_expiries, key=lambda x: abs(x[1] - dte_center))[0]
-
-        # ------------------------------------------------------------------
-        # Fetch and parse options chain
-        # ------------------------------------------------------------------
-        chain_str: str = route_to_vendor("get_options_chain", ticker, selected_expiry)
-        chain_df = _parse_tabular_string(chain_str)
-
-        if chain_df is None or chain_df.empty:
-            return {
-                "options_legs": (
-                    f"No contracts satisfy delta={delta_target} +/-{delta_tolerance} "
-                    f"within DTE [{dte_min},{dte_max}] with OI>{min_oi}. [LIQUIDITY FAIL]"
-                )
-            }
-
-        # ------------------------------------------------------------------
-        # Determine leg structure from strategy
-        # ------------------------------------------------------------------
         leg_types = _get_leg_types(options_strategy)
 
         # ------------------------------------------------------------------
-        # Select contracts for each leg
+        # Build recommendations per timeframe
         # ------------------------------------------------------------------
-        leg_lines = []
-        leg_num = 1
+        report_sections = []
+        primary_legs = None  # first successful bucket becomes the primary recommendation
 
-        for i, leg in enumerate(leg_types):
-            action = leg["action"]
-            opt_type = leg["type"]
+        for bucket in DTE_BUCKETS:
+            bucket_expiries = [
+                (exp, dte) for exp, dte in exp_with_dte
+                if bucket["min"] <= dte <= bucket["max"]
+            ]
+            if not bucket_expiries:
+                report_sections.append(
+                    f"\n### {bucket['label']}\nNo expirations available in this window."
+                )
+                continue
 
-            # For sell legs in spreads, use lower delta target
-            if action == "SELL" and len(leg_types) > 1:
-                delta_offset = -0.15
-            else:
-                delta_offset = 0.0
+            # Pick expiry closest to bucket center
+            center = (bucket["min"] + bucket["max"]) / 2.0
+            best_exp, best_dte = min(bucket_expiries, key=lambda x: abs(x[1] - center))
 
-            row = _select_contract(
-                chain_df, opt_type, delta_target, delta_tolerance, min_oi,
-                delta_offset=delta_offset,
+            # Fetch chain
+            chain_str = route_to_vendor("get_options_chain", ticker, best_exp)
+            chain_df = _parse_tabular_string(chain_str)
+
+            if chain_df is None or chain_df.empty:
+                report_sections.append(
+                    f"\n### {bucket['label']}\nNo chain data for {best_exp} ({best_dte} DTE)."
+                )
+                continue
+
+            legs = _build_legs_for_expiry(
+                ticker, best_exp, best_dte, chain_df, leg_types,
+                delta_target, delta_tolerance, min_oi,
             )
 
-            if row is None:
-                return {
-                    "options_legs": (
-                        f"No contracts satisfy delta={delta_target} +/-{delta_tolerance} "
-                        f"within DTE [{dte_min},{dte_max}] with OI>{min_oi}. [LIQUIDITY FAIL]"
-                    )
-                }
+            if legs is None:
+                report_sections.append(
+                    f"\n### {bucket['label']}\n"
+                    f"Expiry: {best_exp} ({best_dte} DTE) — no contracts match "
+                    f"delta={delta_target} +/-{delta_tolerance} with sufficient OI."
+                )
+                continue
 
-            leg_lines.append(
-                _format_leg(leg_num, action, opt_type, ticker, selected_expiry, row)
-            )
-            leg_num += 1
+            section = f"\n### {bucket['label']}\n"
+            section += f"**Expiry: {best_exp} ({best_dte} DTE)**\n\n"
+            section += "\n".join(legs)
 
-        return {"options_legs": "\n".join(leg_lines)}
+            # Add risk note for short-term
+            if bucket["tag"] == "SHORT":
+                section += (
+                    "\n\n*Warning: 0-5 DTE options have extreme gamma and theta. "
+                    "Small price moves cause large P&L swings. Size accordingly.*"
+                )
+
+            report_sections.append(section)
+
+            if primary_legs is None:
+                primary_legs = "\n".join(legs)
+
+        # ------------------------------------------------------------------
+        # Compose full output
+        # ------------------------------------------------------------------
+        header = f"## Options Contract Selection: {options_strategy.upper()}\n"
+        header += f"Strategy: {options_strategy} | Delta target: {delta_target} | Ticker: {ticker}\n"
+
+        if not primary_legs:
+            return {
+                "options_legs": header + "\nNo viable contracts found across any timeframe. [LIQUIDITY FAIL]"
+            }
+
+        output = header + "\n".join(report_sections)
+        output += "\n\n---\n*Primary recommendation uses the first available timeframe with viable contracts.*"
+
+        return {"options_legs": output}
 
     return strike_expiry_selector_node

@@ -83,13 +83,29 @@ Deliverables — your output MUST include ALL of these sections:
 - Position sizing suggestion (% of portfolio)
 
 ## Options Trade Plan (include ONLY if options data is available above)
-- Recommended strategy (e.g., bull call spread, protective put)
-- Specific legs: strike(s), expiry, type (call/put), buy/sell
-- Entry price per contract (debit or credit)
-- Max profit / max loss / breakeven
+The options data includes contracts across multiple timeframes. You MUST evaluate and recommend for at least TWO timeframes:
+
+### Short-term Trade (0-14 DTE)
+- Specific legs from the short-term/weekly section above
+- Entry price, max profit/loss, breakeven
+- Exit rules (these decay fast — be specific about time-based exits)
+- Key risk: gamma exposure, overnight gap risk
+- Who this is for: active traders, directional conviction plays, event-driven trades
+
+### Swing Trade (14-45 DTE)
+- Specific legs from the monthly section above
+- Entry price, max profit/loss, breakeven
 - Exit rules: when to take profit, when to cut loss
 - Greeks snapshot at entry (delta, theta, vega)
-- Key risk: what kills this trade (e.g., IV crush, time decay, gap down)
+- Who this is for: swing traders, standard premium strategies
+
+### Longer-term Trade (45+ DTE) — if available
+- Specific legs from the longer-term section above
+- Entry price, max profit/loss, breakeven
+- Who this is for: conservative positioning, LEAPS, portfolio hedges
+
+For each timeframe, state: **Recommended: YES/NO** with one-line reasoning.
+Key risk for overall options position: what scenario kills this trade?
 
 ## Risk Summary
 - What could go wrong (top 2-3 scenarios)

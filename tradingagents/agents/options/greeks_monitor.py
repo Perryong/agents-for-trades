@@ -252,19 +252,39 @@ def create_greeks_monitor(llm):
         # ------------------------------------------------------------------
         # Format report
         # ------------------------------------------------------------------
+        flag_explanations = {
+            "DELTA_HEAVY": "Position has significant directional exposure — consider hedging or reducing size",
+            "PIN_GAMMA_RISK": "High gamma near expiry — position P&L will swing rapidly with small price moves",
+            "HIGH_DECAY_COST": "Theta is eroding value quickly — time is working against this position",
+            "VOL_SENSITIVE": "Large vega exposure — an IV crush or spike will significantly impact P&L",
+        }
+
         report_lines = [
-            "GREEKS REPORT",
-            (
-                f"net_delta=${net_dollar_delta:.0f} "
-                f"net_gamma={net_gamma:.4f} "
-                f"net_theta=${net_dollar_theta:.0f}/day "
-                f"net_vega=${net_dollar_vega:.0f}/1%IV"
-            ),
-            f"FLAGS: {', '.join(flags) if flags else 'NONE'}",
+            "## Portfolio Greeks",
+            "",
+            "| Greek | Value | Meaning |",
+            "|-------|-------|---------|",
+            f"| **Delta** | ${net_dollar_delta:.0f} | P&L change per $1 move in underlying |",
+            f"| **Gamma** | {net_gamma:.4f} | Rate of delta change — acceleration risk |",
+            f"| **Theta** | ${net_dollar_theta:.0f}/day | Daily time decay cost/benefit |",
+            f"| **Vega** | ${net_dollar_vega:.0f}/1%IV | P&L change per 1% IV move |",
+            "",
         ]
 
+        if flags:
+            report_lines.append("## Risk Flags")
+            report_lines.append("")
+            for flag in flags:
+                explanation = flag_explanations.get(flag, "Review this exposure")
+                report_lines.append(f"- **{flag}**: {explanation}")
+        else:
+            report_lines.append("## Risk Flags")
+            report_lines.append("")
+            report_lines.append("No risk flags triggered — position Greeks are within acceptable thresholds.")
+
         if tradier_fallback:
-            report_lines.append("Greeks unavailable — Tradier data required")
+            report_lines.append("")
+            report_lines.append("*Note: Greeks are estimated via Black-Scholes. Real-time Greeks from a broker feed would be more accurate.*")
 
         return {"greeks_report": "\n".join(report_lines)}
 

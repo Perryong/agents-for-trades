@@ -139,6 +139,7 @@ function App() {
               <ReportPane
                 content={reportContent}
                 status={state.status}
+                tabLabel={currentTab?.label ?? 'Report'}
               />
             </div>
 
