@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Paper Trading & Validation
-status: defining-requirements
-stopped_at: Milestone started
+status: roadmap-ready
+stopped_at: Roadmap created — ready for Phase 13 planning
 last_updated: "2026-04-03"
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -19,14 +19,27 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-03)
 
 **Core value:** Trader receives a complete, executable options recommendation derived from the same AI analytical process that drives the equity decision
-**Current focus:** Defining requirements for v1.2
+**Current focus:** v1.2 Paper Trading & Validation — Phase 13 next
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 13 — TradingView Chart Integration (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-04-03 — Milestone v1.2 started
+Status: Roadmap created, awaiting phase planning
+Last activity: 2026-04-03 — v1.2 roadmap created
+
+```
+Progress: [                    ] 0/4 phases
+```
+
+## Performance Metrics
+
+| Metric | Value |
+|--------|-------|
+| Phases completed | 0/4 |
+| Plans completed | 0/? |
+| Requirements mapped | 18/18 |
+| Milestone | v1.2 |
 
 ## Accumulated Context
 
@@ -43,18 +56,44 @@ Last activity: 2026-04-03 — Milestone v1.2 started
 | CLI screen command uses console.status() spinner, not Live(layout) | Screener is synchronous and simpler than analyze's real-time multi-agent display |
 | Typer cmd.callback.__name__ fallback for registered command name checks | @app.command() without explicit name sets cmd.name=None; __name__ is the correct fallback |
 
-### Phase Dependencies
+### Key Decisions (v1.2 — established at roadmap)
+
+| Decision | Rationale |
+|----------|-----------|
+| lightweight-charts v5.1.0 (npm) — direct import, no community wrapper | Community wrappers target v3/v4; v5 API is a hard breaking change; official tutorial covers React useRef+useEffect pattern directly |
+| alpaca-py v0.43.2 (not alpaca-trade-api) | alpaca-trade-api is officially deprecated; alpaca-py is the current SDK |
+| All Alpaca SDK calls wrapped with asyncio.to_thread() | SDK methods are synchronous; direct calls inside async FastAPI routes block the event loop and stall SSE streaming |
+| ALPACA_PAPER_KEY / ALPACA_PAPER_SECRET env var naming | Unambiguous naming prevents live/paper key confusion; startup assertion rejects misconfiguration |
+| SQLAlchemy 2.0 async + aiosqlite for trade persistence | Matches existing FastAPI async event loop; ORM abstraction allows future PostgreSQL upgrade by changing only the connection string |
+| Scoring schema defined before any scoring code | Retrofitting historical records is destructive; schema_version field required; pre-v1.2 JSON logs excluded from quantitative metrics |
+| Win rate never displayed alone | Win rate without expectancy and risk-reward is actively misleading; full metric suite always shown together |
+| CHART-03 (trade markers) assigned to Phase 14, not Phase 13 | Trade markers require fill prices from Alpaca; cannot render until execution infrastructure exists |
+| Options multi-leg execution (EXEC-04) in Phase 14 after equity is stable | Highest-complexity item; inherits proven equity order lifecycle; validate with scratch paper account before implementing |
+
+### Phase Dependencies (v1.2)
 
 ```
-Phase 8 (Data Layer)
-  └── Phase 9 (LLM Agent)
-        ├── Phase 10 (API)
-        │     └── Phase 11 (Frontend)
-        └── Phase 12 (CLI)
+Phase 13 (Charts — CHART-01,02,04,05)
+  └── Phase 14 (Execution — EXEC-01..05, CHART-03)
+        └── Phase 15 (Scoring — SCORE-01,02,03)
+              └── Phase 16 (Dashboard — DASH-01..05)
 ```
+
+### Open Architecture Decisions (resolve during planning)
+
+| Decision | Options | Must resolve before |
+|----------|---------|---------------------|
+| Deferred outcome evaluation mechanism (N-trading-day scoring trigger) | (a) manual "close trade" button, (b) Alpaca positions API polled on dashboard load, (c) APScheduler background task | Phase 15 planning |
+| Options multi-leg execution scope | Validate with scratch paper account first; defer to v1.3 if Alpaca paper gaps confirmed | Phase 14 planning |
+| Historical JSON log compatibility in dashboard | Show in history view but exclude from quantitative metrics | Phase 16 planning |
+
+### Research Flags
+
+- Phase 14 (options multi-leg): Alpaca paper environment has documented gaps for complex options order types — validate with a test order before committing scope
+- Phase 15 (deferred evaluation mechanism): Required architecture decision before any scoring code is written
 
 ## Session Continuity
 
 Last session: 2026-04-03
-Stopped at: Milestone v1.2 started
-Next action: Define requirements
+Stopped at: v1.2 roadmap created
+Next action: Run /gsd:plan-phase 13

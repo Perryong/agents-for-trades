@@ -71,30 +71,30 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CHART-01 | — | Pending |
-| CHART-02 | — | Pending |
-| CHART-03 | — | Pending |
-| CHART-04 | — | Pending |
-| CHART-05 | — | Pending |
-| EXEC-01 | — | Pending |
-| EXEC-02 | — | Pending |
-| EXEC-03 | — | Pending |
-| EXEC-04 | — | Pending |
-| EXEC-05 | — | Pending |
-| SCORE-01 | — | Pending |
-| SCORE-02 | — | Pending |
-| SCORE-03 | — | Pending |
-| DASH-01 | — | Pending |
-| DASH-02 | — | Pending |
-| DASH-03 | — | Pending |
-| DASH-04 | — | Pending |
-| DASH-05 | — | Pending |
+| CHART-01 | Phase 13 | Pending |
+| CHART-02 | Phase 13 | Pending |
+| CHART-03 | Phase 14 | Pending |
+| CHART-04 | Phase 13 | Pending |
+| CHART-05 | Phase 13 | Pending |
+| EXEC-01 | Phase 14 | Pending |
+| EXEC-02 | Phase 14 | Pending |
+| EXEC-03 | Phase 14 | Pending |
+| EXEC-04 | Phase 14 | Pending |
+| EXEC-05 | Phase 14 | Pending |
+| SCORE-01 | Phase 15 | Pending |
+| SCORE-02 | Phase 15 | Pending |
+| SCORE-03 | Phase 15 | Pending |
+| DASH-01 | Phase 16 | Pending |
+| DASH-02 | Phase 16 | Pending |
+| DASH-03 | Phase 16 | Pending |
+| DASH-04 | Phase 16 | Pending |
+| DASH-05 | Phase 16 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 18 total
-- Mapped to phases: 0
-- Unmapped: 18
+- Mapped to phases: 18
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-03*
-*Last updated: 2026-04-03 after initial definition*
+*Last updated: 2026-04-03 after roadmap creation — all 18 requirements mapped*
