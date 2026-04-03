@@ -38,6 +38,8 @@ from .chart_routes import chart_router
 app.include_router(chart_router)
 from .trade_routes import trade_router
 app.include_router(trade_router)
+from .score_routes import score_router
+app.include_router(score_router)
 
 # Production: serve Vite dist if it exists
 DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")

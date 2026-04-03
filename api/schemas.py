@@ -109,3 +109,32 @@ class TradeStatusResponse(BaseModel):
     close_price: Optional[float] = None
     pnl_pct: Optional[float] = None
     outcome: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Scoring schemas (Phase 15 — SCORE-02, SCORE-03)
+# ---------------------------------------------------------------------------
+
+class ScoreSummaryResponse(BaseModel):
+    win_rate: float              # percentage 0-100
+    expectancy: float            # average P&L per trade (weighted by win/loss rate)
+    avg_winner: float            # average P&L % of winning trades
+    avg_loser: float             # average P&L % of losing trades
+    profit_factor: float         # sum(winners) / abs(sum(losers)), 0.0 if no losers
+    total_trades: int            # all trades in DB
+    total_closed: int            # trades with outcome != None
+    disclaimer: Optional[str] = None  # present when total_closed < 5
+
+
+class CalibrationBucket(BaseModel):
+    bucket_label: str            # "0-20%", "20-40%", etc.
+    bucket_min: int
+    bucket_max: int
+    actual_win_rate: float       # 0-100
+    trade_count: int
+
+
+class CalibrationResponse(BaseModel):
+    buckets: List[CalibrationBucket]
+    total_scored: int            # trades with non-null confidence + outcome
+    message: Optional[str] = None  # present when insufficient data
