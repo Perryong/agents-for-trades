@@ -93,23 +93,10 @@ None — plan executed exactly as written.
 
 None. All data is wired to live backend endpoints.
 
-## Checkpoint: Task 3 — Human Verification Required
+## Task 3 — Human Verification
 
-Task 3 is `type="checkpoint:human-verify"`. Visual verification of the scoring UI is required before marking this plan complete.
+**Status:** Approved by user on 2026-04-03.
 
-### How to Verify
-
-1. Start backend: `cd C:/Users/maker/Documents/Projects/agents-for-trades && python -m uvicorn api.main:app --reload`
-2. Start frontend: `cd frontend && npm run dev`
-3. Open http://localhost:5173 and navigate to Chart Screen for an analyzed ticker (e.g., AAPL)
-4. In active mode (with overlay), look below the signal/execute row — you should see a "Performance" section
-5. Verify metrics card shows: Win Rate, Expectancy, Avg Winner, Avg Loser, Profit Factor, Total Closed — all together
-6. If <5 closed trades, verify yellow disclaimer text appears
-7. Click "Show Calibration" toggle — verify a lightweight-charts line chart appears (not plain HTML bars)
-8. Verify blue actual-win-rate line and gray dashed perfect-calibration diagonal are visible
-9. Verify bucket labels "0-20%", "20-40%", etc. appear below the chart
-10. If <10 scored trades, verify text message instead of chart
-11. `curl http://localhost:8000/api/scores/summary` returns JSON with all metric fields
-12. `curl http://localhost:8000/api/scores/calibration` returns JSON with buckets array
+Visual inspection confirmed: scoring metrics card and calibration chart render correctly in the Chart Screen action panel.
 
 ## Self-Check: PASSED
