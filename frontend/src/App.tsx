@@ -6,6 +6,7 @@ import { WatchlistPanel } from './components/WatchlistPanel';
 import { ProgressStepper } from './components/ProgressStepper';
 import { ReportTabs } from './components/ReportTabs';
 import { ReportPane } from './components/ReportPane';
+import { ChartScreen } from './components/ChartScreen';
 import { REPORT_TABS } from './types';
 import type { AnalyzeRequest } from './types';
 
@@ -21,7 +22,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('market');
   const [enableOptions, setEnableOptions] = useState(false);
   const [dark, setDark] = useState(getInitialDark);
-  const [mainSection, setMainSection] = useState<'analysis' | 'screener'>('analysis');
+  const [mainSection, setMainSection] = useState<'analysis' | 'screener' | 'chart'>('analysis');
   const [prefillTicker, setPrefillTicker] = useState<string | undefined>(undefined);
   const [llmProvider, setLlmProvider] = useState('google');
   const [quickModel, setQuickModel] = useState('gemini-2.5-flash');
@@ -103,6 +104,16 @@ function App() {
           >
             Screener
           </button>
+          <button
+            onClick={() => setMainSection('chart')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              mainSection === 'chart'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
+          >
+            Chart
+          </button>
         </div>
 
         {mainSection === 'analysis' ? (
@@ -156,7 +167,7 @@ function App() {
               </div>
             )}
           </>
-        ) : (
+        ) : mainSection === 'screener' ? (
           <div className="flex-1 overflow-auto p-6 bg-gray-50 dark:bg-gray-900">
             <WatchlistPanel
               status={screenerState.status}
@@ -166,6 +177,10 @@ function App() {
               onRefresh={() => runScreen(llmProvider, quickModel)}
               onAnalyze={handleAnalyzePick}
             />
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <ChartScreen dark={dark} />
           </div>
         )}
       </main>
