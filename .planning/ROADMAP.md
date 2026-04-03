@@ -86,9 +86,9 @@ Plans:
   1. Each paper trade record stores outcome (WIN/LOSS/OPEN) and P&L percentage alongside fill price, target price, stop price, and decision date
   2. User can view win rate, expectancy, average winner, average loser, and profit factor together — never win rate as a standalone figure
   3. User can view a confidence-calibration chart that plots stated AI confidence against actual outcome rate across all scored trades
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
-- [ ] 15-01-PLAN.md — Backend: Trade model scoring columns, confidence extraction, summary + calibration endpoints
+- [x] 15-01-PLAN.md — Backend: Trade model scoring columns, confidence extraction, summary + calibration endpoints
 - [ ] 15-02-PLAN.md — Frontend: scoring metrics card, calibration chart, ChartActionPanel integration
 
 ### Phase 16: Track Record Dashboard
@@ -111,7 +111,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 13. TradingView Chart Integration | 3/3 | Complete    | 2026-04-03 |
 | 14. Alpaca Paper Trading Execution | 3/3 | Complete    | 2026-04-03 |
-| 15. Recommendation Scoring | 0/2 | Planning complete | - |
+| 15. Recommendation Scoring | 1/2 | In Progress|  |
 | 16. Track Record Dashboard | 0/? | Not started | - |
 
 ---

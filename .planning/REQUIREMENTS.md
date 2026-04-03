@@ -25,9 +25,9 @@ Requirements for Paper Trading & Validation milestone. Each maps to roadmap phas
 
 ### Scoring (Recommendation Scoring)
 
-- [ ] **SCORE-01**: Each trade decision stores outcome field (WIN/LOSS/OPEN) and P&L percentage
-- [ ] **SCORE-02**: User can view win rate, expectancy, and aggregate P&L metrics
-- [ ] **SCORE-03**: User can view confidence-calibration chart comparing stated confidence vs actual outcome rate
+- [x] **SCORE-01**: Each trade decision stores outcome field (WIN/LOSS/OPEN) and P&L percentage
+- [x] **SCORE-02**: User can view win rate, expectancy, and aggregate P&L metrics
+- [x] **SCORE-03**: User can view confidence-calibration chart comparing stated confidence vs actual outcome rate
 
 ### Dashboard (Track Record)
 
@@ -81,9 +81,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXEC-03 | Phase 14 | Complete |
 | EXEC-04 | Phase 14 | Complete |
 | EXEC-05 | Phase 14 | Complete |
-| SCORE-01 | Phase 15 | Pending |
-| SCORE-02 | Phase 15 | Pending |
-| SCORE-03 | Phase 15 | Pending |
+| SCORE-01 | Phase 15 | Complete |
+| SCORE-02 | Phase 15 | Complete |
+| SCORE-03 | Phase 15 | Complete |
 | DASH-01 | Phase 16 | Pending |
 | DASH-02 | Phase 16 | Pending |
 | DASH-03 | Phase 16 | Pending |
