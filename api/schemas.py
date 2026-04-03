@@ -138,3 +138,49 @@ class CalibrationResponse(BaseModel):
     buckets: List[CalibrationBucket]
     total_scored: int            # trades with non-null confidence + outcome
     message: Optional[str] = None  # present when insufficient data
+
+
+# ---------------------------------------------------------------------------
+# Dashboard schemas (Phase 16 — DASH-01..05)
+# ---------------------------------------------------------------------------
+
+class DashboardSummaryResponse(BaseModel):
+    """Per D-06: summary stats endpoint. Win rate never shown alone (STATE.md decision)."""
+    total_trades: int
+    total_closed: int
+    win_rate: float              # percentage 0-100
+    expectancy: float
+    avg_winner: float
+    avg_loser: float
+    profit_factor: float
+    aggregate_pnl: float         # sum of all pnl_pct for closed trades
+    disclaimer: Optional[str] = None  # when total_closed < 5
+
+
+class DashboardTradeItem(BaseModel):
+    """Single row in trade history table. Per D-09 columns."""
+    id: int
+    ticker: str
+    direction: str               # "BUY" | "SELL"
+    trade_type: str              # "equity" | "option"
+    entry_date: Optional[str]    # analysis_date or fill_time ISO
+    outcome: Optional[str]       # "WIN" | "LOSS" | None
+    pnl_pct: Optional[float]
+    strategy_name: Optional[str]
+    is_legacy: bool              # True if no outcome and no pnl — per D-12
+
+
+class DashboardTradesResponse(BaseModel):
+    trades: List[DashboardTradeItem]
+    total: int
+
+
+class EquityCurvePoint(BaseModel):
+    """Single data point on equity curve. Per D-05: X = close date, Y = cumulative P&L."""
+    time: str                    # ISO date string for lightweight-charts
+    value: float                 # cumulative P&L percentage
+
+
+class EquityCurveResponse(BaseModel):
+    points: List[EquityCurvePoint]
+    total_trades: int
