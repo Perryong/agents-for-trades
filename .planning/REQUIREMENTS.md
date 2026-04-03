@@ -1,91 +1,100 @@
-# Requirements: TradingAgents — Stock Recommendation System
+# Requirements: TradingAgents
 
-**Defined:** 2026-04-02
-**Core Value:** The trader receives a complete, executable options recommendation derived from the same AI analytical process that drives the equity decision
+**Defined:** 2026-04-03
+**Core Value:** Trader receives a complete, executable options recommendation derived from the same AI analytical process that drives the equity decision
 
-## v1.1 Requirements
+## v1.2 Requirements
 
-Requirements for stock recommendation/screening system. Each maps to roadmap phases.
+Requirements for Paper Trading & Validation milestone. Each maps to roadmap phases.
 
-### Screener Data Layer
+### Charts (TradingView Lightweight Charts v5)
 
-- [x] **SCREEN-01**: Programmatic pre-filter scans market universe via yfinance bulk download with chunked fetching and rate-limit safety
-- [x] **SCREEN-02**: Pre-filter outputs scored candidate list (max 50) ranked by volume, momentum, and unusual activity signals
-- [x] **SCREEN-03**: Screener data routed through existing `VENDOR_METHODS` pattern with new `screener_data` category
-- [x] **SCREEN-04**: Market-session-aware cache prevents stale data during trading hours and avoids unnecessary refetches after close
+- [ ] **CHART-01**: User can view candlestick price chart for any analyzed ticker
+- [ ] **CHART-02**: User can view volume bars below the candlestick chart
+- [ ] **CHART-03**: User can see paper trade entry/exit markers overlaid on the chart
+- [ ] **CHART-04**: User can toggle between daily, weekly, and monthly timeframes
+- [ ] **CHART-05**: User can see per-agent bull/bear signal annotations at the decision point on the chart
 
-### LLM Screener Agent
+### Execution (Alpaca Paper Trading)
 
-- [x] **RANK-01**: `create_screener_agent` factory follows existing `create_*` pattern, uses `quick_thinking_llm` for cost control
-- [x] **RANK-02**: LLM ranker accepts pre-filtered candidates (hard cap 50) and returns top 3-5 picks with rationale and confidence score
-- [x] **RANK-03**: Screener output uses dedicated `ScreenerResult` model — never written to `AgentState`
-- [x] **RANK-04**: Structured JSON output per pick: ticker, score, rationale, key metrics (volume, momentum, sector)
+- [ ] **EXEC-01**: User can configure Alpaca paper trading API keys via environment variables
+- [ ] **EXEC-02**: User can auto-execute an equity BUY/SELL order from the agent's final decision
+- [ ] **EXEC-03**: User can see order status (submitted/filled/rejected) in the frontend
+- [ ] **EXEC-04**: User can auto-execute multi-leg options orders from the options legs builder output
+- [ ] **EXEC-05**: System auto-closes paper positions after N days and computes outcome (WIN/LOSS/OPEN)
 
-### Backend API
+### Scoring (Recommendation Scoring)
 
-- [x] **API-01**: `POST /api/screen` endpoint returns synchronous JSON with ranked picks and `screened_at` timestamp
-- [x] **API-02**: Screener endpoint is independent from analysis SSE stream — no coupling between screener and pipeline
+- [ ] **SCORE-01**: Each trade decision stores outcome field (WIN/LOSS/OPEN) and P&L percentage
+- [ ] **SCORE-02**: User can view win rate, expectancy, and aggregate P&L metrics
+- [ ] **SCORE-03**: User can view confidence-calibration chart comparing stated confidence vs actual outcome rate
 
-### Frontend Integration
+### Dashboard (Track Record)
 
-- [x] **FE-01**: WatchlistPanel component displays ranked screener results with key metrics per pick
-- [x] **FE-02**: User can select a screener pick to pre-populate the analysis config and run the full pipeline
-- [x] **FE-03**: Stale data indicator shows `screened_at` timestamp prominently
+- [ ] **DASH-01**: User can view summary statistics (win rate, total trades, P&L, avg gain/loss)
+- [ ] **DASH-02**: User can view chronological trade history table with outcomes
+- [ ] **DASH-03**: User can view equity curve chart showing running P&L over time
+- [ ] **DASH-04**: User can view per-ticker accuracy breakdown
+- [ ] **DASH-05**: User can view separate win rates for options vs equity decisions
 
-### CLI Integration
+## v1.3+ Requirements
 
-- [x] **CLI-01**: `screen` subcommand runs the screener and displays ranked results in a Rich table
-- [x] **CLI-02**: CLI output includes ticker, score, rationale summary, and key metrics per pick
+Deferred to future release. Tracked but not in current roadmap.
 
-## v2 Requirements
+### Scoring
 
-### Enhanced Screening
-
-- **SCREEN-V2-01**: finvizfinance as alternative screener data vendor (richer filters, unusual volume detection)
-- **SCREEN-V2-02**: Options-readiness flag on screener picks (IV rank, liquidity check)
-- **SCREEN-V2-03**: Screener results persistence to JSON (consistent with trade decision logging)
+- **SCORE-04**: User can view per-agent accuracy breakdown (which agents had most accurate signals)
 
 ### Backtesting
 
-- **BACK-01**: Evaluate logged trade decisions against subsequent price action (equity)
-- **BACK-02**: Synthetic options backtesting using Black-Scholes with historical IV
-- **BACK-03**: Benchmark comparison against buy-and-hold S&P 500
+- **BACK-01**: User can replay historical decisions against price data
+- **BACK-02**: User can compare agent performance across different market regimes
 
 ## Out of Scope
 
+Explicitly excluded. Documented to prevent scope creep.
+
 | Feature | Reason |
 |---------|--------|
-| Auto-running full pipeline on screened picks | LLM cost prohibitive — user selects which to analyze |
-| finvizfinance dependency | Deferred to v2 — yfinance-only for v1.1 |
-| Real-time streaming screener updates | Batch/on-demand only, consistent with existing pipeline |
-| Backtesting engine | Deferred to v1.2 — need accumulated logged decisions first |
-| Live order execution | Analysis and order generation only — no automated submission |
+| Live/real-money Alpaca execution | Paper-only in v1.2; regulatory compliance and risk surface |
+| TradingView Advanced Charting Library | Proprietary, requires application, 100kB+ overhead, overkill |
+| TradingView iframe/embed widget | Cannot overlay custom data, agent signals, or trade markers |
+| Portfolio rebalancing / position sizing | No persistent portfolio model; fixed paper order size |
+| WebSocket real-time P&L streaming | REST polling sufficient for paper trading frequency |
+| Multiple broker integrations | Alpaca only; vendor-abstract the interface for future |
+| Social comparison / leaderboard | Single-user tool, no multi-user architecture |
+| Natural language outcome entry | Auto-compute from price data instead |
 
 ## Traceability
 
+Which phases cover which requirements. Updated during roadmap creation.
+
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCREEN-01 | Phase 8 | Complete |
-| SCREEN-02 | Phase 8 | Complete |
-| SCREEN-03 | Phase 8 | Complete |
-| SCREEN-04 | Phase 8 | Complete |
-| RANK-01 | Phase 9 | Complete |
-| RANK-02 | Phase 9 | Complete |
-| RANK-03 | Phase 9 | Complete |
-| RANK-04 | Phase 9 | Complete |
-| API-01 | Phase 10 | Complete |
-| API-02 | Phase 10 | Complete |
-| FE-01 | Phase 11 | Complete |
-| FE-02 | Phase 11 | Complete |
-| FE-03 | Phase 11 | Complete |
-| CLI-01 | Phase 12 | Complete |
-| CLI-02 | Phase 12 | Complete |
+| CHART-01 | — | Pending |
+| CHART-02 | — | Pending |
+| CHART-03 | — | Pending |
+| CHART-04 | — | Pending |
+| CHART-05 | — | Pending |
+| EXEC-01 | — | Pending |
+| EXEC-02 | — | Pending |
+| EXEC-03 | — | Pending |
+| EXEC-04 | — | Pending |
+| EXEC-05 | — | Pending |
+| SCORE-01 | — | Pending |
+| SCORE-02 | — | Pending |
+| SCORE-03 | — | Pending |
+| DASH-01 | — | Pending |
+| DASH-02 | — | Pending |
+| DASH-03 | — | Pending |
+| DASH-04 | — | Pending |
+| DASH-05 | — | Pending |
 
 **Coverage:**
-- v1.1 requirements: 15 total
-- Mapped to phases: 15
-- Unmapped: 0
+- v1.2 requirements: 18 total
+- Mapped to phases: 0
+- Unmapped: 18
 
 ---
-*Requirements defined: 2026-04-02*
-*Last updated: 2026-04-02 after v1.1 roadmap creation*
+*Requirements defined: 2026-04-03*
+*Last updated: 2026-04-03 after initial definition*
