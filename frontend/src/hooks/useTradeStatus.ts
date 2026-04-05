@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import type { TradeStatus, OrderStatus } from '../types';
 
-const TERMINAL_STATUSES: OrderStatus[] = ['filled', 'rejected', 'error'];
+// 'filled' intentionally excluded: bracket orders remain open after fill.
+// Polling continues until a bracket leg fills (Target Hit / Stop-Loss) or
+// the user manually closes the position, transitioning to 'closed'.
+const TERMINAL_STATUSES: OrderStatus[] = ['rejected', 'error', 'closed', 'expired'];
 
 const INITIAL_STATUS: TradeStatus = {
   status: 'idle',
@@ -13,6 +16,7 @@ const INITIAL_STATUS: TradeStatus = {
   close_price: null,
   pnl_pct: null,
   outcome: null,
+  close_reason: null,
 };
 
 export function useTradeStatus(ticker: string, orderId: string | null): TradeStatus {
@@ -55,6 +59,7 @@ export function useTradeStatus(ticker: string, orderId: string | null): TradeSta
             close_price: data.close_price ?? null,
             pnl_pct: data.pnl_pct ?? null,
             outcome: data.outcome ?? null,
+            close_reason: data.close_reason ?? null,
           });
 
           // Stop polling when terminal state is reached
@@ -63,6 +68,12 @@ export function useTradeStatus(ticker: string, orderId: string | null): TradeSta
               clearInterval(intervalRef.current);
               intervalRef.current = null;
             }
+          }
+
+          // After fill, slow polling to every 10s (bracket legs may take time)
+          if (status === 'filled' && intervalRef.current !== null) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = window.setInterval(poll, 10000);
           }
         })
         .catch((err: unknown) => {
