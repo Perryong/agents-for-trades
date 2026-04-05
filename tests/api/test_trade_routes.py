@@ -383,48 +383,13 @@ async def test_submit_trade_stores_confidence(app_with_db, test_session_factory)
 
 
 @pytest.mark.asyncio
-async def test_auto_close_after_n_days(app_with_db, test_session_factory):
-    """Filled trade with fill_time 10+ days ago gets closed by check-autoclose."""
-    order_id = str(uuid.uuid4())
-    old_fill_time = datetime(2026, 3, 10, 14, 30)  # well over 5 trading days ago
-
-    async with test_session_factory() as session:
-        trade = Trade(
-            ticker="NVDA",
-            trade_type="equity",
-            direction="BUY",
-            order_id=order_id,
-            status="filled",
-            quantity=100,
-            fill_price=100.0,
-            fill_time=old_fill_time,
-        )
-        session.add(trade)
-        await session.commit()
-
-    mock_position = MagicMock()
-    mock_position.filled_avg_price = "110.0"
-    mock_client = MagicMock()
-    mock_client.close_position.return_value = mock_position
-
-    with patch("api.trade_routes.get_client", return_value=mock_client):
-        async with AsyncClient(
-            transport=ASGITransport(app=app_with_db), base_url="http://test"
-        ) as client:
-            resp = await client.post("/api/trades/check-autoclose")
-
-    assert resp.status_code == 200, resp.text
-    data = resp.json()
-    assert data["count"] >= 1
-
-    # Verify DB updated
-    async with test_session_factory() as session:
-        result = await session.execute(select(Trade).where(Trade.order_id == order_id))
-        closed_trade = result.scalar_one()
-
-    assert closed_trade.status == "closed"
-    assert closed_trade.close_time is not None
-    assert closed_trade.outcome is not None
+async def test_auto_close_endpoint_removed(app_with_db):
+    """D-10: check-autoclose endpoint no longer exists — replaced by bracket order OCO."""
+    async with AsyncClient(
+        transport=ASGITransport(app=app_with_db), base_url="http://test"
+    ) as client:
+        resp = await client.post("/api/trades/check-autoclose")
+    assert resp.status_code in (404, 405), f"Expected 404/405, got {resp.status_code}"
 
 
 # === Wave 0 stubs for Phase 1 ===
@@ -436,12 +401,14 @@ async def test_bracket_submit():
     # Expects: 200 response with order_id, bracket_tp_order_id and bracket_sl_order_id stored on Trade
     pass
 
-@pytest.mark.skip(reason="Wave 0 stub — implementation in Plan 01-03")
 @pytest.mark.asyncio
-async def test_no_autoclose_endpoint():
-    """D-10: check-autoclose endpoint is removed entirely."""
-    # Expects: /trades/check-autoclose route does NOT exist in trade_router.routes
-    pass
+async def test_no_autoclose_endpoint(app_with_db):
+    """D-10: check-autoclose endpoint is removed entirely (Wave 0 stub → implemented)."""
+    async with AsyncClient(
+        transport=ASGITransport(app=app_with_db), base_url="http://test"
+    ) as client:
+        resp = await client.post("/api/trades/check-autoclose")
+    assert resp.status_code in (404, 405)
 
 @pytest.mark.skip(reason="Wave 0 stub — implementation in Plan 01-03")
 @pytest.mark.asyncio
