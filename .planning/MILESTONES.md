@@ -1,5 +1,20 @@
 # Milestones
 
+## v1.0 Trade Recommendation Sidebar (Shipped: 2026-04-05)
+
+**Phases completed:** 1 phases, 6 plans, 10 tasks
+
+**Key accomplishments:**
+
+- One-liner:
+- Extended Trade model with bracket order columns, added BracketTradeRequest/LivePriceResponse schemas, GET /api/price/{ticker}/live endpoint via Alpaca data client, and structured JSON parsing in chart overlay with regex fallback
+- One-liner:
+- One-liner:
+- 320px brokerage-style right sidebar replaces bottom ChartActionPanel with editable bracket order form, live P&L, and inline close confirmation
+- api/dashboard_routes.py:
+
+---
+
 ## v1.2 Paper Trading & Validation (Shipped: 2026-04-03)
 
 **Phases completed:** 4 phases, 10 plans, 14 tasks

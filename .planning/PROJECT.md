@@ -59,9 +59,19 @@ The trader receives a complete, executable options recommendation — strategy, 
 - ✓ Recommendation scoring system (win rate, expectancy, profit factor, confidence-calibration chart) — v1.2
 - ✓ Track record dashboard (summary stats, equity curve, trade history table, per-ticker drill-down, equity vs options split) — v1.2
 
+*(v1.0 Trade Recommendation Sidebar — shipped 2026-04-05)*
+
+- ✓ Brokerage-style right sidebar replaces ChartActionPanel with editable AI trade recommendations — v1.0
+- ✓ Alpaca bracket orders (OCO entry + take-profit + stop-loss), replacing 5-day auto-close — v1.0
+- ✓ Live price streaming via Alpaca StockHistoricalDataClient (5s polling) — v1.0
+- ✓ AI trader structured JSON output for reliable price/signal extraction — v1.0
+- ✓ Close-reason detection (Target Hit / Stop-Loss / Manual Close / Expired) — v1.0
+- ✓ Dashboard extensions: risk-reward ratio, R-multiple, close-reason column — v1.0
+- ✓ Confidence extraction wired to bracket orders for calibration scoring — v1.0
+
 ### Active
 
-*(No active milestone — run /gsd:new-milestone to start v1.3)*
+*(No active milestone — run /gsd:new-milestone to start next)*
 
 ### Out of Scope
 
@@ -72,7 +82,7 @@ The trader receives a complete, executable options recommendation — strategy, 
 
 ## Context
 
-**Current state (post v1.2):** ~18,000 Python LOC + ~3,500 TypeScript LOC. 80+ tests passing. Frontend: 4-screen app (Analysis, Screener, Chart, Track Record) with lightweight-charts v5 charting, Alpaca paper trading execution, scoring metrics + calibration chart, and full track record dashboard. Backend: FastAPI with SSE streaming, chart overlay, trade execution (Alpaca SDK), scoring, and dashboard endpoints. SQLite trade persistence via SQLAlchemy 2.0 async. Paper trades auto-close after 5 trading days with WIN/LOSS outcome computation.
+**Current state (post v1.0 sidebar):** ~124k Python LOC + ~3,800 TypeScript LOC. Frontend: 4-screen app (Analysis, Screener, Chart with brokerage sidebar, Track Record) with lightweight-charts v5, Alpaca bracket order execution (OCO with TP/SL), live price streaming, scoring metrics, and track record dashboard with risk-reward and R-multiple. Backend: FastAPI with SSE streaming, chart overlay with structured JSON parsing, bracket trade execution (Alpaca SDK), scoring, and dashboard endpoints. SQLite trade persistence via SQLAlchemy 2.0 async. Trades close via bracket order legs or manual close — no more auto-close timer.
 
 **Architecture:** LangGraph `StateGraph` with `AgentState` as shared state dict. All agents are factory functions (`create_*`) returning closures. Data layer uses `VENDOR_METHODS` dict in `interface.py` for routing. Options agents run as parallel branch alongside equity agents, both completing before Risk Judge synthesizes unified decision.
 
@@ -100,6 +110,10 @@ The trader receives a complete, executable options recommendation — strategy, 
 | JSON mode + Pydantic for LLM screener output | Reliable structured output with retry/degradation | ✓ Good — handles malformed JSON gracefully |
 | Separate APIRouter for screener | SSE independence from analysis stream | ✓ Good — zero coupling confirmed by AST test |
 | Direct import over VENDOR_METHODS for screener agent | Screener owns its data pipeline; routing table exists for future consumers | — Revisit if adding alternative data vendors |
+| Alpaca bracket orders (OCO) for trade lifecycle | Real market conditions for AI success measurement; bracket legs handle TP/SL atomically | ✓ Good — single API call, close-reason detection via leg polling |
+| Structured JSON from AI trader agent | Reliable price/signal extraction instead of regex-only prose parsing | ✓ Good — JSON-first with regex fallback, no breaking change |
+| Live price via Alpaca REST polling (5s) | WebSocket deferred; REST reuses existing credentials, no new packages | ✓ Good — acceptable latency for paper trading sidebar |
+| Remove 5-day auto-close | Bracket order OCO legs handle trade lifecycle; auto-close was arbitrary | ✓ Good — trades close at AI's target/stop-loss or manual close |
 
 ## Evolution
 
@@ -119,9 +133,9 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-## Current Milestone: None (v1.2 shipped)
+## Current Milestone: None (v1.0 sidebar shipped)
 
-v1.2 Paper Trading & Validation shipped 2026-04-03. All 18 requirements satisfied. Run `/gsd:new-milestone` to start v1.3.
+v1.0 Trade Recommendation Sidebar shipped 2026-04-05. 19/19 decisions verified. 5 tech debt items accepted. Run `/gsd:new-milestone` to start next milestone.
 
 ---
-*Last updated: 2026-04-03 after v1.2 milestone completion*
+*Last updated: 2026-04-05 after v1.0 milestone completion*
