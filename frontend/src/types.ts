@@ -109,7 +109,7 @@ export const REPORT_TABS: ReportTab[] = [
 
 // --- Trade types (Phase 14) ---
 
-export type OrderStatus = 'idle' | 'submitted' | 'filled' | 'rejected' | 'error';
+export type OrderStatus = 'idle' | 'submitted' | 'filled' | 'rejected' | 'error' | 'closed';
 
 export interface TradeStatus {
   status: OrderStatus;
@@ -121,6 +121,7 @@ export interface TradeStatus {
   close_price: number | null;
   pnl_pct: number | null;
   outcome: string | null;
+  close_reason: string | null;       // "Target Hit" | "Stop-Loss" | "Manual Close" | "Expired" | null
 }
 
 export interface TradeRequest {
@@ -134,6 +135,28 @@ export interface TradeRequest {
   expiry?: string;
   contract_type?: string;
   confidence_text?: string;
+}
+
+export interface BracketOrderParams {
+  ticker: string;
+  direction: string;              // "BUY" | "SELL"
+  trade_type: string;             // "equity" | "option"
+  entry_price: number | null;     // null = market order
+  target_price: number;
+  stop_loss: number;
+  quantity: number;
+  tif: string;                    // "GTC" | "DAY"
+  strategy_name?: string;
+  analysis_date?: string;
+  confidence?: number;
+}
+
+export interface LivePriceData {
+  ticker: string;
+  price: number;
+  open: number;
+  change_pct: number;
+  timestamp: string;
 }
 
 export interface TradeResponse {
@@ -244,6 +267,8 @@ export interface DashboardSummary {
   profit_factor: number;
   aggregate_pnl: number;
   disclaimer: string | null;
+  avg_risk_reward: number | null;
+  avg_r_multiple: number | null;
 }
 
 export interface DashboardTradeItem {
@@ -256,6 +281,7 @@ export interface DashboardTradeItem {
   pnl_pct: number | null;
   strategy_name: string | null;
   is_legacy: boolean;
+  close_reason: string | null;
 }
 
 export interface DashboardTradesData {
