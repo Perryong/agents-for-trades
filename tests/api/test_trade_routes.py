@@ -425,3 +425,48 @@ async def test_auto_close_after_n_days(app_with_db, test_session_factory):
     assert closed_trade.status == "closed"
     assert closed_trade.close_time is not None
     assert closed_trade.outcome is not None
+
+
+# === Wave 0 stubs for Phase 1 ===
+
+@pytest.mark.skip(reason="Wave 0 stub — implementation in Plan 01-03")
+@pytest.mark.asyncio
+async def test_bracket_submit():
+    """D-09: POST /api/trades/bracket submits Alpaca bracket order with TP + SL legs."""
+    # Expects: 200 response with order_id, bracket_tp_order_id and bracket_sl_order_id stored on Trade
+    pass
+
+@pytest.mark.skip(reason="Wave 0 stub — implementation in Plan 01-03")
+@pytest.mark.asyncio
+async def test_no_autoclose_endpoint():
+    """D-10: check-autoclose endpoint is removed entirely."""
+    # Expects: /trades/check-autoclose route does NOT exist in trade_router.routes
+    pass
+
+@pytest.mark.skip(reason="Wave 0 stub — implementation in Plan 01-03")
+@pytest.mark.asyncio
+async def test_bracket_tif():
+    """D-11: TIF field (GTC or DAY) passed through to Alpaca bracket order."""
+    # Expects: MarketOrderRequest or LimitOrderRequest receives time_in_force matching request.tif
+    pass
+
+@pytest.mark.skip(reason="Wave 0 stub — implementation in Plan 01-03")
+@pytest.mark.asyncio
+async def test_expired_entry_no_outcome():
+    """D-12: Expired entry order gets close_reason='Expired' with no outcome or pnl_pct."""
+    # Expects: trade.status='expired', trade.close_reason='Expired', trade.outcome=None, trade.pnl_pct=None
+    pass
+
+@pytest.mark.skip(reason="Wave 0 stub — implementation in Plan 01-03")
+@pytest.mark.asyncio
+async def test_close_reason_target_hit():
+    """D-15: When TP bracket leg fills, close_reason is set to 'Target Hit'."""
+    # Expects: trade.close_reason='Target Hit', trade.status='closed', trade.close_price set
+    pass
+
+@pytest.mark.skip(reason="Wave 0 stub — implementation in Plan 01-05")
+@pytest.mark.asyncio
+async def test_legacy_delete():
+    """D-18: DELETE /api/trades/legacy removes trades with no bracket leg IDs."""
+    # Expects: trades without bracket_tp_order_id/bracket_sl_order_id and not active are deleted
+    pass
