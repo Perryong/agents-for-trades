@@ -2,7 +2,7 @@
 phase: 1
 slug: trade-recommendation-sidebar-lock-in-flow
 status: draft
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-04-05
 ---
@@ -38,17 +38,30 @@ created: 2026-04-05
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| TBD | TBD | TBD | TBD | TBD | TBD | TBD | ⬜ pending |
+| W0-T1 | 01-00 | 0 | D-09,D-10,D-11,D-12,D-15,D-18 | stubs | `pytest tests/api/test_trade_routes.py --collect-only -q` | yes (existing) | pending |
+| W0-T2 | 01-00 | 0 | D-03 | stub | `pytest tests/api/test_price_routes.py --collect-only -q` | Wave 0 creates | pending |
+| W0-T3 | 01-00 | 0 | D-13 | stub | `pytest tests/api/test_chart_routes.py --collect-only -q` | yes (existing) | pending |
+| W0-T4 | 01-00 | 0 | D-16,D-17 | stubs | `pytest tests/api/test_dashboard_routes.py --collect-only -q` | Wave 0 creates | pending |
+| 01-01-T2 | 01-01 | 1 | D-03,D-13 | unit | `pytest tests/api/test_price_routes.py tests/api/test_chart_routes.py -x` | Wave 0 | pending |
+| 01-03-T1 | 01-03 | 2 | D-09,D-10,D-11,D-12,D-15 | unit | `pytest tests/api/test_trade_routes.py -x` | Wave 0 | pending |
+| 01-05-T1 | 01-05 | 4 | D-16,D-17,D-18 | unit | `pytest tests/api/test_dashboard_routes.py tests/api/test_trade_routes.py::test_legacy_delete -x` | Wave 0 | pending |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
-
-*Populated after plans are created.*
+*Status: pending / green / red / flaky*
 
 ---
 
 ## Wave 0 Requirements
 
-- [ ] Existing infrastructure covers all phase requirements.
+Plan 01-00 creates all test stubs before Wave 1 execution begins:
+
+- [ ] `tests/api/test_price_routes.py` — 1 stub covering D-03
+- [ ] `tests/api/test_trade_routes.py` — 6 stubs covering D-09, D-10, D-11, D-12, D-15, D-18
+- [ ] `tests/api/test_chart_routes.py` — 1 stub covering D-13
+- [ ] `tests/api/test_dashboard_routes.py` — 2 stubs covering D-16, D-17
+
+**Total: 10 test stubs across 4 files**
+
+After Plan 01-00 completes, set `wave_0_complete: true` in this frontmatter.
 
 ---
 
@@ -65,9 +78,9 @@ created: 2026-04-05
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
 - [ ] No watch-mode flags
 - [ ] Feedback latency < 30s
 - [ ] `nyquist_compliant: true` set in frontmatter
