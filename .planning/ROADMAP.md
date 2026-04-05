@@ -61,7 +61,7 @@ Plans:
 - [x] 01-02-PLAN.md — Frontend types and hooks: BracketOrderParams, LivePriceData, useLivePrice, useTrade bracket support
 - [x] 01-03-PLAN.md — Bracket order execution: bracket submission, close-reason detection, manual close, remove auto-close
 - [x] 01-04-PLAN.md — TradeSidebar UI: new sidebar component, ChartScreen layout restructure, delete old components
-- [ ] 01-05-PLAN.md — Dashboard extensions: risk-reward, R-multiple, close-reason column, legacy data cleanup
+- [x] 01-05-PLAN.md — Dashboard extensions: risk-reward, R-multiple, close-reason column, legacy data cleanup
 
 ---
 
