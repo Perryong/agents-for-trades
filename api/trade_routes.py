@@ -2,8 +2,9 @@
 
 Provides:
   POST /api/trades           — submit equity or single-leg options order
-  GET  /api/trades/{ticker}/status — poll Alpaca for order status
-  POST /api/trades/check-autoclose — find + close positions held >= N trading days
+  POST /api/trades/bracket   — submit bracket order (entry + TP + SL as OCO)
+  GET  /api/trades/{ticker}/status — poll Alpaca for order status, detect close_reason
+  POST /api/trades/{ticker}/close  — manually close an open position
 
 All Alpaca SDK calls are wrapped with asyncio.to_thread() (D-18) to avoid
 blocking the FastAPI async event loop.
@@ -17,16 +18,18 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select
-import exchange_calendars as ec
-import pandas as pd
 
 from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest, ClosePositionRequest
-from alpaca.trading.enums import OrderSide, TimeInForce, OrderStatus
+from alpaca.trading.requests import (
+    MarketOrderRequest, LimitOrderRequest,
+    TakeProfitRequest, StopLossRequest,
+    GetOrderByIdRequest, ClosePositionRequest,
+)
+from alpaca.trading.enums import OrderSide, TimeInForce, OrderStatus, OrderClass
 
 from .db import SessionDep
 from .models import Trade
-from .schemas import TradeRequest, TradeResponse, TradeStatusResponse
+from .schemas import TradeRequest, TradeResponse, TradeStatusResponse, BracketTradeRequest
 
 logger = logging.getLogger(__name__)
 trade_router = APIRouter(prefix="/api")
@@ -159,26 +162,6 @@ def build_occ_symbol(ticker: str, expiry: str, contract_type: str, strike: float
 
 
 # ---------------------------------------------------------------------------
-# Trading day counter for auto-close (EXEC-05, D-10, D-12)
-# ---------------------------------------------------------------------------
-
-def _trading_days_since(fill_time: datetime) -> int:
-    """Count NYSE trading days elapsed since fill_time (exclusive of fill day).
-
-    Uses exchange_calendars 'XNYS' calendar per research Pattern 8.
-    Returns 0 if fill_time is today or in the future.
-    """
-    cal = ec.get_calendar("XNYS")
-    start = pd.Timestamp(fill_time.date())
-    end = pd.Timestamp(datetime.utcnow().date())
-    if end <= start:
-        return 0
-    # sessions_in_range is inclusive on both ends; subtract 1 to exclude fill day
-    sessions = cal.sessions_in_range(start, end)
-    return max(0, len(sessions) - 1)
-
-
-# ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
@@ -270,57 +253,175 @@ async def submit_trade(request: TradeRequest, session: SessionDep):
     )
 
 
+@trade_router.post("/trades/bracket", response_model=TradeResponse)
+async def submit_bracket_trade(request: BracketTradeRequest, session: SessionDep):
+    """Submit a bracket order: entry + take-profit (limit) + stop-loss (stop) as OCO."""
+    try:
+        client = get_client()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    ticker = request.ticker.upper()
+    side = OrderSide.BUY if request.direction.upper() == "BUY" else OrderSide.SELL
+    tif = TimeInForce.GTC if request.tif.upper() == "GTC" else TimeInForce.DAY
+
+    # Determine parent order type: limit if entry_price provided, market otherwise
+    take_profit = TakeProfitRequest(limit_price=request.target_price)
+    stop_loss = StopLossRequest(stop_price=request.stop_loss)
+
+    if request.entry_price is not None:
+        order_data = LimitOrderRequest(
+            symbol=ticker,
+            qty=request.quantity,
+            side=side,
+            time_in_force=tif,
+            limit_price=request.entry_price,
+            order_class=OrderClass.BRACKET,
+            take_profit=take_profit,
+            stop_loss=stop_loss,
+        )
+    else:
+        order_data = MarketOrderRequest(
+            symbol=ticker,
+            qty=request.quantity,
+            side=side,
+            time_in_force=tif,
+            order_class=OrderClass.BRACKET,
+            take_profit=take_profit,
+            stop_loss=stop_loss,
+        )
+
+    try:
+        order = await asyncio.to_thread(client.submit_order, order_data=order_data)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Alpaca bracket order error: {exc}")
+
+    # Extract bracket leg IDs from order.legs
+    tp_order_id = None
+    sl_order_id = None
+    if order.legs:
+        for leg in order.legs:
+            # Identify legs by order_type: limit = TP, stop = SL
+            leg_type = str(leg.order_type).lower() if leg.order_type else ""
+            if "limit" in leg_type:
+                tp_order_id = str(leg.id)
+            elif "stop" in leg_type:
+                sl_order_id = str(leg.id)
+        # Fallback: if types didn't match, use positional (TP=0, SL=1)
+        if not tp_order_id and len(order.legs) >= 1:
+            tp_order_id = str(order.legs[0].id)
+        if not sl_order_id and len(order.legs) >= 2:
+            sl_order_id = str(order.legs[1].id)
+
+    trade = Trade(
+        ticker=ticker,
+        trade_type=request.trade_type,
+        direction=request.direction.upper(),
+        order_id=str(order.id),
+        status="submitted",
+        quantity=request.quantity,
+        strategy_name=request.strategy_name,
+        analysis_date=request.analysis_date,
+        entry_price=request.entry_price,
+        confidence=request.confidence,
+        target_price=request.target_price,
+        stop_price=request.stop_loss,
+        bracket_tp_order_id=tp_order_id,
+        bracket_sl_order_id=sl_order_id,
+    )
+    session.add(trade)
+    await session.commit()
+    await session.refresh(trade)
+
+    return TradeResponse(
+        id=trade.id,
+        order_id=trade.order_id,
+        status=trade.status,
+        ticker=trade.ticker,
+        direction=trade.direction,
+        trade_type=trade.trade_type,
+        quantity=trade.quantity,
+        fill_price=trade.fill_price,
+        fill_time=trade.fill_time.isoformat() if trade.fill_time else None,
+        confidence=trade.confidence,
+    )
+
+
 @trade_router.get("/trades/{ticker}/status", response_model=TradeStatusResponse)
 async def poll_trade_status(
     ticker: str,
     session: SessionDep,
     order_id: str = Query(..., description="Alpaca order UUID"),
 ):
-    """Poll Alpaca for order status and update the local DB record.
-
-    Always returns close_time from the Trade model so CHART-03 can render
-    exit markers after auto-close runs.
-    """
+    """Poll Alpaca for order status, detect close_reason from bracket legs."""
     try:
         client = get_client()
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 
-    # Fetch from DB first
     result = await session.execute(select(Trade).where(Trade.order_id == order_id))
     trade = result.scalar_one_or_none()
     if trade is None:
         raise HTTPException(status_code=404, detail="Trade not found")
 
-    # Poll Alpaca
+    # Poll Alpaca with nested=True to get bracket leg data
     try:
-        order = await asyncio.to_thread(client.get_order_by_id, order_id=order_id)
+        order = await asyncio.to_thread(
+            client.get_order_by_id,
+            order_id=order_id,
+            filter=GetOrderByIdRequest(nested=True),
+        )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Alpaca status error: {exc}")
 
-    # Map Alpaca status to our status string
     alpaca_status = order.status
-    terminal_states = {
-        OrderStatus.FILLED,
-        OrderStatus.REJECTED,
-        OrderStatus.CANCELED,
-        OrderStatus.EXPIRED,
-    }
 
-    if alpaca_status == OrderStatus.FILLED and trade.status != "filled":
+    if alpaca_status == OrderStatus.FILLED and trade.status == "submitted":
         trade.status = "filled"
         trade.fill_price = float(order.filled_avg_price) if order.filled_avg_price else None
         trade.fill_time = order.filled_at
         await session.commit()
 
-    elif alpaca_status in (OrderStatus.REJECTED, OrderStatus.CANCELED, OrderStatus.EXPIRED):
+    elif alpaca_status in (OrderStatus.EXPIRED,) and trade.status == "submitted":
+        # D-12: Unfilled entry = "no trade" — mark expired, no outcome
+        trade.status = "expired"
+        trade.close_reason = "Expired"
+        await session.commit()
+
+    elif alpaca_status in (OrderStatus.REJECTED, OrderStatus.CANCELED):
         new_status = str(alpaca_status.value)
         if trade.status != new_status:
             trade.status = new_status
             await session.commit()
 
+    # Check bracket legs for close_reason (only when trade is filled and no close_reason yet)
+    if trade.status == "filled" and trade.close_reason is None and order.legs:
+        close_reason = None
+        close_price = None
+        for leg in order.legs:
+            if leg.status == OrderStatus.FILLED:
+                if trade.bracket_tp_order_id and str(leg.id) == trade.bracket_tp_order_id:
+                    close_reason = "Target Hit"
+                elif trade.bracket_sl_order_id and str(leg.id) == trade.bracket_sl_order_id:
+                    close_reason = "Stop-Loss"
+                close_price = float(leg.filled_avg_price) if leg.filled_avg_price else None
+                break
+
+        if close_reason:
+            trade.close_reason = close_reason
+            trade.close_price = close_price
+            trade.close_time = datetime.utcnow()
+            trade.status = "closed"
+            # Compute P&L
+            if close_price and trade.fill_price and trade.fill_price != 0:
+                if trade.direction == "BUY":
+                    trade.pnl_pct = (close_price - trade.fill_price) / trade.fill_price * 100
+                else:
+                    trade.pnl_pct = (trade.fill_price - close_price) / trade.fill_price * 100
+                trade.outcome = "WIN" if trade.pnl_pct > 0 else "LOSS"
+            await session.commit()
+
     rejection_reason: Optional[str] = None
-    # alpaca-py surfaces rejection details in order.legs or via status
     if alpaca_status == OrderStatus.REJECTED:
         rejection_reason = "Order rejected by Alpaca"
 
@@ -334,69 +435,59 @@ async def poll_trade_status(
         close_price=trade.close_price,
         pnl_pct=trade.pnl_pct,
         outcome=trade.outcome,
+        close_reason=trade.close_reason,
     )
 
 
-@trade_router.post("/trades/check-autoclose")
-async def check_autoclose(session: SessionDep, hold_days: int = Query(default=5)):
-    """Find filled positions held >= hold_days trading days and close them.
-
-    Counts NYSE trading days using exchange_calendars 'XNYS' calendar (D-10, D-12).
-    Computes P&L and WIN/LOSS outcome per D-11.
-    """
+@trade_router.post("/trades/{ticker}/close")
+async def close_position(ticker: str, session: SessionDep):
+    """Manually close an open position: cancel OCO legs, then market close."""
     try:
         client = get_client()
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 
+    # Find the active trade for this ticker
     result = await session.execute(
-        select(Trade).where(Trade.status == "filled", Trade.outcome == None)  # noqa: E711
+        select(Trade).where(
+            Trade.ticker == ticker.upper(),
+            Trade.status == "filled",
+            Trade.outcome == None,  # noqa: E711
+        )
     )
-    open_trades = result.scalars().all()
+    trade = result.scalar_one_or_none()
+    if trade is None:
+        raise HTTPException(status_code=404, detail="No open position found")
 
-    closed_ids = []
-    for trade in open_trades:
-        if trade.fill_time is None:
-            continue
+    # Step 1: Cancel pending OCO legs to avoid conflicts
+    for leg_id in [trade.bracket_tp_order_id, trade.bracket_sl_order_id]:
+        if leg_id:
+            try:
+                await asyncio.to_thread(client.cancel_order_by_id, order_id=leg_id)
+            except Exception:
+                pass  # already filled or canceled — harmless
 
-        days_held = _trading_days_since(trade.fill_time)
-        if days_held < hold_days:
-            continue
+    # Step 2: Market close the position
+    try:
+        close_order = await asyncio.to_thread(
+            client.close_position, symbol_or_asset_id=ticker.upper()
+        )
+        close_price = float(close_order.filled_avg_price) if hasattr(close_order, "filled_avg_price") and close_order.filled_avg_price else None
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Close position error: {exc}")
 
-        # Determine symbol to close: OCC symbol for options, ticker for equity
-        close_symbol = trade.occ_symbol if trade.trade_type == "option" and trade.occ_symbol else trade.ticker
+    # Step 3: Update trade record
+    trade.close_reason = "Manual Close"
+    trade.close_price = close_price
+    trade.close_time = datetime.utcnow()
+    trade.status = "closed"
 
-        try:
-            position = await asyncio.to_thread(
-                client.close_position, symbol_or_asset_id=close_symbol
-            )
-            close_price = float(position.filled_avg_price) if hasattr(position, "filled_avg_price") and position.filled_avg_price else None
-        except Exception as exc:
-            err_str = str(exc)
-            if "404" in err_str or "position does not exist" in err_str.lower():
-                # Already closed externally — mark as closed with no price
-                close_price = None
-            else:
-                logger.warning("Failed to close %s: %s", trade.order_id, exc)
-                continue
-
-        # Compute P&L per D-11
-        pnl_pct: Optional[float] = None
-        outcome: Optional[str] = None
-        if close_price is not None and trade.fill_price is not None and trade.fill_price != 0:
-            if trade.direction == "BUY":
-                pnl_pct = (close_price - trade.fill_price) / trade.fill_price * 100
-            else:
-                pnl_pct = (trade.fill_price - close_price) / trade.fill_price * 100
-            outcome = "WIN" if pnl_pct > 0 else "LOSS"
-
-        trade.status = "closed"
-        trade.close_price = close_price
-        trade.close_time = datetime.utcnow()
-        trade.pnl_pct = pnl_pct
-        trade.outcome = outcome if outcome else "LOSS"  # default LOSS if no price data
-
-        closed_ids.append(trade.id)
+    if close_price and trade.fill_price and trade.fill_price != 0:
+        if trade.direction == "BUY":
+            trade.pnl_pct = (close_price - trade.fill_price) / trade.fill_price * 100
+        else:
+            trade.pnl_pct = (trade.fill_price - close_price) / trade.fill_price * 100
+        trade.outcome = "WIN" if trade.pnl_pct > 0 else "LOSS"
 
     await session.commit()
-    return {"closed_trade_ids": closed_ids, "count": len(closed_ids)}
+    return {"status": "closed", "close_reason": "Manual Close", "close_price": close_price}
