@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import type { TradeRequest, TradeResponse } from '../types';
+import type { TradeRequest, TradeResponse, BracketOrderParams } from '../types';
 
 interface UseTradeResult {
   submitTrade: (req: TradeRequest) => Promise<TradeResponse>;
+  submitBracketTrade: (params: BracketOrderParams) => Promise<TradeResponse>;
   isSubmitting: boolean;
 }
 
@@ -36,5 +37,32 @@ export function useTrade(): UseTradeResult {
     }
   };
 
-  return { submitTrade, isSubmitting };
+  const submitBracketTrade = async (params: BracketOrderParams): Promise<TradeResponse> => {
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/trades/bracket', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+
+      if (!res.ok) {
+        let detail = `HTTP ${res.status}`;
+        try {
+          const errBody = await res.json() as { detail?: string };
+          if (errBody.detail) detail = errBody.detail;
+        } catch {
+          // ignore JSON parse failure
+        }
+        throw new Error(detail);
+      }
+
+      const data = await res.json() as TradeResponse;
+      return data;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return { submitTrade, submitBracketTrade, isSubmitting };
 }
