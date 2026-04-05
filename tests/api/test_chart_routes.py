@@ -171,3 +171,14 @@ async def test_overlay_ticker_uppercased(tmp_path):
 
     assert response.status_code == 200
     assert response.json()["ticker"] == "AAPL"
+
+
+# === Wave 0 stub for Phase 1 ===
+
+@pytest.mark.skip(reason="Wave 0 stub — implementation in Plan 01-01")
+def test_structured_json_overlay():
+    """D-13: Structured JSON block parsed from trader output, with regex fallback."""
+    # Expects: _parse_structured_json('text ```json {"signal":"BUY","entry_price":100.0} ```') returns dict
+    # Expects: _parse_structured_json('no json here') returns None
+    # Expects: get_chart_overlay tries JSON first, falls back to regex
+    pass
