@@ -39,7 +39,21 @@ You must:
 3. If options data is available in the investment plan, propose a specific options trade with strategy name, strikes, expiry, and expected premium.
 4. End with a firm decision and always conclude your response with 'FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL**' to confirm your recommendation.
 
-Lessons from past decisions: {past_memory_str}""",
+Lessons from past decisions: {past_memory_str}
+
+Your response MUST end with a JSON block in this exact format:
+```json
+{{
+  "signal": "BUY" | "SELL" | "HOLD",
+  "entry_price": <float>,
+  "target_price": <float>,
+  "stop_loss": <float>,
+  "time_in_force": "GTC" | "DAY",
+  "confidence": <float 0-100>,
+  "strategy": "<strategy name or null>"
+}}
+```
+All price fields are required for BUY/SELL signals. Use null only for HOLD signals.""",
             },
             context,
         ]

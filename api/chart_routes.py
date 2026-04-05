@@ -15,6 +15,17 @@ from .schemas import ChartOverlayResponse
 chart_router = APIRouter(prefix="/api")
 
 
+def _parse_structured_json(text: str) -> dict | None:
+    """Extract trailing ```json block from trader output."""
+    m = re.search(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if m:
+        try:
+            return json.loads(m.group(1))
+        except (ValueError, json.JSONDecodeError):
+            return None
+    return None
+
+
 def _log_dir(ticker: str) -> Path:
     """Return the path to the TradingAgentsStrategy_logs directory for a ticker.
 
@@ -105,15 +116,31 @@ async def get_chart_overlay(ticker: str):
     options_legs_text = state.get("options_legs", "")
     options_strategy_text = state.get("options_strategy", "")
 
+    # Try structured JSON first (D-13), fallback to regex
+    structured = _parse_structured_json(ftd)
+
+    if structured:
+        signal = structured.get("signal", _extract_signal(ftd))
+        entry_price_val = structured.get("entry_price")
+        take_profit_val = structured.get("target_price")
+        stop_loss_val = structured.get("stop_loss")
+        strategy_val = structured.get("strategy") or _extract_strategy_name(options_strategy_text)
+    else:
+        signal = _extract_signal(ftd)
+        entry_price_val = _extract_price(ftd, "entry")
+        take_profit_val = _extract_price(ftd, r"target|take.profit|tp")
+        stop_loss_val = _extract_price(ftd, r"stop.loss|sl")
+        strategy_val = _extract_strategy_name(options_strategy_text)
+
     return ChartOverlayResponse(
         ticker=ticker.upper(),
         analysis_date=latest_date,
-        signal=_extract_signal(ftd),
-        entry_price=_extract_price(ftd, "entry"),
-        take_profit=_extract_price(ftd, r"target|take.profit|tp"),
-        stop_loss=_extract_price(ftd, r"stop.loss|sl"),
+        signal=signal.upper() if isinstance(signal, str) else signal,
+        entry_price=float(entry_price_val) if entry_price_val is not None else None,
+        take_profit=float(take_profit_val) if take_profit_val is not None else None,
+        stop_loss=float(stop_loss_val) if stop_loss_val is not None else None,
         expiry_date=_extract_expiry(options_legs_text),
-        strategy_name=_extract_strategy_name(options_strategy_text),
+        strategy_name=strategy_val,
         options_legs=options_legs_text,
         final_trade_decision=ftd,
     )
