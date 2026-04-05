@@ -1,16 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import type { ChartTimeframe } from '../types';
+import type { ChartTimeframe, BracketOrderParams } from '../types';
 import { TIMEFRAME_CONFIG } from '../types';
 import { useChartData } from '../hooks/useChartData';
 import { useOverlay } from '../hooks/useOverlay';
 import { useTrade } from '../hooks/useTrade';
 import { useTradeStatus } from '../hooks/useTradeStatus';
 import { useTradeMarker } from '../hooks/useTradeMarker';
-import { useScoreSummary, useCalibration } from '../hooks/useScores';
+import { useLivePrice } from '../hooks/useLivePrice';
 import { ChartContainer } from './ChartContainer';
 import { ChartTickerPicker } from './ChartTickerPicker';
-import { ChartActionPanel } from './ChartActionPanel';
-import { TradeConfirmModal } from './TradeConfirmModal';
+import { TradeSidebar } from './TradeSidebar';
 
 const TIMEFRAMES: ChartTimeframe[] = ['1D', '1M', '3M', '6M', '1Y'];
 
@@ -27,7 +26,6 @@ export function ChartScreen({ dark, initialTicker, onViewAnalysis }: ChartScreen
   const hasSetSmartDefault = useRef(false);
 
   // Trade execution state
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
 
   // Sync ticker when initialTicker prop changes (e.g. auto-navigate from Analysis)
@@ -41,15 +39,9 @@ export function ChartScreen({ dark, initialTicker, onViewAnalysis }: ChartScreen
 
   const { bars, volumeData, loading, error } = useChartData(ticker, timeframe);
   const { overlay } = useOverlay(ticker);
-  const { submitTrade, isSubmitting } = useTrade();
+  const { submitBracketTrade, isSubmitting } = useTrade();
   const tradeStatus = useTradeStatus(ticker, currentOrderId);
-  const { summary: scoreSummary } = useScoreSummary();
-  const { calibration } = useCalibration();
-
-  // Auto-close check: fires once on mount per D-09 (fire-and-forget)
-  useEffect(() => {
-    fetch('/api/trades/check-autoclose', { method: 'POST' }).catch(() => {});
-  }, []);
+  const livePrice = useLivePrice(overlay ? ticker : null);
 
   // Derive trade fill/exit markers from tradeStatus for chart rendering
   const tradeMarker = useTradeMarker(
@@ -58,11 +50,6 @@ export function ChartScreen({ dark, initialTicker, onViewAnalysis }: ChartScreen
   );
 
   const isActiveMode = overlay !== null;
-
-  // Determine if options execution is possible: check for "LEG 1:" pattern in options_legs
-  const canExecuteOptions = overlay
-    ? /LEG\s+1:/i.test(overlay.options_legs)
-    : false;
 
   // Smart default timeframe in active mode (per D-25)
   useEffect(() => {
@@ -81,107 +68,86 @@ export function ChartScreen({ dark, initialTicker, onViewAnalysis }: ChartScreen
     }
   }, [overlay]);
 
-  const handleExecute = () => {
-    setShowConfirmModal(true);
-  };
-
-  const handleConfirmTrade = async () => {
-    if (!overlay) return;
-    setShowConfirmModal(false);
-
+  const handleBracketTrade = async (params: BracketOrderParams) => {
     try {
-      const response = await submitTrade({
-        ticker: overlay.ticker,
-        direction: overlay.signal,
-        trade_type: 'equity',
-        strategy_name: overlay.strategy_name ?? undefined,
-        analysis_date: overlay.analysis_date,
-        confidence_text: overlay.final_trade_decision ?? undefined,
-      });
+      const response = await submitBracketTrade(params);
       setCurrentOrderId(response.order_id);
     } catch (err) {
-      console.error('Trade submission failed:', err instanceof Error ? err.message : String(err));
+      console.error('Bracket trade submission failed:', err instanceof Error ? err.message : String(err));
     }
   };
 
-  const handleCancelModal = () => {
-    setShowConfirmModal(false);
+  const handleClosePosition = async () => {
+    if (!ticker) return;
+    try {
+      await fetch(`/api/trades/${encodeURIComponent(ticker)}/close`, { method: 'POST' });
+      // Polling in useTradeStatus will pick up the status change
+    } catch (err) {
+      console.error('Close position failed:', err instanceof Error ? err.message : String(err));
+    }
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Trade confirmation modal */}
-      {overlay && (
-        <TradeConfirmModal
-          open={showConfirmModal}
-          onConfirm={handleConfirmTrade}
-          onCancel={handleCancelModal}
-          ticker={overlay.ticker}
-          direction={overlay.signal}
-          quantity={100}
-          orderType="Market"
-          tradeType="equity"
-          strategyName={overlay.strategy_name ?? undefined}
-        />
-      )}
+    <div className="flex flex-row h-full">
+      {/* Left: chart area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top bar: ticker picker + timeframe presets */}
+        <div className="flex items-start justify-between gap-4 px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
+          <ChartTickerPicker value={ticker} onChange={setTicker} />
 
-      {/* Top bar: ticker picker + timeframe presets */}
-      <div className="flex items-start justify-between gap-4 px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
-        <ChartTickerPicker value={ticker} onChange={setTicker} />
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {TIMEFRAMES.map(tf => (
+              <button
+                key={tf}
+                onClick={() => setTimeframe(tf)}
+                className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
+                  timeframe === tf
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                }`}
+              >
+                {TIMEFRAME_CONFIG[tf].label}
+              </button>
+            ))}
+          </div>
+        </div>
 
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {TIMEFRAMES.map(tf => (
-            <button
-              key={tf}
-              onClick={() => setTimeframe(tf)}
-              className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
-                timeframe === tf
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
-              }`}
-            >
-              {TIMEFRAME_CONFIG[tf].label}
-            </button>
-          ))}
+        {/* Chart area */}
+        <div className="flex-1 relative overflow-hidden bg-gray-50 dark:bg-gray-900">
+          {!ticker ? (
+            <div className="absolute inset-0 flex items-center justify-center text-gray-400 dark:text-gray-500 text-sm">
+              Enter a ticker symbol to view chart
+            </div>
+          ) : loading ? (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm text-gray-500 dark:text-gray-400">Loading chart data...</span>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="absolute inset-0 flex items-center justify-center px-6">
+              <div className="max-w-md text-center">
+                <p className="text-red-600 dark:text-red-400 text-sm font-medium mb-1">Failed to load chart data</p>
+                <p className="text-gray-500 dark:text-gray-400 text-xs">{error}</p>
+              </div>
+            </div>
+          ) : bars && volumeData ? (
+            <ChartContainer data={bars} volumeData={volumeData} dark={dark} overlay={overlay} tradeMarker={tradeMarker} />
+          ) : null}
         </div>
       </div>
 
-      {/* Chart area */}
-      <div className="flex-1 relative overflow-hidden bg-gray-50 dark:bg-gray-900">
-        {!ticker ? (
-          <div className="absolute inset-0 flex items-center justify-center text-gray-400 dark:text-gray-500 text-sm">
-            Enter a ticker symbol to view chart
-          </div>
-        ) : loading ? (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-gray-500 dark:text-gray-400">Loading chart data...</span>
-            </div>
-          </div>
-        ) : error ? (
-          <div className="absolute inset-0 flex items-center justify-center px-6">
-            <div className="max-w-md text-center">
-              <p className="text-red-600 dark:text-red-400 text-sm font-medium mb-1">Failed to load chart data</p>
-              <p className="text-gray-500 dark:text-gray-400 text-xs">{error}</p>
-            </div>
-          </div>
-        ) : bars && volumeData ? (
-          <ChartContainer data={bars} volumeData={volumeData} dark={dark} overlay={overlay} tradeMarker={tradeMarker} />
-        ) : null}
-      </div>
-
-      {/* Action panel — pinned bottom, only in active mode */}
+      {/* Right: sidebar — only in active mode */}
       {isActiveMode && overlay && (
-        <ChartActionPanel
+        <TradeSidebar
           overlay={overlay}
+          tradeStatus={tradeStatus}
+          isSubmitting={isSubmitting}
+          onExecute={handleBracketTrade}
+          onClosePosition={handleClosePosition}
+          livePrice={livePrice}
           onViewAnalysis={onViewAnalysis ?? (() => {})}
-          ticker={overlay.ticker}
-          onExecute={handleExecute}
-          tradeStatus={isSubmitting ? { ...tradeStatus, status: 'submitted' } : tradeStatus}
-          canExecuteOptions={canExecuteOptions}
-          scoreSummary={scoreSummary}
-          calibration={calibration}
         />
       )}
     </div>
