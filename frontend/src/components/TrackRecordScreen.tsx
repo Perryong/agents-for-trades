@@ -186,7 +186,7 @@ export function TrackRecordScreen({ dark, onNavigateChart }: TrackRecordScreenPr
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Performance Summary</h2>
           {summaryLoading ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Array.from({ length: 7 }).map((_, i) => (
+              {Array.from({ length: 9 }).map((_, i) => (
                 <div key={i} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
                   <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded h-3 w-16 mb-2" />
                   <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded h-7 w-20" />
@@ -226,6 +226,19 @@ export function TrackRecordScreen({ dark, onNavigateChart }: TrackRecordScreenPr
                   label="Aggregate P&L"
                   value={`${summary.aggregate_pnl >= 0 ? '+' : ''}${summary.aggregate_pnl.toFixed(2)}%`}
                   colorClass={summary.aggregate_pnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
+                />
+                <StatCard
+                  label="Risk-Reward"
+                  value={summary.avg_risk_reward != null ? `${summary.avg_risk_reward.toFixed(2)}:1` : '--'}
+                />
+                <StatCard
+                  label="Avg R-Multiple"
+                  value={summary.avg_r_multiple != null
+                    ? `${summary.avg_r_multiple >= 0 ? '+' : ''}${summary.avg_r_multiple.toFixed(2)}`
+                    : '--'}
+                  colorClass={summary.avg_r_multiple != null
+                    ? (summary.avg_r_multiple >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')
+                    : undefined}
                 />
               </div>
               {summary.disclaimer && (
@@ -272,7 +285,7 @@ export function TrackRecordScreen({ dark, onNavigateChart }: TrackRecordScreenPr
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                      {['Ticker', 'Direction', 'Type', 'Entry Date', 'Outcome', 'P&L %', 'Strategy'].map(col => (
+                      {['Ticker', 'Direction', 'Type', 'Entry Date', 'Outcome', 'Close Reason', 'P&L %', 'Strategy'].map(col => (
                         <th key={col} className="px-4 py-3 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
                           {col}
                         </th>
@@ -329,6 +342,28 @@ export function TrackRecordScreen({ dark, onNavigateChart }: TrackRecordScreenPr
                                   : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                               }`}>
                                 {trade.outcome}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 dark:text-gray-500">--</span>
+                            )}
+                          </td>
+                          {/* Close Reason -- D-19 */}
+                          <td className="px-4 py-3">
+                            {trade.close_reason === 'Target Hit' ? (
+                              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-green-900/30 text-green-400">
+                                Target Hit
+                              </span>
+                            ) : trade.close_reason === 'Stop-Loss' ? (
+                              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-900/30 text-red-400">
+                                Stop-Loss
+                              </span>
+                            ) : trade.close_reason === 'Manual Close' ? (
+                              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-gray-700 text-gray-300">
+                                Manual Close
+                              </span>
+                            ) : trade.close_reason === 'Expired' ? (
+                              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-gray-700 text-gray-400">
+                                Expired
                               </span>
                             ) : (
                               <span className="text-gray-400 dark:text-gray-500">--</span>
