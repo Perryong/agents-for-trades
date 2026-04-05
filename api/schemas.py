@@ -109,6 +109,29 @@ class TradeStatusResponse(BaseModel):
     close_price: Optional[float] = None
     pnl_pct: Optional[float] = None
     outcome: Optional[str] = None
+    close_reason: Optional[str] = None  # "Target Hit" | "Stop-Loss" | "Manual Close" | "Expired" | null
+
+
+class BracketTradeRequest(BaseModel):
+    ticker: str
+    direction: str                        # "BUY" | "SELL"
+    trade_type: str = "equity"
+    entry_price: Optional[float] = None   # If None or close to market: market order; else: limit
+    target_price: float                   # TakeProfitRequest.limit_price
+    stop_loss: float                      # StopLossRequest.stop_price
+    quantity: int = 100
+    tif: str = "GTC"                      # "GTC" | "DAY"
+    strategy_name: Optional[str] = None
+    analysis_date: Optional[str] = None
+    confidence: Optional[float] = None
+
+
+class LivePriceResponse(BaseModel):
+    ticker: str
+    price: float
+    open: float
+    change_pct: float
+    timestamp: str
 
 
 # ---------------------------------------------------------------------------
@@ -155,6 +178,8 @@ class DashboardSummaryResponse(BaseModel):
     profit_factor: float
     aggregate_pnl: float         # sum of all pnl_pct for closed trades
     disclaimer: Optional[str] = None  # when total_closed < 5
+    avg_risk_reward: Optional[float] = None   # D-16
+    avg_r_multiple: Optional[float] = None    # D-17
 
 
 class DashboardTradeItem(BaseModel):
@@ -168,6 +193,7 @@ class DashboardTradeItem(BaseModel):
     pnl_pct: Optional[float]
     strategy_name: Optional[str]
     is_legacy: bool              # True if no outcome and no pnl — per D-12
+    close_reason: Optional[str] = None  # D-19
 
 
 class DashboardTradesResponse(BaseModel):

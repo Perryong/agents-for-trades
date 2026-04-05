@@ -55,3 +55,24 @@ async def ensure_scoring_columns() -> None:
                     pass  # column already exists — safe to ignore
                 else:
                     raise
+
+
+async def ensure_bracket_columns() -> None:
+    """Add Phase-1 bracket order and close-reason columns."""
+    new_columns = [
+        ("close_reason", "TEXT"),
+        ("entry_price", "REAL"),
+        ("bracket_tp_order_id", "TEXT"),
+        ("bracket_sl_order_id", "TEXT"),
+    ]
+    async with engine.begin() as conn:
+        for col_name, col_type in new_columns:
+            try:
+                await conn.execute(
+                    text(f"ALTER TABLE trades ADD COLUMN {col_name} {col_type}")
+                )
+            except Exception as exc:
+                if "duplicate column name" in str(exc).lower():
+                    pass
+                else:
+                    raise

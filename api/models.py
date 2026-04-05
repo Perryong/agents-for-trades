@@ -36,4 +36,8 @@ class Trade(Base):
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     target_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     stop_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    close_reason: Mapped[str | None] = mapped_column(String, nullable=True)       # "Target Hit"|"Stop-Loss"|"Manual Close"|"Expired"
+    entry_price: Mapped[float | None] = mapped_column(Float, nullable=True)       # AI-recommended entry (may differ from fill)
+    bracket_tp_order_id: Mapped[str | None] = mapped_column(String, nullable=True) # Alpaca UUID of take-profit leg
+    bracket_sl_order_id: Mapped[str | None] = mapped_column(String, nullable=True) # Alpaca UUID of stop-loss leg
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

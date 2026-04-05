@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import router
-from .db import engine, Base, ensure_scoring_columns
+from .db import engine, Base, ensure_scoring_columns, ensure_bracket_columns
 
 
 @asynccontextmanager
@@ -16,6 +16,7 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await ensure_scoring_columns()
+    await ensure_bracket_columns()
     yield
     await engine.dispose()
 
