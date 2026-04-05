@@ -59,7 +59,7 @@ Plans:
 - [x] 01-00-PLAN.md — Wave 0 test infrastructure: 10 test stubs across 4 files for Nyquist compliance
 - [x] 01-01-PLAN.md — Backend data layer: DB migration, schemas, live price endpoint, AI structured JSON
 - [x] 01-02-PLAN.md — Frontend types and hooks: BracketOrderParams, LivePriceData, useLivePrice, useTrade bracket support
-- [ ] 01-03-PLAN.md — Bracket order execution: bracket submission, close-reason detection, manual close, remove auto-close
+- [x] 01-03-PLAN.md — Bracket order execution: bracket submission, close-reason detection, manual close, remove auto-close
 - [ ] 01-04-PLAN.md — TradeSidebar UI: new sidebar component, ChartScreen layout restructure, delete old components
 - [ ] 01-05-PLAN.md — Dashboard extensions: risk-reward, R-multiple, close-reason column, legacy data cleanup
 
