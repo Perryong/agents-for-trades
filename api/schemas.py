@@ -124,6 +124,7 @@ class BracketTradeRequest(BaseModel):
     strategy_name: Optional[str] = None
     analysis_date: Optional[str] = None
     confidence: Optional[float] = None
+    confidence_text: Optional[str] = None  # Prose text for confidence extraction
 
 
 class LivePriceResponse(BaseModel):

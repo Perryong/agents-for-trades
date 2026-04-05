@@ -323,7 +323,9 @@ async def submit_bracket_trade(request: BracketTradeRequest, session: SessionDep
         strategy_name=request.strategy_name,
         analysis_date=request.analysis_date,
         entry_price=request.entry_price,
-        confidence=request.confidence,
+        confidence=request.confidence or (
+            _extract_confidence(request.confidence_text) if request.confidence_text else None
+        ),
         target_price=request.target_price,
         stop_price=request.stop_loss,
         bracket_tp_order_id=tp_order_id,

@@ -149,6 +149,7 @@ export interface BracketOrderParams {
   strategy_name?: string;
   analysis_date?: string;
   confidence?: number;
+  confidence_text?: string;
 }
 
 export interface LivePriceData {

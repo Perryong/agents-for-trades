@@ -114,7 +114,7 @@ export function TradeSidebar({
       tif,
       strategy_name: overlay.strategy_name ?? undefined,
       analysis_date: overlay.analysis_date,
-      confidence: undefined,
+      confidence_text: overlay.final_trade_decision,
     });
   };
 
