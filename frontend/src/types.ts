@@ -109,7 +109,7 @@ export const REPORT_TABS: ReportTab[] = [
 
 // --- Trade types (Phase 14) ---
 
-export type OrderStatus = 'idle' | 'submitted' | 'filled' | 'rejected' | 'error' | 'closed';
+export type OrderStatus = 'idle' | 'submitted' | 'filled' | 'rejected' | 'error' | 'closed' | 'expired';
 
 export interface TradeStatus {
   status: OrderStatus;
