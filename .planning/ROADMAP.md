@@ -53,11 +53,11 @@ See: `.planning/milestones/v1.2-ROADMAP.md` for full details.
 **Goal:** Replace the bottom ChartActionPanel with a brokerage-style right sidebar displaying editable AI trade recommendations, live prices, and bracket order execution (entry + OCO take-profit + stop-loss). Remove the 5-day auto-close system. Track close reasons and extend the dashboard with risk-reward and R-multiple metrics.
 **Requirements:** [D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12, D-13, D-14, D-15, D-16, D-17, D-18, D-19]
 **Depends on:** v1.2 (Phases 13-16)
-**Plans:** 2/6 plans executed
+**Plans:** 3/6 plans executed
 
 Plans:
 - [x] 01-00-PLAN.md — Wave 0 test infrastructure: 10 test stubs across 4 files for Nyquist compliance
-- [ ] 01-01-PLAN.md — Backend data layer: DB migration, schemas, live price endpoint, AI structured JSON
+- [x] 01-01-PLAN.md — Backend data layer: DB migration, schemas, live price endpoint, AI structured JSON
 - [x] 01-02-PLAN.md — Frontend types and hooks: BracketOrderParams, LivePriceData, useLivePrice, useTrade bracket support
 - [ ] 01-03-PLAN.md — Bracket order execution: bracket submission, close-reason detection, manual close, remove auto-close
 - [ ] 01-04-PLAN.md — TradeSidebar UI: new sidebar component, ChartScreen layout restructure, delete old components
