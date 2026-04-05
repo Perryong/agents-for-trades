@@ -48,6 +48,20 @@ See: `.planning/milestones/v1.2-ROADMAP.md` for full details.
 
 </details>
 
+### Phase 1: Trade Recommendation Sidebar & Lock-In Flow
+
+**Goal:** Replace the bottom ChartActionPanel with a brokerage-style right sidebar displaying editable AI trade recommendations, live prices, and bracket order execution (entry + OCO take-profit + stop-loss). Remove the 5-day auto-close system. Track close reasons and extend the dashboard with risk-reward and R-multiple metrics.
+**Requirements:** [D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12, D-13, D-14, D-15, D-16, D-17, D-18, D-19]
+**Depends on:** v1.2 (Phases 13-16)
+**Plans:** 5 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Backend data layer: DB migration, schemas, live price endpoint, AI structured JSON
+- [ ] 01-02-PLAN.md — Frontend types and hooks: BracketOrderParams, LivePriceData, useLivePrice, useTrade bracket support
+- [ ] 01-03-PLAN.md — Bracket order execution: bracket submission, close-reason detection, manual close, remove auto-close
+- [ ] 01-04-PLAN.md — TradeSidebar UI: new sidebar component, ChartScreen layout restructure, delete old components
+- [ ] 01-05-PLAN.md — Dashboard extensions: risk-reward, R-multiple, close-reason column, legacy data cleanup
+
 ---
 
 *Roadmap created: 2026-03-31*
