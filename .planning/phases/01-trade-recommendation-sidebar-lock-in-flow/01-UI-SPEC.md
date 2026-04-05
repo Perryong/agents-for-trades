@@ -22,6 +22,11 @@ design_system: tailwind-v4-custom
 
 ## 2. Layout Contract
 
+### Focal Points
+
+- **Primary focal point:** `LivePriceHeader` price display — largest text (24px bold), top of sidebar, first element the eye lands on.
+- **Secondary focal point:** `ExecuteButton` — full-width, high-contrast, anchored at sidebar bottom; draws action intent after price is registered.
+
 ### ChartScreen restructure (D-01)
 
 Current layout: `flex-col` — top bar → chart → bottom `ChartActionPanel`
@@ -71,17 +76,17 @@ Sidebar is a single `flex-col` container with `overflow-y-auto` on the body sect
 
 ## 3. Spacing Scale
 
-Multiples of 4px only. Tailwind v4 utility mapping:
+Multiples of 4px only. Standard set: {4, 8, 16, 24, 32, 48, 64}. No values outside this set.
 
 | Token | px | Tailwind class |
 |-------|----|----------------|
 | 4 | 4px | `p-1` / `gap-1` |
 | 8 | 8px | `p-2` / `gap-2` |
-| 12 | 12px | `p-3` / `gap-3` |
 | 16 | 16px | `p-4` / `gap-4` |
 | 24 | 24px | `p-6` / `gap-6` |
 | 32 | 32px | `p-8` / `gap-8` |
 | 48 | 48px | `p-12` |
+| 64 | 64px | `p-16` |
 
 **Sidebar-specific spacing:**
 - Sidebar outer padding: 16px horizontal, 16px vertical (`px-4 py-4`)
@@ -89,6 +94,8 @@ Multiples of 4px only. Tailwind v4 utility mapping:
 - Form field rows: 8px vertical gap (`gap-2`)
 - Label-to-input gap: 4px (`gap-1`)
 - CTA button height: 48px (touch-target minimum — `py-3` with `text-base`)
+
+Exceptions: none.
 
 ---
 
@@ -99,11 +106,11 @@ Single system font stack: inherit from OS (`font-sans`). No custom web font.
 | Role | Size | Weight | Line-height | Tailwind classes |
 |------|------|--------|-------------|-----------------|
 | Live price (header) | 24px | 700 (bold) | 1.2 | `text-2xl font-bold` |
-| Section label / field label | 11px | 500 (medium) | 1.4 | `text-[11px] font-medium uppercase tracking-wide` |
 | Field value / body | 14px | 400 (regular) | 1.5 | `text-sm` |
+| Section label / field label | 12px | 400 (regular) | 1.4 | `text-xs uppercase tracking-wide` |
 | Supporting / meta | 12px | 400 (regular) | 1.4 | `text-xs` |
 
-**Exactly 4 sizes, 2 weights (400 regular + 700 bold).** `font-medium` (500) used only for section labels — treated as a label-specific utility, not a free weight.
+**Exactly 3 sizes (24px, 14px, 12px), 2 weights (400 regular + 700 bold).** Section labels and supporting/meta share 12px at weight 400 — differentiated by `uppercase tracking-wide` class on labels only, not by a separate size.
 
 ---
 
@@ -171,7 +178,7 @@ interface TradeSidebarProps {
 
 ### 6.2 OrderForm fields
 
-Each field: label row (11px medium uppercase) + input row (14px, `bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100`).
+Each field: label row (12px regular uppercase tracking-wide) + input row (14px, `bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100`).
 
 | Field | Type | AI pre-fill source | User editable |
 |-------|------|--------------------|--------------|
@@ -196,8 +203,8 @@ Collapsed by default. Toggle shows full options legs text in a monospace block.
 Only rendered when `tradeStatus?.status === 'filled'`.
 
 Layout: two rows
-- Row 1: "Open Position" label (11px gray-400) + fill price (14px gray-100)
-- Row 2: "Live P&L" label (11px gray-400) + P&L value (14px, green-400 if positive, red-400 if negative, formatted as `+$X.XX (+Y.YY%)`)
+- Row 1: "Open Position" label (12px gray-400 uppercase tracking-wide) + fill price (14px gray-100)
+- Row 2: "Live P&L" label (12px gray-400 uppercase tracking-wide) + P&L value (14px, green-400 if positive, red-400 if negative, formatted as `+$X.XX (+Y.YY%)`)
 
 P&L calculation: `(livePrice.price - tradeStatus.fill_price) * quantity` for BUY; inverse for SELL.
 Display both dollar amount and percentage. Show both (D-06, Claude's Discretion resolved: show both).
@@ -211,10 +218,10 @@ Single slot at sidebar bottom. State machine:
 | `idle` (no order yet) | Blue-600 "Execute Paper Trade" button, full width, 48px tall |
 | `submitted` | Amber-600 strip: spinner + "Order Submitted..." — disabled, non-clickable |
 | `filled` | Green-700 strip: "Filled @ $XX.XX" (fill price). Then shows separate red "Close Position" button below |
-| `rejected` | Red-700 "Rejected: {reason}" + gray "Retry" button |
-| `error` | Red-700 "Error" + gray "Retry" button |
+| `rejected` | Red-700 "Rejected: {reason}" + gray "Retry Order" button |
+| `error` | Red-700 "Error" + gray "Retry Order" button |
 
-"Close Position" button (D-06): `bg-red-700 hover:bg-red-600 text-white text-sm font-medium`, full width, 44px. Requires inline confirmation — clicking turns button into a `flex` row: `["Cancel" (gray-700 flex-1)] ["Confirm Close" (red-600 flex-1)]`. No modal. Timeout: none (user must explicitly cancel or confirm).
+"Close Position" button (D-06): `bg-red-700 hover:bg-red-600 text-white text-sm font-medium`, full width, 44px. Requires inline confirmation — clicking turns button into a `flex` row: `["Cancel Close" (gray-700 flex-1)] ["Confirm Close" (red-600 flex-1)]`. No modal. Timeout: none (user must explicitly cancel or confirm).
 
 ### 6.6 SignalBadge (existing — reuse)
 
@@ -233,7 +240,7 @@ $XXX.XX          +X.XX (+Y.YY%)
                  [or -X.XX (-Y.YY%)]
 ```
 - Price: `text-2xl font-bold text-gray-100`
-- Change: `text-sm font-medium` colored `text-green-400` (positive) or `text-red-400` (negative)
+- Change: `text-sm` colored `text-green-400` (positive) or `text-red-400` (negative)
 - Background: `bg-gray-800 rounded-lg px-4 py-3 mb-4`
 
 ### 6.8 Dashboard table updates (D-15, D-16, D-17, D-19)
@@ -270,16 +277,16 @@ Summary stat cards added (use existing `StatCard` component pattern):
 2. User clicks "Execute Paper Trade"
 3. Button immediately changes to amber "Order Submitted..." (no intermediate modal — modal absorbed into sidebar, D-02)
 4. On fill: button area becomes green "Filled @ $XX.XX" + red "Close Position" button appears
-5. On rejection: red rejection reason + gray Retry button
+5. On rejection: red rejection reason + gray "Retry Order" button
 
 No separate confirmation modal. The editable sidebar IS the confirmation surface. The previous `TradeConfirmModal` component is deleted.
 
 ### 7.3 Close Position inline confirmation
 
 1. User clicks "Close Position" (red-700 button)
-2. Button row splits into: "Cancel" (gray-700) | "Confirm Close" (red-600) — no animation, instant DOM swap
+2. Button row splits into: "Cancel Close" (gray-700) | "Confirm Close" (red-600) — no animation, instant DOM swap
 3. On "Confirm Close": submits market sell order via `onClosePosition`, shows spinner in button slot
-4. On "Cancel": reverts to single "Close Position" button
+4. On "Cancel Close": reverts to single "Close Position" button
 
 ### 7.4 Options legs collapse
 
@@ -314,8 +321,8 @@ No separate confirmation modal. The editable sidebar IS the confirmation surface
 |--------|-------|
 | Close open position | "Close Position" |
 | Confirm close | "Confirm Close" |
-| Cancel close | "Cancel" |
-| Retry after rejection | "Retry" |
+| Cancel close | "Cancel Close" |
+| Retry after rejection | "Retry Order" |
 
 ### Empty / Null states
 
@@ -331,7 +338,7 @@ No separate confirmation modal. The editable sidebar IS the confirmation surface
 | Error | Copy |
 |-------|------|
 | Order rejected by Alpaca | "Rejected: {rejection_reason from API}" |
-| Network error on execute | "Error" + "Retry" button (no detail — consistent with existing error pattern) |
+| Network error on execute | "Error" + "Retry Order" button (no detail — consistent with existing error pattern) |
 | Live price fetch failure | silently show "--" for price; do not display an error banner |
 | Bracket order partial fill | "Filled @ $XX.XX" (treat as normal fill; stop/target legs tracked by Alpaca) |
 
@@ -339,7 +346,7 @@ No separate confirmation modal. The editable sidebar IS the confirmation surface
 
 | Action | Approach | Copy |
 |--------|----------|------|
-| Close Position | Inline two-button confirmation (no modal) | "Confirm Close" / "Cancel" |
+| Close Position | Inline two-button confirmation (no modal) | "Confirm Close" / "Cancel Close" |
 | Delete legacy trades (D-18) | Backend migration script only — no UI confirmation surface needed in this phase |
 
 ### Paper trading disclaimer
@@ -398,6 +405,19 @@ No equivalent banner needed in sidebar — sidebar header shows "Paper" label in
 | gray-900/800/700 surfaces | §5 | Existing codebase (all components) |
 | blue-600 accent | §5 | Existing codebase (timeframe buttons, TrackRecordScreen) |
 | green-600/red-600 semantic | §5 | Existing codebase (SignalBadge, direction badges) |
+
+---
+
+## 12. Checker Sign-Off
+
+- [ ] Dimension 1 Copywriting: PASS
+- [ ] Dimension 2 Visuals: PASS
+- [ ] Dimension 3 Color: PASS
+- [ ] Dimension 4 Typography: PASS
+- [ ] Dimension 5 Spacing: PASS
+- [ ] Dimension 6 Registry Safety: PASS
+
+**Approval:** pending
 
 ---
 
