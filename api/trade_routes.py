@@ -491,3 +491,28 @@ async def close_position(ticker: str, session: SessionDep):
 
     await session.commit()
     return {"status": "closed", "close_reason": "Manual Close", "close_price": close_price}
+
+
+@trade_router.delete("/trades/legacy")
+async def delete_legacy_trades(session: SessionDep):
+    """Delete legacy trades from old auto-close system (D-18).
+
+    Targets trades that have no close_reason and were closed by the
+    old 5-day auto-close system (status='closed' but no bracket leg IDs).
+    Also deletes any trades with null outcome that are not currently active.
+    """
+    from sqlalchemy import delete
+
+    # Delete trades that:
+    # 1. Have no bracket leg IDs (pre-bracket era)
+    # 2. Are not currently active (not 'submitted' or 'filled')
+    result = await session.execute(
+        delete(Trade).where(
+            Trade.bracket_tp_order_id == None,  # noqa: E711
+            Trade.bracket_sl_order_id == None,  # noqa: E711
+            Trade.status.notin_(["submitted", "filled"]),
+        )
+    )
+    deleted_count = result.rowcount
+    await session.commit()
+    return {"deleted_count": deleted_count}

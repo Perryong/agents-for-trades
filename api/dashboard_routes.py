@@ -33,6 +33,27 @@ def _mean(values: list[float]) -> float:
     return sum(values) / len(values)
 
 
+def _risk_reward(trade) -> float | None:
+    """Risk-reward ratio: reward_distance / risk_distance (D-16)."""
+    if not all([trade.fill_price, trade.target_price, trade.stop_price]):
+        return None
+    if trade.direction == "BUY":
+        risk = trade.fill_price - trade.stop_price
+        reward = trade.target_price - trade.fill_price
+    else:
+        risk = trade.stop_price - trade.fill_price
+        reward = trade.fill_price - trade.target_price
+    return reward / risk if risk > 0 else None
+
+
+def _r_multiple(trade) -> float | None:
+    """R-multiple: actual_pnl_pct / risk_pct (D-17)."""
+    if not all([trade.fill_price, trade.stop_price, trade.pnl_pct is not None]):
+        return None
+    risk_pct = abs(trade.fill_price - trade.stop_price) / trade.fill_price * 100
+    return trade.pnl_pct / risk_pct if risk_pct > 0 else None
+
+
 def _filter_trades(
     all_trades: list,
     ticker: Optional[str] = None,
@@ -77,6 +98,12 @@ async def get_dashboard_summary(
     if total_closed < 5:
         disclaimer = f"Based on {total_closed} trade(s) -- insufficient sample for statistical significance."
 
+    # Risk-reward and R-multiple (D-16, D-17)
+    rr_values = [v for v in (_risk_reward(t) for t in closed) if v is not None]
+    rm_values = [v for v in (_r_multiple(t) for t in closed) if v is not None]
+    avg_risk_reward = _mean(rr_values) if rr_values else None
+    avg_r_multiple = _mean(rm_values) if rm_values else None
+
     return DashboardSummaryResponse(
         total_trades=total_trades,
         total_closed=total_closed,
@@ -87,6 +114,8 @@ async def get_dashboard_summary(
         profit_factor=round(profit_factor, 4),
         aggregate_pnl=round(aggregate_pnl, 4),
         disclaimer=disclaimer,
+        avg_risk_reward=round(avg_risk_reward, 4) if avg_risk_reward is not None else None,
+        avg_r_multiple=round(avg_r_multiple, 4) if avg_r_multiple is not None else None,
     )
 
 
@@ -120,6 +149,7 @@ async def get_dashboard_trades(
             pnl_pct=t.pnl_pct,
             strategy_name=t.strategy_name,
             is_legacy=is_legacy,
+            close_reason=t.close_reason,  # NEW D-19
         ))
 
     return DashboardTradesResponse(trades=items, total=len(items))
