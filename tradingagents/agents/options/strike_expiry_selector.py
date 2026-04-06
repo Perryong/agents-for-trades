@@ -155,8 +155,11 @@ def _select_contract(
         # Approximate delta from strike vs current price using mid of bid/ask
         # delta ~0.30 call ≈ ~7-10% OTM, delta ~0.30 put ≈ ~7-10% OTM
         type_df["_mid"] = (type_df["bid"] + type_df["ask"]) / 2
+        # When bid/ask are zero (after hours), fall back to lastPrice
+        if "_mid" in type_df.columns and (type_df["_mid"] <= 0).all() and "lastPrice" in type_df.columns:
+            type_df["_mid"] = type_df["lastPrice"].fillna(0)
         # Estimate current price from ATM options (highest mid for calls near strikes)
-        atm_price = type_df.loc[type_df["_mid"].idxmax(), "strike"] if not type_df.empty else 0
+        atm_price = type_df.loc[type_df["_mid"].idxmax(), "strike"] if not type_df.empty and (type_df["_mid"] > 0).any() else 0
 
         # For the fallback, use moneyness ratio to approximate delta
         # delta_target 0.30 ≈ strike/price ratio of ~1.07 for calls, ~0.93 for puts

@@ -118,12 +118,25 @@ def get_options_chain(symbol: str, expiration: str) -> str:
         today = date.today()
         T = max((exp_date - today).days / 365.0, 1 / 365.0)
 
+        # Minimum IV threshold: below this, BS Greeks are unreliable
+        # (e.g. yfinance returns IV ~0.00001 when bid/ask are zero after hours)
+        MIN_IV_THRESHOLD = 0.005
+
         deltas, gammas, thetas, vegas = [], [], [], []
         for _, row in combined.iterrows():
             iv = row.get("iv") or row.get("impliedVolatility")
             strike = row.get("strike", 0)
             opt_type = row.get("option_type", "call")
-            if spot > 0 and strike > 0 and iv and iv > 0:
+            bid = float(row.get("bid", 0) or 0)
+            ask = float(row.get("ask", 0) or 0)
+
+            # Skip Greeks when data is unreliable: near-zero IV or both
+            # bid/ask are zero (common after market hours). This forces the
+            # moneyness-based fallback in strike_expiry_selector.
+            iv_valid = iv and float(iv) >= MIN_IV_THRESHOLD
+            quotes_valid = bid > 0 or ask > 0
+
+            if spot > 0 and strike > 0 and iv_valid and quotes_valid:
                 g = _bs_greeks(spot, strike, T, r, float(iv), opt_type)
                 deltas.append(g["delta"])
                 gammas.append(g["gamma"])
