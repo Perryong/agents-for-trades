@@ -4,23 +4,45 @@ from typing import Any, Dict, Optional
 
 from langchain_core.callbacks import BaseCallbackHandler
 
-_run_queues: Dict[str, asyncio.Queue] = {}
+_run_queues: Dict[str, tuple[asyncio.Queue, threading.Event]] = {}
 
 
-def register_run(run_id: str) -> asyncio.Queue:
-    """Create and store a new asyncio.Queue for the given run_id."""
+class AnalysisCancelledError(Exception):
+    """Raised inside the LangGraph thread when the cancel event is set."""
+    pass
+
+
+def register_run(run_id: str) -> tuple[asyncio.Queue, threading.Event]:
+    """Create and store a new asyncio.Queue and threading.Event for the given run_id."""
     q: asyncio.Queue = asyncio.Queue()
-    _run_queues[run_id] = q
-    return q
+    cancel_event = threading.Event()
+    _run_queues[run_id] = (q, cancel_event)
+    return q, cancel_event
 
 
 def get_queue(run_id: str) -> Optional[asyncio.Queue]:
     """Retrieve the queue for the given run_id, or None if not found."""
-    return _run_queues.get(run_id)
+    entry = _run_queues.get(run_id)
+    return entry[0] if entry else None
+
+
+def get_cancel_event(run_id: str) -> Optional[threading.Event]:
+    """Retrieve the cancel event for the given run_id, or None if not found."""
+    entry = _run_queues.get(run_id)
+    return entry[1] if entry else None
+
+
+def cancel_run(run_id: str) -> bool:
+    """Set the cancel flag for a run. Returns True if run was found."""
+    event = get_cancel_event(run_id)
+    if event:
+        event.set()
+        return True
+    return False
 
 
 def remove_run(run_id: str) -> None:
-    """Remove the queue for the given run_id from the registry."""
+    """Remove the queue and cancel event for the given run_id from the registry."""
     _run_queues.pop(run_id, None)
 
 
@@ -30,13 +52,23 @@ class ProgressCallbackHandler(BaseCallbackHandler):
     Designed to be used from a synchronous LangGraph/LangChain execution
     thread. Uses asyncio.run_coroutine_threadsafe to safely put events onto
     the async queue from the callback thread.
+
+    Checks the cancel_event between nodes (on_chain_start and on_chain_end)
+    and raises AnalysisCancelledError if cancellation has been requested.
+    LLM-level callbacks do NOT check cancel — in-flight LLM calls are allowed
+    to complete naturally.
     """
 
-    def __init__(self, run_id: str, loop: asyncio.AbstractEventLoop) -> None:
+    def __init__(self, run_id: str, loop: asyncio.AbstractEventLoop, cancel_event: threading.Event) -> None:
         super().__init__()
         self.run_id = run_id
         self.loop = loop
+        self.cancel_event = cancel_event
         self._lock = threading.Lock()
+
+    def _check_cancel(self) -> None:
+        if self.cancel_event.is_set():
+            raise AnalysisCancelledError("Analysis cancelled by user")
 
     def _put(self, event: dict) -> None:
         """Thread-safely put an event onto the run's asyncio queue."""
@@ -48,11 +80,13 @@ class ProgressCallbackHandler(BaseCallbackHandler):
         self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs: Any
     ) -> None:
         """Emit a node_start event when a chain/node begins execution."""
+        self._check_cancel()
         name = kwargs.get("name") or serialized.get("name", "unknown")
         self._put({"type": "node_start", "node": name})
 
     def on_chain_end(self, outputs: Dict[str, Any], **kwargs: Any) -> None:
         """Emit a node_end event when a chain/node finishes execution."""
+        self._check_cancel()
         name = kwargs.get("name", "unknown")
         self._put({"type": "node_end", "node": name})
 
