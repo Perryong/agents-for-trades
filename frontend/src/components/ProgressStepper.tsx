@@ -1,10 +1,4 @@
-import {
-  EQUITY_NODES,
-  OPTIONS_NODES,
-  RESEARCH_NODES,
-  TRADING_NODES,
-  RISK_NODES,
-} from '../types';
+import { getNodeList } from '../types';
 import type { AnalysisStatus } from '../types';
 
 interface ProgressStepperProps {
@@ -12,16 +6,6 @@ interface ProgressStepperProps {
   currentNode: string | null;
   enableOptions: boolean;
   status: AnalysisStatus;
-}
-
-function getNodeList(enableOptions: boolean): string[] {
-  return [
-    ...EQUITY_NODES,
-    ...(enableOptions ? OPTIONS_NODES : []),
-    ...RESEARCH_NODES,
-    ...TRADING_NODES,
-    ...RISK_NODES,
-  ];
 }
 
 type NodeStatus = 'done' | 'running' | 'pending';

@@ -8,7 +8,8 @@ import { ReportTabs } from './components/ReportTabs';
 import { ReportPane } from './components/ReportPane';
 import { ChartScreen } from './components/ChartScreen';
 import { TrackRecordScreen } from './components/TrackRecordScreen';
-import { REPORT_TABS } from './types';
+import { GlobalStatusBar } from './components/GlobalStatusBar';
+import { REPORT_TABS, getNodeList } from './types';
 import type { AnalyzeRequest } from './types';
 
 function getInitialDark(): boolean {
@@ -19,7 +20,7 @@ function getInitialDark(): boolean {
 }
 
 function App() {
-  const { state, startAnalysis } = useAnalysis();
+  const { state, startAnalysis, cancelAnalysis } = useAnalysis();
   const [activeTab, setActiveTab] = useState('market');
   const [enableOptions, setEnableOptions] = useState(false);
   const [dark, setDark] = useState(getInitialDark);
@@ -33,6 +34,7 @@ function App() {
   const lastAnalyzedTicker = useRef<string>('');
 
   const { state: screenerState, runScreen } = useScreener();
+  const totalNodes = getNodeList(enableOptions).length;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -91,7 +93,7 @@ function App() {
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Analysis Dashboard</p>
         <ConfigSidebar
           onAnalyze={handleAnalyze}
-          isRunning={state.status === 'running'}
+          isRunning={state.status === 'running' || state.status === 'cancelling'}
           prefillTicker={prefillTicker}
         />
       </aside>
@@ -141,6 +143,14 @@ function App() {
             Track Record
           </button>
         </div>
+
+        <GlobalStatusBar
+          status={state.status}
+          completedCount={state.completedNodes.length}
+          totalCount={totalNodes}
+          ticker={lastAnalyzedTicker.current}
+          onCancel={cancelAnalysis}
+        />
 
         {mainSection === 'analysis' ? (
           <>
