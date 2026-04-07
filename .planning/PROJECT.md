@@ -135,7 +135,7 @@ This document evolves at phase transitions and milestone boundaries.
 ---
 ## Current Milestone: None (v1.0 sidebar shipped)
 
-v1.0 Trade Recommendation Sidebar shipped 2026-04-05. 19/19 decisions verified. 5 tech debt items accepted. Run `/gsd:new-milestone` to start next milestone.
+v1.0 Trade Recommendation Sidebar shipped 2026-04-05. 19/19 decisions verified. 5 tech debt items accepted. Phase 01 complete — added global analysis progress status bar and cancellation support (backend threading.Event + DELETE endpoint, frontend GlobalStatusBar component). Run `/gsd:new-milestone` to start next milestone.
 
 ---
-*Last updated: 2026-04-05 after v1.0 milestone completion*
+*Last updated: 2026-04-07 after Phase 01 completion*
