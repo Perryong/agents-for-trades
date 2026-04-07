@@ -1,6 +1,6 @@
 // SSE event types from the backend
 export interface ProgressEvent {
-  type: 'node_start' | 'node_end' | 'complete' | 'error';
+  type: 'node_start' | 'node_end' | 'complete' | 'error' | 'cancelled';
   node?: string;
   state?: Record<string, unknown>;
   signal?: string;
@@ -39,7 +39,7 @@ export interface AnalysisResult {
 }
 
 // State for useReducer in useAnalysis hook
-export type AnalysisStatus = 'idle' | 'running' | 'done' | 'error';
+export type AnalysisStatus = 'idle' | 'running' | 'cancelling' | 'done' | 'error';
 
 export interface AnalysisState {
   status: AnalysisStatus;
@@ -82,6 +82,16 @@ export const RISK_NODES = [
   'Neutral Analyst',
   'Portfolio Manager',
 ] as const;
+
+export function getNodeList(enableOptions: boolean): string[] {
+  return [
+    ...EQUITY_NODES,
+    ...(enableOptions ? OPTIONS_NODES : []),
+    ...RESEARCH_NODES,
+    ...TRADING_NODES,
+    ...RISK_NODES,
+  ];
+}
 
 // Report tab definitions
 export interface ReportTab {

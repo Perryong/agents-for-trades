@@ -15,7 +15,9 @@ type Action =
   | { type: 'NODE_START'; node: string }
   | { type: 'NODE_END'; node: string }
   | { type: 'COMPLETE'; result: AnalysisResult }
-  | { type: 'ERROR'; message: string };
+  | { type: 'ERROR'; message: string }
+  | { type: 'CANCEL' }
+  | { type: 'CANCELLED' };
 
 function reducer(state: AnalysisState, action: Action): AnalysisState {
   switch (action.type) {
@@ -35,6 +37,10 @@ function reducer(state: AnalysisState, action: Action): AnalysisState {
       return { ...state, status: 'done', currentNode: null, result: action.result };
     case 'ERROR':
       return { ...state, status: 'error', currentNode: null, errorMsg: action.message };
+    case 'CANCEL':
+      return { ...state, status: 'cancelling' };
+    case 'CANCELLED':
+      return initialState;
     default:
       return state;
   }
@@ -45,6 +51,7 @@ export function useAnalysis() {
   const esRef = useRef<EventSource | null>(null);
   // Track whether an analysis is running to avoid stale closure in onerror
   const isRunningRef = useRef<boolean>(false);
+  const runIdRef = useRef<string | null>(null);
 
   const startAnalysis = useCallback(async (request: AnalyzeRequest) => {
     // Close any existing SSE connection
@@ -58,6 +65,7 @@ export function useAnalysis() {
 
     // Step 1: Generate client-side run_id (UUID v4 via crypto.randomUUID)
     const runId = crypto.randomUUID();
+    runIdRef.current = runId;
 
     // Step 2: POST config to /api/analyze/{run_id}
     try {
@@ -140,6 +148,13 @@ export function useAnalysis() {
       es.close();
     });
 
+    es.addEventListener('cancelled', () => {
+      isRunningRef.current = false;
+      runIdRef.current = null;
+      dispatch({ type: 'CANCELLED' });
+      es.close();
+    });
+
     // Native EventSource onerror (connection errors)
     // Uses isRunningRef to avoid stale closure bug — state.status read inside
     // useCallback([]) would always see 'idle' due to closure capture.
@@ -151,14 +166,26 @@ export function useAnalysis() {
     };
   }, []);
 
+  const cancelAnalysis = useCallback(async () => {
+    const runId = runIdRef.current;
+    if (!runId) return;
+    dispatch({ type: 'CANCEL' });
+    try {
+      await fetch(`/api/analyze/${runId}`, { method: 'DELETE' });
+    } catch {
+      // Best-effort; SSE cancelled event will confirm
+    }
+  }, []);
+
   const reset = useCallback(() => {
     if (esRef.current) {
       esRef.current.close();
       esRef.current = null;
     }
     isRunningRef.current = false;
+    runIdRef.current = null;
     dispatch({ type: 'RESET' });
   }, []);
 
-  return { state, startAnalysis, reset };
+  return { state, startAnalysis, cancelAnalysis, reset };
 }
