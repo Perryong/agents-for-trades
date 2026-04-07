@@ -67,7 +67,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 
 Plans:
 - [x] 01-01-PLAN.md — Backend cancellation infrastructure (progress.py, routes.py, tests)
-- [ ] 01-02-PLAN.md — Frontend progress visibility and cancel UX (types, useAnalysis, GlobalStatusBar, App.tsx)
+- [x] 01-02-PLAN.md — Frontend progress visibility and cancel UX (types, useAnalysis, GlobalStatusBar, App.tsx)
 
 ---
 
