@@ -69,6 +69,12 @@ The trader receives a complete, executable options recommendation — strategy, 
 - ✓ Dashboard extensions: risk-reward ratio, R-multiple, close-reason column — v1.0
 - ✓ Confidence extraction wired to bracket orders for calibration scoring — v1.0
 
+*(v1.0 Analysis Progress & Cancellation — shipped 2026-04-07)*
+
+- ✓ Global status bar showing agent completion counts visible across all tabs during analysis — v1.0
+- ✓ Analysis cancellation via threading.Event + DELETE endpoint + SSE cancelled event — v1.0
+- ✓ Cancel button in global status bar with immediate feedback ("Cancelling..." state) — v1.0
+
 ### Active
 
 *(No active milestone — run /gsd:new-milestone to start next)*
@@ -82,7 +88,7 @@ The trader receives a complete, executable options recommendation — strategy, 
 
 ## Context
 
-**Current state (post v1.0 sidebar):** ~124k Python LOC + ~3,800 TypeScript LOC. Frontend: 4-screen app (Analysis, Screener, Chart with brokerage sidebar, Track Record) with lightweight-charts v5, Alpaca bracket order execution (OCO with TP/SL), live price streaming, scoring metrics, and track record dashboard with risk-reward and R-multiple. Backend: FastAPI with SSE streaming, chart overlay with structured JSON parsing, bracket trade execution (Alpaca SDK), scoring, and dashboard endpoints. SQLite trade persistence via SQLAlchemy 2.0 async. Trades close via bracket order legs or manual close — no more auto-close timer.
+**Current state (post v1.0 progress & cancellation):** ~124k Python LOC + ~3,900 TypeScript LOC. Frontend: 4-screen app (Analysis, Screener, Chart with brokerage sidebar, Track Record) with lightweight-charts v5, Alpaca bracket order execution (OCO with TP/SL), live price streaming, scoring metrics, track record dashboard, global analysis status bar with cancel button. Backend: FastAPI with SSE streaming, chart overlay with structured JSON parsing, bracket trade execution (Alpaca SDK), scoring, dashboard endpoints, analysis cancellation via threading.Event + DELETE endpoint. SQLite trade persistence via SQLAlchemy 2.0 async.
 
 **Architecture:** LangGraph `StateGraph` with `AgentState` as shared state dict. All agents are factory functions (`create_*`) returning closures. Data layer uses `VENDOR_METHODS` dict in `interface.py` for routing. Options agents run as parallel branch alongside equity agents, both completing before Risk Judge synthesizes unified decision.
 
@@ -114,6 +120,10 @@ The trader receives a complete, executable options recommendation — strategy, 
 | Structured JSON from AI trader agent | Reliable price/signal extraction instead of regex-only prose parsing | ✓ Good — JSON-first with regex fallback, no breaking change |
 | Live price via Alpaca REST polling (5s) | WebSocket deferred; REST reuses existing credentials, no new packages | ✓ Good — acceptable latency for paper trading sidebar |
 | Remove 5-day auto-close | Bracket order OCO legs handle trade lifecycle; auto-close was arbitrary | ✓ Good — trades close at AI's target/stop-loss or manual close |
+| threading.Event for analysis cancellation | Stdlib, no new deps; checked between LangGraph nodes, not during LLM calls | ✓ Good — graceful abort without mid-call interruption |
+| DELETE /api/analyze/{run_id} for cancel | RESTful; single endpoint, 204/404 responses | ✓ Good — clean API contract |
+| GlobalStatusBar as standalone component | Renders between tab nav and content, visible on all tabs | ✓ Good — no prop drilling, receives analysis state directly |
+| getNodeList exported from types.ts | Single source of truth for node counting (ProgressStepper + GlobalStatusBar) | ✓ Good — eliminates duplicate logic |
 
 ## Evolution
 
@@ -133,9 +143,9 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-## Current Milestone: None (v1.0 sidebar shipped)
+## Current Milestone: None
 
-v1.0 Trade Recommendation Sidebar shipped 2026-04-05. 19/19 decisions verified. 5 tech debt items accepted. Phase 01 complete — added global analysis progress status bar and cancellation support (backend threading.Event + DELETE endpoint, frontend GlobalStatusBar component). Run `/gsd:new-milestone` to start next milestone.
+v1.0 Analysis Progress & Cancellation shipped 2026-04-07. Global status bar and cancel mechanism added. Run `/gsd:new-milestone` to start next milestone.
 
 ---
-*Last updated: 2026-04-07 after Phase 01 completion*
+*Last updated: 2026-04-07 after v1.0 Analysis Progress & Cancellation milestone*

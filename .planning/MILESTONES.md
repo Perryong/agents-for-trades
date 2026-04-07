@@ -1,5 +1,20 @@
 # Milestones
 
+## v1.0 Analysis Progress & Cancellation (Shipped: 2026-04-07)
+
+**Phases completed:** 2 phases, 8 plans, 10 tasks
+
+**Key accomplishments:**
+
+- 1. [Rule 1 - Bug] Removed unused node constant imports from ProgressStepper
+- One-liner:
+- Extended Trade model with bracket order columns, added BracketTradeRequest/LivePriceResponse schemas, GET /api/price/{ticker}/live endpoint via Alpaca data client, and structured JSON parsing in chart overlay with regex fallback
+- One-liner:
+- One-liner:
+- api/dashboard_routes.py:
+
+---
+
 ## v1.0 Trade Recommendation Sidebar (Shipped: 2026-04-05)
 
 **Phases completed:** 1 phases, 6 plans, 10 tasks

@@ -6,6 +6,7 @@
 - **v1.1 Stock Recommendation System** — Phases 8-12 (shipped 2026-04-03)
 - **v1.2 Paper Trading & Validation** — Phases 13-16 (shipped 2026-04-03)
 - **v1.0 Trade Recommendation Sidebar** — Phase 1 (shipped 2026-04-05)
+- **v1.0 Analysis Progress & Cancellation** — Phase 1 (shipped 2026-04-07)
 
 ## Phases
 
@@ -58,16 +59,14 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 
 </details>
 
-### Phase 1: Add analysis progress visibility and cancellation support
+<details>
+<summary>v1.0 Analysis Progress & Cancellation (Phase 1) — SHIPPED 2026-04-07</summary>
 
-**Goal:** Add a global progress status bar visible across all tabs showing agent completion counts, and a cancellation mechanism (threading.Event + DELETE endpoint + SSE cancelled event) that lets users abort a running analysis from any tab with full state cleanup.
-**Requirements**: PROG-01, PROG-02, PROG-03, PROG-04, PROG-05, PROG-06, PROG-07, PROG-08
-**Depends on:** Phase 0
-**Plans:** 2 plans
+- [x] Phase 1: Add analysis progress visibility and cancellation support (2/2 plans) — completed 2026-04-07
 
-Plans:
-- [x] 01-01-PLAN.md — Backend cancellation infrastructure (progress.py, routes.py, tests)
-- [x] 01-02-PLAN.md — Frontend progress visibility and cancel UX (types, useAnalysis, GlobalStatusBar, App.tsx)
+See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
+
+</details>
 
 ---
 
@@ -76,3 +75,4 @@ Plans:
 *v1.1 shipped: 2026-04-03*
 *v1.2 shipped: 2026-04-03*
 *v1.0 sidebar shipped: 2026-04-05*
+*v1.0 progress & cancellation shipped: 2026-04-07*
