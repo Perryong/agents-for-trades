@@ -1,9 +1,9 @@
 import asyncio
 import json
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from sse_starlette import EventSourceResponse
 from .schemas import AnalyzeRequest, AnalyzeResponse
-from .progress import register_run, get_queue, remove_run, ProgressCallbackHandler
+from .progress import register_run, get_queue, remove_run, ProgressCallbackHandler, cancel_run, AnalysisCancelledError
 
 router = APIRouter(prefix="/api")
 
@@ -16,8 +16,8 @@ async def start_analysis(run_id: str, request: AnalyzeRequest):
     to receive SSE progress events.
     """
     loop = asyncio.get_event_loop()
-    q = register_run(run_id)
-    handler = ProgressCallbackHandler(run_id, loop)
+    q, cancel_event = register_run(run_id)
+    handler = ProgressCallbackHandler(run_id, loop, cancel_event)
 
     async def run_graph():
         try:
@@ -37,6 +37,8 @@ async def start_analysis(run_id: str, request: AnalyzeRequest):
                 if isinstance(v, (str, int, float, bool, type(None)))
             }
             await q.put({"type": "complete", "state": serialized, "signal": signal})
+        except AnalysisCancelledError:
+            await q.put({"type": "cancelled"})
         except Exception as e:
             await q.put({"type": "error", "message": str(e)})
         finally:
@@ -50,8 +52,8 @@ async def start_analysis(run_id: str, request: AnalyzeRequest):
 async def stream_progress(run_id: str):
     """Open an SSE stream for a running analysis job.
 
-    Emits events: node_start, node_end, complete, error.
-    Stream ends when a complete or error event is received.
+    Emits events: node_start, node_end, complete, error, cancelled.
+    Stream ends when a complete, error, or cancelled event is received.
     """
     q = get_queue(run_id)
 
@@ -72,3 +74,13 @@ async def stream_progress(run_id: str):
             remove_run(run_id)
 
     return EventSourceResponse(event_generator())
+
+
+@router.delete("/analyze/{run_id}", status_code=204)
+async def cancel_analysis(run_id: str):
+    """Cancel a running analysis by setting its cancel flag.
+    Returns 204 if cancelled, 404 if run_id not found.
+    """
+    found = cancel_run(run_id)
+    if not found:
+        raise HTTPException(status_code=404, detail="Run not found or already complete")
