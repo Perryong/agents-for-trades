@@ -58,6 +58,17 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 
 </details>
 
+### Phase 1: Add analysis progress visibility and cancellation support
+
+**Goal:** Add a global progress status bar visible across all tabs showing agent completion counts, and a cancellation mechanism (threading.Event + DELETE endpoint + SSE cancelled event) that lets users abort a running analysis from any tab with full state cleanup.
+**Requirements**: PROG-01, PROG-02, PROG-03, PROG-04, PROG-05, PROG-06, PROG-07, PROG-08
+**Depends on:** Phase 0
+**Plans:** 2 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Backend cancellation infrastructure (progress.py, routes.py, tests)
+- [ ] 01-02-PLAN.md — Frontend progress visibility and cancel UX (types, useAnalysis, GlobalStatusBar, App.tsx)
+
 ---
 
 *Roadmap created: 2026-03-31*
