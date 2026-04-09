@@ -117,6 +117,10 @@ Plans:
 **Requirements**: OPT-01, UI-01, UI-02, UI-03
 **Plans**: 2 plans
 
+Plans:
+- [ ] 19-01-PLAN.md — TypeScript fixes: remove enableOptions from App/ProgressStepper/ReportTabs, wire vol fields in useAnalysis
+- [ ] 19-02-PLAN.md — UI features: grouped tab section headers (EQUITY/OPTIONS/DECISION) + collapsible vol context banner
+
 **Success Criteria** (what must be TRUE):
   1. ConfigSidebar contains no "Enable Options" toggle — opening the config panel shows no options-gating control
   2. Report tab area shows three visible section headers — "Equity", "Options", "Decision" — above the relevant tab groups
@@ -129,7 +133,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 17. Vol Context Backend | 3/3 | Complete    | 2026-04-09 |
 | 18. Analyst Prompt Integration | 2/2 | Complete    | 2026-04-09 |
-| 19. Frontend Restructure | 0/? | Not started | - |
+| 19. Frontend Restructure | 0/2 | Not started | - |
 
 ---
 
