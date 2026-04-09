@@ -75,16 +75,18 @@ The trader receives a complete, executable options recommendation — strategy, 
 - ✓ Analysis cancellation via threading.Event + DELETE endpoint + SSE cancelled event — v1.0
 - ✓ Cancel button in global status bar with immediate feedback ("Cancelling..." state) — v1.0
 
+*(v2.0 Vol-Aware Analysis Pipeline — shipped 2026-04-09)*
+
+- ✓ Vol Context graph node pre-fetches volatility narrative (IV rank, IV/HV, P/C ratio, skew) before analysts run — v2.0
+- ✓ All 5 equity analysts receive vol narrative with per-analyst directive strength (Strong/Moderate/Weak) — v2.0
+- ✓ Analysts produce `vol_note` field in output for auditability — v2.0
+- ✓ Options analysis always-on — `enable_options` toggle removed — v2.0
+- ✓ Frontend tabs grouped into Equity | Options | Decision sections — v2.0
+- ✓ Collapsible vol context banner pinned at top of every analyst tab — v2.0
+
 ### Active
 
-*(v2.0 Vol-Aware Analysis Pipeline — started 2026-04-09)*
-
-- [ ] Vol Context graph node pre-fetches volatility narrative (IV rank, IV/HV, P/C ratio, skew) before analysts run
-- [ ] All 5 equity analysts receive vol narrative with per-analyst directive strength (Strong/Moderate/Weak)
-- [ ] Analysts produce `vol_note` field in output for auditability
-- [ ] Options analysis always-on — `enable_options` toggle removed
-- [ ] Frontend tabs grouped into Equity | Options | Decision sections
-- [ ] Collapsible vol context banner pinned at top of every analyst tab
+*(No active milestone — run /gsd:new-milestone to start next)*
 
 ### Out of Scope
 

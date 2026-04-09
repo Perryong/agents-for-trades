@@ -1,5 +1,18 @@
 # Milestones
 
+## v2.0 Vol-Aware Analysis Pipeline (Shipped: 2026-04-09)
+
+**Phases completed:** 3 phases, 7 plans, 15 tasks
+
+**Key accomplishments:**
+
+- AgentState extended with 6 vol fields; create_vol_context_node() factory computes IV rank, IV/HV ratio, P/C ratio, and skew narrative from cached options data with full try/except fallback
+- Vol Context node wired as START gate before all equity analysts; OPTIONS_NODES always registered; enable_options toggle fully removed from backend
+- extract_vol_note() shared regex utility plus vol-aware market and technical analysts emitting vol_note_market and vol_note_technical via prompt.partial() injection
+- ReportTabs renders EQUITY/OPTIONS/DECISION section rows with pinned labels; ReportPane shows a collapsible vol context banner above equity analyst reports
+
+---
+
 ## v1.0 Analysis Progress & Cancellation (Shipped: 2026-04-07)
 
 **Phases completed:** 2 phases, 8 plans, 10 tasks
