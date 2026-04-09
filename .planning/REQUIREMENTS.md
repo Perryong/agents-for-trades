@@ -20,7 +20,7 @@
 
 ### Options Always-On
 
-- [ ] **OPT-01**: `enable_options` toggle removed from frontend ConfigSidebar — options always enabled
+- [x] **OPT-01**: `enable_options` toggle removed from frontend ConfigSidebar — options always enabled
 - [x] **OPT-02**: Backend always runs full options pipeline — no conditional `if enable_options` blocks in setup.py
 - [x] **OPT-03**: `getNodeList()` returns all nodes (equity + options + vol context) unconditionally
 
@@ -28,7 +28,7 @@
 
 - [ ] **UI-01**: Report tabs grouped into 3 visual sections with headers: Equity (5) | Options (6) | Decision (2)
 - [ ] **UI-02**: Collapsible vol context banner pinned at top of every analyst report tab, showing the vol narrative
-- [ ] **UI-03**: Progress stepper includes "Vol Context" node as the first node before analysts
+- [x] **UI-03**: Progress stepper includes "Vol Context" node as the first node before analysts
 
 ## Future Requirements
 
@@ -56,12 +56,12 @@
 | ANALYST-01 | Phase 18 | Complete |
 | ANALYST-02 | Phase 18 | Complete |
 | ANALYST-03 | Phase 18 | Complete |
-| OPT-01 | Phase 19 | Pending |
+| OPT-01 | Phase 19 | Complete |
 | OPT-02 | Phase 17 | Complete |
 | OPT-03 | Phase 17 | Complete |
 | UI-01 | Phase 19 | Pending |
 | UI-02 | Phase 19 | Pending |
-| UI-03 | Phase 19 | Pending |
+| UI-03 | Phase 19 | Complete |
 
 **Coverage:**
 - v2.0 requirements: 13 total

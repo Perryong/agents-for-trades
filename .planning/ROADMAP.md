@@ -118,7 +118,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 19-01-PLAN.md — TypeScript fixes: remove enableOptions from App/ProgressStepper/ReportTabs, wire vol fields in useAnalysis
+- [x] 19-01-PLAN.md — TypeScript fixes: remove enableOptions from App/ProgressStepper/ReportTabs, wire vol fields in useAnalysis
 - [ ] 19-02-PLAN.md — UI features: grouped tab section headers (EQUITY/OPTIONS/DECISION) + collapsible vol context banner
 
 **Success Criteria** (what must be TRUE):
@@ -133,7 +133,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 17. Vol Context Backend | 3/3 | Complete    | 2026-04-09 |
 | 18. Analyst Prompt Integration | 2/2 | Complete    | 2026-04-09 |
-| 19. Frontend Restructure | 0/2 | Not started | - |
+| 19. Frontend Restructure | 1/2 | In Progress|  |
 
 ---
 
