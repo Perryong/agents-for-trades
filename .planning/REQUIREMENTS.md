@@ -7,10 +7,10 @@
 
 ### Vol Context Pipeline
 
-- [ ] **VOL-01**: Vol Context node computes IV rank, IV/HV ratio, P/C ratio, and skew narrative from yfinance data
+- [x] **VOL-01**: Vol Context node computes IV rank, IV/HV ratio, P/C ratio, and skew narrative from yfinance data
 - [ ] **VOL-02**: Vol Context node runs before all equity analysts as a visible graph node in the progress stepper
-- [ ] **VOL-03**: Vol Context output stored in `state["vol_context"]` as a narrative paragraph with soft directive
-- [ ] **VOL-04**: Vol Context fetch is non-blocking — analysts run without vol context if fetch fails, failure flagged in state
+- [x] **VOL-03**: Vol Context output stored in `state["vol_context"]` as a narrative paragraph with soft directive
+- [x] **VOL-04**: Vol Context fetch is non-blocking — analysts run without vol context if fetch fails, failure flagged in state
 
 ### Analyst Integration
 
@@ -49,10 +49,10 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| VOL-01 | Phase 17 | Pending |
+| VOL-01 | Phase 17 | Complete |
 | VOL-02 | Phase 17 | Pending |
-| VOL-03 | Phase 17 | Pending |
-| VOL-04 | Phase 17 | Pending |
+| VOL-03 | Phase 17 | Complete |
+| VOL-04 | Phase 17 | Complete |
 | ANALYST-01 | Phase 18 | Pending |
 | ANALYST-02 | Phase 18 | Pending |
 | ANALYST-03 | Phase 18 | Pending |

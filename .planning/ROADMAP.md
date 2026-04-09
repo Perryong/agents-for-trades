@@ -84,7 +84,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 **Plans**: 3 plans
 
 Plans:
-- [ ] 17-01-PLAN.md — AgentState vol fields + Vol Context node module (pure Python narrative builder)
+- [x] 17-01-PLAN.md — AgentState vol fields + Vol Context node module (pure Python narrative builder)
 - [ ] 17-02-PLAN.md — Graph wiring: Vol Context into setup.py, progress.py, schemas.py (always-on options)
 - [ ] 17-03-PLAN.md — Frontend types: remove enable_options, add vol fields, PRE_NODES, group-based REPORT_TABS
 
@@ -123,7 +123,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 17. Vol Context Backend | 0/3 | Not started | - |
+| 17. Vol Context Backend | 1/3 | In Progress|  |
 | 18. Analyst Prompt Integration | 0/? | Not started | - |
 | 19. Frontend Restructure | 0/? | Not started | - |
 
