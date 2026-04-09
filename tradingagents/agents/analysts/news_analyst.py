@@ -3,12 +3,21 @@ import time
 import json
 from tradingagents.agents.utils.agent_utils import get_news, get_global_news
 from tradingagents.dataflows.config import get_config
+from tradingagents.agents.utils.vol_note_utils import extract_vol_note
 
 
 def create_news_analyst(llm):
     def news_analyst_node(state):
         current_date = state["trade_date"]
         ticker = state["company_of_interest"]
+
+        vol_context = state.get("vol_context")
+        vol_block = f"\n\n## Vol Context\n{vol_context}\n" if vol_context else ""
+        vol_directive = (
+            "Reference volatility context only if a specific news event in your findings is the identifiable cause of elevated IV. "
+            "Do not generically mention vol conditions — tie it directly to a news catalyst if relevant. "
+            "Conclude your report with an exact line: **Vol Note:** [one sentence linking vol to a news catalyst, or 'No news-driven vol catalyst identified']."
+        ) if vol_context else ""
 
         tools = [
             get_news,
@@ -31,7 +40,9 @@ def create_news_analyst(llm):
                     " If you or any other assistant has the FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** or deliverable,"
                     " prefix your response with FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** so the team knows to stop."
                     " You have access to the following tools: {tool_names}.\n{system_message}"
-                    "For your reference, the current date is {current_date}. We are looking at the company {ticker}",
+                    "{vol_directive}"
+                    "For your reference, the current date is {current_date}. We are looking at the company {ticker}"
+                    "\n{vol_block}",
                 ),
                 MessagesPlaceholder(variable_name="messages"),
             ]
@@ -41,6 +52,8 @@ def create_news_analyst(llm):
         prompt = prompt.partial(tool_names=", ".join([tool.name for tool in tools]))
         prompt = prompt.partial(current_date=current_date)
         prompt = prompt.partial(ticker=ticker)
+        prompt = prompt.partial(vol_directive=vol_directive)
+        prompt = prompt.partial(vol_block=vol_block)
 
         chain = prompt | llm.bind_tools(tools)
         result = chain.invoke(state["messages"])
@@ -49,10 +62,12 @@ def create_news_analyst(llm):
 
         if len(result.tool_calls) == 0:
             report = result.content
+            vol_note = extract_vol_note(report)
 
         return {
             "messages": [result],
             "news_report": report,
+            "vol_note_news": vol_note if len(result.tool_calls) == 0 else None,
         }
 
     return news_analyst_node
