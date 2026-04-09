@@ -1,214 +1,261 @@
-# Technology Stack — v1.2 Paper Trading & Validation
+# Technology Stack — v2.0 Vol-Aware Analyst Pipeline
 
 **Project:** TradingAgents — Options Extension
-**Milestone:** v1.2 Paper Trading & Validation
-**Researched:** 2026-04-03
-**Scope:** NEW additions only. Existing stack (Python, LangGraph, LangChain, FastAPI, React 19, TypeScript, Vite 8, Tailwind v4, pandas, yfinance, Tradier) is validated and unchanged.
+**Milestone:** v2.0 Vol-Aware Analysis Pipeline
+**Researched:** 2026-04-09
+**Confidence:** HIGH
+**Scope:** NEW additions only. Existing stack is validated and unchanged.
 
 ---
 
 ## Context: What Already Exists (Do Not Re-add)
 
-| Concern | Existing | Notes |
-|---------|----------|-------|
-| HTTP framework | FastAPI, SSE streaming | All new endpoints follow `api/screener_routes.py` pattern |
-| Data | yfinance, Tradier, pandas | OHLC data for charts available from existing yfinance layer |
-| Frontend | React 19, TypeScript, Tailwind v4, Vite 8 | No peer-dep changes allowed |
-| LLM | LangChain multi-provider | Scoring system is pure Python math, no LLM calls |
-| Caching | In-process dict with TTL | Sufficient for chart data; no new cache infra |
+| Concern | Existing | Version | Notes |
+|---------|----------|---------|-------|
+| Graph framework | LangGraph StateGraph | 1.1.3 | All new nodes follow `add_node` / `add_edge` pattern |
+| LLM abstraction | langchain-core | 1.2.23 | `ChatPromptTemplate`, `SystemMessage`, `HumanMessage` available |
+| Structured output | Pydantic v2 BaseModel | 2.12.5 | Already used for screener agent JSON output |
+| Data layer | yfinance + Tradier | yfinance 1.2.0 | `get_options_chain()`, `get_historical_iv()` already implemented |
+| Caching | `get_cached_text()` in yfinance_cache.py | — | Smart cache with `is_good` quality guard; reuse for vol context |
+| Agent state | `AgentState(MessagesState)` TypedDict | — | `_last_value` reducer pattern for all new fields |
+| Error handling | `_safe_options_node()` wrapper | — | Try/catch with empty-string fallback; reuse for Vol Context node |
+| Frontend | React 19, TypeScript, Tailwind v4 | — | No peer-dep changes |
 
 ---
 
-## New Stack Additions
+## New Stack Additions for v2.0
 
-### 1. Frontend: TradingView Lightweight Charts
+### Summary
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| lightweight-charts | ^5.1.0 | Candlestick/OHLC price history; equity curve line chart in track record dashboard | Official TradingView library. Canvas-based (not SVG) — handles 10k+ data points without perf degradation. 35kB gzipped. No React peer dependency — imperative DOM API means zero React version coupling. |
+**Zero new Python packages. Zero new npm packages.**
 
-**Integration pattern — use the vanilla imperative API directly:**
+Every capability needed for v2.0 is already present in the installed stack. The work is architectural — adding a graph node, extending prompts, and updating frontend layout — not dependency work.
+
+---
+
+### 1. Vol Context Node: Pure Python Data Computation
+
+**No new libraries.** The Vol Context node is a Python function that reads from the existing data layer.
+
+| Existing Asset | What It Provides | Used For |
+|----------------|------------------|----------|
+| `get_options_chain(symbol, expiration)` in `y_finance_options.py` | Options chain with IV, volume, OI per contract | P/C ratio, skew direction, IV from near-term expiry |
+| `get_historical_iv(symbol)` in `y_finance_options.py` | Median IV per expiration date over trailing period | IV rank, IV vs HV calculation |
+| `get_cached_text()` in `yfinance_cache.py` | Smart cache with TTL and `is_good` quality guard | Cache the vol narrative; don't re-fetch within TTL |
+| `_safe_options_node()` in `setup.py` | Try/catch wrapper returning empty-string fallback | Wrap Vol Context node so analyst pipeline is non-blocking |
+
+**Vol narrative construction is pure Python arithmetic:**
+- IV rank = percentile position of current IV within 52-week IV range (no library needed)
+- IV vs HV ratio = current_iv / hv30 (already computed in `volatility_analyst.py`)
+- P/C ratio = sum(put volume) / sum(call volume) from options chain
+- Skew direction = compare 25-delta put IV to 25-delta call IV from chain
+
+**Why not reuse the existing `volatility_analyst.py` LLM agent for the pre-fetch:**
+That agent runs after Trader in the options pipeline and produces a full markdown report. The Vol Context node is a lighter pre-fetch that produces a single narrative paragraph — no LLM call needed. Arithmetic only. This keeps Vol Context latency under 1 second (vs 10-30 seconds for an LLM call) and avoids burning tokens before any analyst has run.
+
+---
+
+### 2. Prompt Engineering: System + User Hybrid (D-09)
+
+**No new libraries.** `langchain_core.messages.SystemMessage` and `langchain_core.messages.HumanMessage` are already in langchain-core 1.2.23.
+
+The D-09 hybrid structure splits vol context injection into two parts:
+
+```python
+from langchain_core.messages import SystemMessage, HumanMessage
+
+# System message: role framing + directive strength (per-analyst)
+# User message: the vol narrative paragraph (identical for all analysts)
+
+# Market Analyst (Strong directive)
+system_directive = (
+    "Volatility IS market conditions. The vol context below reflects how options "
+    "markets are pricing risk right now — weight it heavily in your assessment. "
+    "If IV is elevated, that IS the market telling you something."
+)
+
+# Technical Analyst (Moderate directive)
+system_directive = (
+    "The vol context below may confirm or contradict price action. Elevated IV "
+    "during a breakout suggests conviction; elevated IV during consolidation "
+    "suggests fear. Incorporate where relevant."
+)
+
+# News Analyst (Weak directive)
+system_directive = (
+    "Reference the vol context only if news events appear to be driving the "
+    "elevated volatility. Otherwise, focus on your primary analysis."
+)
+```
+
+**Why system message for directive, user message for data:**
+System messages set behavioral framing that persists across tool-calling loops. User messages deliver factual context. Splitting them means the per-analyst directive is not diluted by the shared vol paragraph, and the shared paragraph is not repeated in the system message of every analyst. This is the documented LangChain best practice for role-specific context injection.
+
+**Why not a single concatenated system message (Option A rejected by D-09):**
+Concatenating everything into the system message makes the per-analyst directive invisible — it reads as one block of instructions. The split gives clear separation between "how to use this context" (system) and "here is the context" (user).
+
+**Why not a separate LangChain chain step (over-engineered for this use case):**
+Vol injection is a string interpolation, not a transformation pipeline. Adding a LangChain `RunnableLambda` or `RunnablePassthrough` to inject a string adds indirection with no benefit. Direct `state["vol_context"]` read in the analyst's prompt construction is simpler and consistent with how `state["trade_date"]` and `state["company_of_interest"]` are already injected.
+
+---
+
+### 3. `vol_note` Field: Free-Text Extraction Over Structured Output
+
+**Approach: Free-text extraction from prose report (defer structured output enforcement).**
+
+The 17-CONTEXT.md defers `vol_note` structured output enforcement to a follow-up phase if free-text works. Research confirms this is the right call for v2.0.
+
+**Why free-text works here:**
+The analyst is instructed to include `vol_note` as a labeled field at the end of its report (e.g., `**Vol Note:** <one sentence>`). Regex extraction on a clearly labeled line is reliable when the LLM is instructed to produce it in a fixed format. The Trader agent already uses this pattern — a JSON block at the end of prose output — and it works.
+
+**Pattern (consistent with Trader agent):**
+```python
+# In analyst prompt:
+"End your report with exactly this line:\n**Vol Note:** <one sentence referencing how vol context affected your assessment>"
+
+# Extraction in analyst node:
+import re
+match = re.search(r'\*\*Vol Note:\*\*\s*(.+)', report)
+vol_note = match.group(1).strip() if match else None
+```
+
+**Why NOT `with_structured_output` (Pydantic BaseModel) for analysts:**
+The tool-calling analysts (market, social, news, fundamentals) already use `llm.bind_tools(tools)`. You cannot chain `bind_tools` and `with_structured_output` on the same LLM call — they are mutually exclusive. Switching to structured output would require abandoning the tool-calling loop architecture, which is a major refactor. Free-text extraction preserves the existing agent architecture unchanged.
+
+**Why NOT a second LLM call to extract `vol_note`:**
+Adds token cost and latency for every analyst. The labeled-field pattern makes extraction deterministic enough without a second call.
+
+**When to revisit:** If `vol_note` extraction fails more than ~10% of runs in testing, add a validation step. If all 5 analysts are eventually converted to single-pass (no tool calls), `with_structured_output` becomes viable.
+
+---
+
+### 4. LangGraph Node Registration: Existing Pattern
+
+**No new LangGraph APIs.** The Vol Context node follows the identical registration pattern as all other nodes.
+
+```python
+# In setup.py — Vol Context node addition:
+workflow.add_node("Vol Context", vol_context_node)
+
+# Fan-out from Vol Context to all equity analysts (replaces direct START -> analysts)
+workflow.add_conditional_edges(
+    "Vol Context",
+    route_equity_start,     # existing function — returns equity_entries list
+    equity_entries,
+)
+
+# START now goes to Vol Context only
+workflow.add_edge(START, "Vol Context")
+```
+
+**Node naming:** "Vol Context" — no colon, consistent with "Options - X" pattern. LangGraph 1.1.3 reserves `:` in node names (documented in existing KEY_DECISIONS).
+
+**Frontend node list:** Add `"Vol Context"` to `EQUITY_NODES` (or a new `PRE_NODES` constant) in `frontend/src/types.ts`. The 17-CONTEXT.md leaves this choice to implementation — recommend adding it as the first entry in a new `PRE_NODES` constant to keep semantics clear (it is not an analyst, it is pre-processing).
+
+---
+
+### 5. AgentState Extension
+
+**No new patterns.** Add two fields following the existing `_last_value` reducer pattern.
+
+```python
+# In agent_states.py — additions to AgentState:
+vol_context: Annotated[str, _last_value]          # vol narrative paragraph; empty string if fetch failed
+vol_context_available: Annotated[bool, _last_value]  # flag for Risk Judge weighting
+```
+
+**Why `vol_context_available` as a separate boolean:**
+The Risk Judge prompt can read this flag to adjust weighting — "if vol context was unavailable, do not penalize the analysts for not referencing it." This is cleaner than checking `if state["vol_context"] == ""`.
+
+---
+
+### 6. Frontend: Tab Grouping + Collapsible Banner
+
+**No new npm packages.** Both features use existing React 19 + TypeScript + Tailwind v4.
+
+**Tab grouping (D-07):**
+Add section header `<div>` elements above the existing tab row in `ReportTabs.tsx`. Pure CSS layout — three `<span>` labels (Equity / Options / Decision) positioned above the relevant tab buttons. No component library needed.
+
+**Collapsible vol banner (D-08):**
+Use the HTML `<details>` / `<summary>` element pattern. Available in all modern browsers, zero JavaScript needed for open/close behavior.
 
 ```tsx
-// frontend/src/components/PriceChart.tsx
-import { createChart, IChartApi, ISeriesApi } from 'lightweight-charts';
-import { useRef, useEffect } from 'react';
-
-export function PriceChart({ data }: { data: OHLCBar[] }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const chart = createChart(containerRef.current, { width: 800, height: 400 });
-    const series = chart.addCandlestickSeries();
-    series.setData(data);
-    chartRef.current = chart;
-    return () => chart.remove();  // cleanup
-  }, []);
-
-  // Update series on data change without recreating chart
-  useEffect(() => {
-    // call series.setData(data) on chartRef
-  }, [data]);
-
-  return <div ref={containerRef} />;
-}
+// In ReportPane.tsx — vol context banner above each analyst tab content:
+<details open={isFirstView}>
+  <summary className="cursor-pointer text-sm font-medium text-amber-400 py-2">
+    Vol Context — {volContextAvailable ? 'Available' : 'Unavailable'}
+  </summary>
+  <div className="text-sm text-slate-300 p-3 bg-slate-800 rounded mb-4">
+    {volContext || 'Vol context was not available for this ticker.'}
+  </div>
+</details>
 ```
 
-This is the TradingView-documented pattern. No third-party wrapper library is needed or recommended.
+**Why `<details>/<summary>` over a custom accordion component:**
+Zero JavaScript for toggle behavior, native browser accessibility (keyboard navigable), no Tailwind plugin needed. The existing codebase has no accordion component — building one adds complexity for a feature that `<details>` handles natively.
 
-**Why not a wrapper library (kaktana, ukorvl, lightweight-charts-react-components):**
-All community wrappers lag behind v5 API. The v5 release completely revamped the series creation API (breaking change from v4). Using wrappers introduces a maintenance lag between v5 features and wrapper adoption. The imperative pattern is 20 lines and requires no additional package.
-
-**Why not Recharts:**
-Recharts 3.x requires `--legacy-peer-deps` with React 19 (known GitHub issue #4558, peer dep on `react-is`). SVG-based rendering degrades with trade history datasets. Recharts is general-purpose; lightweight-charts is purpose-built for financial time-series.
-
-**Why not react-stockcharts:**
-Abandoned — last commit 2019, D3 v4 dependency, no maintenance.
-
----
-
-### 2. Backend: Alpaca Paper Trading
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| alpaca-py | ^0.43.2 | Submit paper orders (equity + multi-leg options), poll positions and account state | Official Alpaca Python SDK. Replaces the deprecated `alpaca-trade-api` package. `TradingClient(paper=True)` routes all calls to the paper sandbox automatically. |
-
-**Confirmed capabilities (paper environment):**
-- `TradingClient('api-key', 'secret-key', paper=True)` — zero config switch to paper env
-- Equity: `MarketOrderRequest(symbol, qty, side, time_in_force)`
-- Multi-leg options: `order_class=OrderClass.MLEG`, `legs=[...]` with OCC-format symbols (e.g., `SPY250127C00608000` = SPY Jan 27 2025 Call $608)
-- Paper accounts have Level 3 options (spreads, straddles, iron condors) **enabled by default** — no approval process, no KYC
-- `get_all_positions()`, `get_account()` for portfolio state
-- Order callbacks: poll `get_order_by_id()` for fill confirmation
-
-**OCC symbol construction:**
-The existing options pipeline (legs builder agent) already selects strikes and expiry. The output must be reformatted to OCC format before Alpaca submission:
-```
-{UNDERLYING}{YYMMDD}{C|P}{8-digit-strike-padded}
-e.g., SPY → expiry 2025-01-27 → Call → $608.00 → SPY250127C00608000
-```
-
-**Integration point:**
-New `api/paper_trading_routes.py` (APIRouter, following `api/screener_routes.py` pattern). Alpaca credentials added as env vars `ALPACA_API_KEY` and `ALPACA_SECRET_KEY` alongside existing `TRADIER_API_KEY`.
-
-**Why not `alpaca-trade-api` (legacy package):**
-Officially deprecated by Alpaca. All new development on `alpaca-py`.
-
-**Why not IBKR / Tastytrade:**
-Alpaca paper is free, instant account creation, no KYC, Python SDK matches existing architecture. IBKR requires running TWS/IB Gateway as a local process. Tastytrade has no paper trading API.
-
----
-
-### 3. Backend: Persistence Layer
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| sqlalchemy | ^2.0.48 | ORM for trade recommendations, paper orders, scoring results | De facto FastAPI persistence standard. Async-native in 2.0 (matches existing async FastAPI event loop). Type-safe, Pydantic-interoperable. |
-| aiosqlite | ^0.22.1 | Async SQLite driver for SQLAlchemy 2.0 | Zero infrastructure — file-based DB embedded in Python stdlib driver. Sufficient for local tool data volumes (hundreds to low thousands of rows). Upgrade to PostgreSQL later by changing only the connection string. |
-
-**Connection string:** `sqlite+aiosqlite:///./data/trades.db`
-
-**Session injection:**
-```python
-# api/database.py
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-
-engine = create_async_engine("sqlite+aiosqlite:///./data/trades.db")
-AsyncSession = async_sessionmaker(engine, expire_on_commit=False)
-
-async def get_db():
-    async with AsyncSession() as session:
-        yield session
-```
-
-**Schema scope for v1.2:**
-
-```
-recommendations        — ticker, date, signal, confidence_score, agent_outputs (JSON)
-paper_orders           — alpaca_order_id, recommendation_id (FK), symbol, status, fill_price, filled_at
-scoring_results        — recommendation_id (FK), outcome (win/loss/neutral), return_pct, scored_at
-```
-
-**Why SQLite over PostgreSQL:**
-This is a single-user local dev tool. SQLite is zero-infra, built into Python, and adequate for the data volumes involved. The ORM layer means switching to Postgres later requires only a connection string change.
-
-**Why async SQLAlchemy over sync:**
-FastAPI is already async. Using `create_async_engine` + `aiosqlite` keeps the event loop clean and consistent with existing SSE streaming patterns. Mixing sync DB calls into an async FastAPI app causes thread-pool overhead.
-
-**Why not Alembic for migrations:**
-Premature for v1.2. `Base.metadata.create_all(engine)` on startup is sufficient when the schema is being defined for the first time. Add Alembic if schema migrations are needed in v1.3+.
-
----
-
-### 4. Backend: Scoring System
-
-**No new library dependencies.** All scoring metrics are pure Python math on existing data:
-
-| Metric | Implementation | Library |
-|--------|---------------|---------|
-| Win rate | `wins / total_scored` | stdlib |
-| Average return % | `mean(return_pct)` | `statistics` (stdlib) |
-| Sharpe ratio | `mean_r / std_r * sqrt(252)` annualized | `statistics` (stdlib) or `pandas` (already in requirements) |
-| Max drawdown | Rolling max / min on equity curve | `pandas` (already in requirements) |
-| Profit factor | `gross_wins / abs(gross_losses)` | stdlib |
-| Consecutive wins/losses | Running streak counter | stdlib |
-
-**pandas is already in requirements.txt** — no new dependency for calculations.
-
-**Scoring trigger:** When Alpaca confirms a fill (`order.status == "filled"`), a background task computes `return_pct` against entry price and writes to `scoring_results`. Outcome (win/loss/neutral) is determined when position is closed.
+**Default state:** `open` attribute controls expand/collapse. Pass `open={true}` on first render, remove on subsequent renders by tracking in localStorage (or leave always-open — per 17-CONTEXT.md specifics, default expanded is preferred).
 
 ---
 
 ## Complete Dependency Delta
 
-### Python — additions to `requirements.txt`
+**Zero new packages.**
 
 ```
-alpaca-py>=0.43.2
-sqlalchemy>=2.0.48
-aiosqlite>=0.22.1
+Python additions:   none
+npm additions:      none
 ```
 
-### npm — addition to `frontend/package.json` dependencies
-
-```json
-"lightweight-charts": "^5.1.0"
-```
-
-**Total new packages: 4.** That's it.
+All capabilities are present in the existing installed stack:
+- langchain-core 1.2.23 — `SystemMessage`, `HumanMessage`, `ChatPromptTemplate`
+- pydantic 2.12.5 — `BaseModel`, `Field`, `Optional` (available if structured output needed later)
+- langgraph 1.1.3 — `StateGraph.add_node()`, `add_edge()`, `add_conditional_edges()`
+- yfinance 1.2.0 — options chain and IV history data
+- React 19 + Tailwind v4 — `<details>/<summary>`, CSS section headers
 
 ---
 
 ## What NOT to Add
 
-| Rejected | Reason |
-|----------|--------|
-| Recharts / Chart.js / Victory | General-purpose charting with SVG rendering and React 19 peer-dep issues. lightweight-charts is the right tool for financial time-series — Canvas-based, financial-domain-native. |
-| community wrapper for lightweight-charts | All lag behind v5 API. Imperative pattern is 20 lines and needs no extra package. |
-| backtrader | Already in requirements (unused). Backtesting is explicitly deferred to v1.3+. Do NOT wire it into v1.2. |
-| redis | Overkill for local scoring persistence. Redis is already in requirements but was superseded by in-process dict for screener cache. Not needed here. |
-| Celery / task queues | Paper order submission is fast (<500ms). Scoring can run as a FastAPI `BackgroundTask`. No queue infra needed. |
-| PostgreSQL | Out of scope for a local single-user tool. SQLite + SQLAlchemy ORM provides the same API; switch connection string when/if needed. |
-| Alembic | Premature for v1.2. `create_all()` on startup is sufficient for a new schema with no existing data to migrate. |
-| TA-Lib | Technical indicator overlays would require native binary compilation. The existing Python agents already produce technical analysis. Pass computed indicator data as lightweight-charts series arrays — no TA-Lib needed. |
-| WebSocket (ws / socket.io) | Paper trading status can be polled via REST at 5s interval. Alpaca fills settle within seconds. Full WebSocket infra is disproportionate for this use case. |
-| alpaca-trade-api (legacy) | Officially deprecated by Alpaca. Use alpaca-py only. |
+| Rejected | Reason | Pattern Instead |
+|----------|--------|----------------|
+| `with_structured_output` for analyst `vol_note` | Mutually exclusive with `bind_tools` — would require removing tool-calling loops from 4 analysts | Labeled field in prose + regex extraction (Trader agent pattern) |
+| Second LLM call to extract `vol_note` | Doubles token cost per analyst (5x overhead) for a field that can be extracted with a regex | Labeled field format in the prompt instruction |
+| LangChain `RunnableLambda` / `RunnablePassthrough` for vol injection | Adds indirection to a string interpolation — no benefit | Direct `state["vol_context"]` read in prompt construction |
+| Separate "vol_note" tab in frontend | Adds a 14th tab; vol context is shared context not an analyst output | Collapsible banner pinned above existing analyst content |
+| React accordion/disclosure component library (Radix, headlessui) | No existing component library in codebase; `<details>/<summary>` is native and sufficient | `<details open>` / `<summary>` HTML elements |
+| LLM call in Vol Context node | Adds 10-30 seconds and token cost before any analyst runs; context can be computed arithmetically | Pure Python arithmetic on existing data layer output |
+| New caching infrastructure for vol context | Existing `get_cached_text()` with `is_good` guard already handles this correctly | Reuse `yfinance_cache.get_cached_text()` with 30-min TTL |
+| Dedicated vol_context database table | Vol context is ephemeral per analysis run — no cross-run value | Stays in `AgentState` only; not persisted |
 
 ---
 
 ## Integration Points
 
-| New Feature | Attaches To | Notes |
-|------------|-------------|-------|
-| `<PriceChart>` component | React frontend — new component in `frontend/src/components/` | Receives OHLC bars via `GET /api/chart/{ticker}?days=90` — served by new endpoint that calls existing yfinance data layer. |
-| `<EquityCurve>` component | React frontend — track record Dashboard tab | Receives `{date, equity}` data from `GET /api/dashboard/equity-curve`. Rendered as lightweight-charts line series. |
-| Paper trading router | FastAPI — new `api/paper_trading_routes.py` | User confirms execution after seeing analysis. POST `/api/paper/execute` accepts final decision payload, submits to Alpaca, persists recommendation + order. |
-| SQLAlchemy models | `api/models.py` + `api/database.py` (new files) | Session injected via `Depends(get_db)` into route handlers. |
-| Scoring computation | `api/scoring.py` (new module) | Triggered by `BackgroundTasks` when Alpaca confirms fill. Reads from `paper_orders`, writes to `scoring_results`. |
-| Dashboard API endpoints | FastAPI — new `api/dashboard_routes.py` | `GET /api/dashboard/summary`, `/equity-curve`, `/trade-history`, `/scoring`. |
-| Track record Dashboard tab | React frontend — new tab in existing tab structure | Consumes dashboard endpoints. Table of past trades + equity curve chart + aggregate stats (win rate, Sharpe, avg return). |
+| New Feature | Attaches To | File |
+|------------|-------------|------|
+| Vol Context node (Python arithmetic) | `setup.py` — inserts before analyst fan-out | `tradingagents/graph/setup.py` |
+| `vol_context` + `vol_context_available` fields | `AgentState` TypedDict | `tradingagents/agents/utils/agent_states.py` |
+| Per-analyst system directive strings | Each analyst factory function | `tradingagents/agents/analysts/{market,technical,social,news,fundamentals}_analyst.py` |
+| `vol_note` regex extraction | Each analyst node's return dict | Same 5 analyst files |
+| "Vol Context" node name in progress tracking | `ProgressCallbackHandler._GRAPH_NODES` set | `tradingagents/graph/trading_graph.py` |
+| "Vol Context" node in frontend node list | `PRE_NODES` constant (new) or `EQUITY_NODES[0]` | `frontend/src/types.ts` |
+| `vol_context` field in `AnalysisResult` | SSE complete event payload | `frontend/src/types.ts` |
+| Remove `enable_options` toggle | `ConfigSidebar.tsx`, `AnalyzeRequest`, `schemas.py`, `setup.py` | 4 files |
+| Tab section headers (Equity/Options/Decision) | `ReportTabs.tsx` | `frontend/src/components/ReportTabs.tsx` |
+| Collapsible vol banner | `ReportPane.tsx` — above analyst content | `frontend/src/components/ReportPane.tsx` |
+
+---
+
+## Version Compatibility
+
+| Package | Version | Compatibility Note |
+|---------|---------|-------------------|
+| langchain-core | 1.2.23 | `SystemMessage` + `HumanMessage` stable since 0.1.x; no breaking changes in this area |
+| langgraph | 1.1.3 | `add_node` / `add_edge` / `add_conditional_edges` API stable; no changes needed |
+| pydantic | 2.12.5 | v2 `BaseModel` with `Optional` fields available if `vol_note` structured output added later |
+| yfinance | 1.2.0 | `get_options_chain()` and `get_historical_iv()` already tested in production (v1.0) |
 
 ---
 
@@ -216,27 +263,29 @@ aiosqlite>=0.22.1
 
 | Area | Confidence | Reason |
 |------|------------|--------|
-| lightweight-charts 5.1.0 | HIGH | npm result confirmed "latest 3 months ago"; official TradingView library with active maintenance and documented v5 migration path |
-| alpaca-py 0.43.2 | HIGH | PyPI confirmed version; official Alpaca SDK with documented multi-leg options support and paper-Level 3 defaults |
-| SQLAlchemy 2.0.48 | HIGH | Official SQLAlchemy blog post confirmed Mar 2026 release; 2.0 series is production/stable |
-| aiosqlite 0.22.1 | HIGH | PyPI confirmed Dec 23, 2025 release; only async SQLite driver for SQLAlchemy 2.0 async engine |
-| Scoring system (no new deps) | HIGH | All metrics expressible with pandas (existing) and stdlib; no novel library needed |
-| Imperative chart pattern (no wrapper) | HIGH | Official TradingView docs show this exact pattern for React; avoids v5 wrapper lag |
+| Zero new dependencies | HIGH | All required primitives verified present in installed environment |
+| Free-text `vol_note` extraction | HIGH | Identical pattern already proven in Trader agent JSON block extraction |
+| `<details>/<summary>` collapsible | HIGH | Native HTML; no library dependency; works in all modern browsers |
+| Vol Context node arithmetic | HIGH | Same data functions used by `volatility_analyst.py` (v1.0, shipped) |
+| `with_structured_output` incompatibility with `bind_tools` | HIGH | LangChain documented constraint — both configure the LLM call; cannot combine |
+| LangGraph node insertion pattern | HIGH | Directly read from `setup.py` source; no API guesswork |
 
 ---
 
 ## Sources
 
-- [lightweight-charts npm](https://www.npmjs.com/package/lightweight-charts) — v5.1.0 confirmed
-- [lightweight-charts v5 announcement](https://www.tradingview.com/blog/en/tradingview-lightweight-charts-version-5-50837/) — series API revamp, 35kB, multi-pane
-- [From v4 to v5 migration guide](https://tradingview.github.io/lightweight-charts/docs/migrations/from-v4-to-v5) — breaking changes documented
-- [Basic React example — official](https://tradingview.github.io/lightweight-charts/tutorials/react/simple) — useRef + useEffect pattern
-- [Advanced React example — official](https://tradingview.github.io/lightweight-charts/tutorials/react/advanced) — multi-component imperative chart
-- [alpaca-py PyPI](https://pypi.org/project/alpaca-py/) — v0.43.2 confirmed
-- [Alpaca-py trading docs](https://alpaca.markets/sdks/python/trading.html) — TradingClient, order request classes
-- [Multi-leg Level 3 options in paper — Alpaca changelog](https://docs.alpaca.markets/changelog/multi-leg-level-3-options-trading-in-paper) — paper Level 3 default-enabled
-- [alpaca-py mleg example notebook](https://github.com/alpacahq/alpaca-py/blob/master/examples/options-trading-mleg.ipynb) — MLEG order format with OCC symbols
-- [SQLAlchemy 2.0.48](https://www.sqlalchemy.org/changelog/CHANGES_2_0_44) — 2.0 series stable, Mar 2026
-- [aiosqlite PyPI](https://pypi.org/project/aiosqlite/) — v0.22.1, Dec 2025
-- [FastAPI SQL databases guide](https://fastapi.tiangolo.com/tutorial/sql-databases/) — async SQLAlchemy + FastAPI Depends() pattern
-- [Recharts React 19 issue #4558](https://github.com/recharts/recharts/issues/4558) — peer dep conflict rationale for not using Recharts
+- Installed environment: `python -c "import importlib.metadata; ..."` — package versions confirmed directly
+- `tradingagents/agents/utils/agent_states.py` — `AgentState` TypedDict, `_last_value` reducer pattern
+- `tradingagents/graph/setup.py` — `_safe_options_node()`, node registration, edge wiring patterns
+- `tradingagents/agents/analysts/market_analyst.py` — existing prompt structure (`ChatPromptTemplate`, `bind_tools`)
+- `tradingagents/agents/analysts/technical_analyst.py` — single-pass (no tool loop) pattern for reference
+- `tradingagents/agents/trader/trader.py` — labeled JSON block extraction pattern (reference for `vol_note`)
+- `tradingagents/agents/options/volatility_analyst.py` — existing IV arithmetic; confirms reusability for Vol Context node
+- `tradingagents/dataflows/yfinance_cache.py` — `get_cached_text()` with `is_good` guard
+- `frontend/src/types.ts` — `EQUITY_NODES`, `OPTIONS_NODES`, `getNodeList()`, `REPORT_TABS`, `AnalysisResult`
+- `.planning/phases/17-mandatory-options-vol-aware-analysts/17-CONTEXT.md` — all implementation decisions (D-01 through D-13)
+
+---
+
+*Stack research for: v2.0 Vol-Aware Analyst Pipeline*
+*Researched: 2026-04-09*

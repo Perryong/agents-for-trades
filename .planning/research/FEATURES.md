@@ -1,151 +1,214 @@
-# Feature Landscape: Paper Trading & Validation
+# Feature Research
 
-**Domain:** Paper trade execution, interactive charting, recommendation scoring, and performance tracking layered on an existing AI multi-agent trading framework
-**Researched:** 2026-04-03
-**Milestone scope:** v1.2 — NEW features only; existing equity/options/screener pipeline is unchanged
-
----
-
-## Table Stakes
-
-Features users expect. Missing = product feels incomplete or broken.
-
-| Feature | Why Expected | Complexity | Existing Pipeline Dependency |
-|---------|--------------|------------|------------------------------|
-| **TradingView Lightweight Charts — candlestick view** | Any stock analysis tool surfaces a price chart; users orient themselves visually before reading agent reports | Medium | Needs historical OHLCV data — yfinance already fetched in analysis pipeline; chart reads from same data |
-| **TradingView — volume bars** | Volume is co-displayed with price on every professional chart; absence feels like a regression | Low | Same OHLCV payload; volume series is a second chart pane |
-| **TradingView — trade entry/exit markers** | When Alpaca executes a paper trade, its fill price must be visible on the chart as an overlay marker; otherwise "did it execute?" is unanswerable | Medium | Alpaca fill price feeds back into chart marker data; requires connecting order response to chart state |
-| **Alpaca paper trading — submit equity order** | Core v1.2 requirement; auto-execute the agent's BUY/SELL decision as a simulated trade | Medium | Agent final decision JSON (already logged to `analysis_history/`) provides ticker, direction, size; Alpaca `alpaca-py` SDK submits `MarketOrderRequest` with `paper=True` |
-| **Alpaca paper trading — order status display** | User must confirm whether order was accepted/filled/rejected; silent execution is untrustworthy | Low | Poll `TradingClient.get_order_by_id()` or use order event; display in frontend alongside analysis result |
-| **Alpaca paper trading — separate API keys config** | Paper account uses different keys from live account; must be configurable in environment/config without code changes | Low | Add `ALPACA_PAPER_KEY`, `ALPACA_PAPER_SECRET`, `ALPACA_PAPER=true` to existing `.env` / config pattern |
-| **Recommendation scoring — per-decision outcome field** | Every logged trade decision needs a place to record whether the call was correct; without it, accuracy cannot be computed | Low | Extend existing `analysis_history/TICKER/DATE.json` schema with `outcome` field (WIN/LOSS/OPEN) and `pnl_pct` |
-| **Recommendation scoring — win rate calculation** | Most fundamental accuracy metric; without it the system has no feedback loop | Low | Pure Python aggregation over logged JSON files; no new infrastructure |
-| **Track record dashboard — summary statistics** | Win rate, total trades, P&L, avg gain/loss are the minimum a user expects when asking "how is this system doing?" | Medium | Aggregation over `analysis_history/` JSON files; new API endpoint returns summary dict |
-| **Track record dashboard — trade history table** | Chronological list of past decisions with outcome; users expect to drill into individual calls | Low | Read from existing JSON log files; format for frontend table component |
+**Domain:** Vol-aware multi-agent LLM analysis pipeline — mandatory options + volatility context injection
+**Researched:** 2026-04-09
+**Confidence:** HIGH (codebase verified, domain confirmed from prior milestones and external research)
 
 ---
 
-## Differentiators
+## Context: What Already Exists
 
-Features that set this system apart. Not expected, but add meaningful value.
+This milestone is additive. The existing system already has:
 
-| Feature | Value Proposition | Complexity | Existing Pipeline Dependency |
-|---------|-------------------|------------|------------------------------|
-| **TradingView — agent signal overlay** | Annotate the chart with which agents were bullish/bearish at the decision point; turns a price chart into an explainability view | High | Requires storing per-agent signal summaries keyed to date; existing `AgentState` fields contain this already |
-| **TradingView — multi-timeframe toggle** | Daily / weekly / monthly views on same chart; traders make decisions across timeframes | Medium | yfinance supports multiple interval/period combos; same OHLCV schema |
-| **Alpaca paper trading — multi-leg options order** | The options pipeline already produces a complete legs builder output (strategy, strikes, sides, ratios); auto-executing the legs via Alpaca `mleg` order class closes the loop from analysis to simulated execution | High | Alpaca Level 3 paper trading supports `order_class=mleg`; maps directly to existing `OptionsLegsBuilderReport` in `AgentState`; requires new translation layer from legs JSON to Alpaca legs array |
-| **Recommendation scoring — per-agent accuracy** | Track which individual agents (technical, social, news, fundamentals, volatility, flow) had the most accurate signals over time; allows disabling consistently wrong agents | High | Requires storing individual agent votes (bull/bear/hold + conviction) per decision — partially available in existing reports |
-| **Recommendation scoring — confidence-calibration view** | Compare agent's stated confidence level vs actual outcome rate; a well-calibrated system should have 80%-confident calls succeed ~80% of the time | High | Requires extracting confidence scores from final decision JSON; existing `FinalDecision` schema has `confidence` field |
-| **Track record dashboard — equity curve chart** | Running P&L plotted over time using paper trade fills; shows whether the system is improving or degrading over the live paper period | Medium | Aggregate filled order P&L from Alpaca paper account via `TradingClient.get_portfolio_history()`; render with Lightweight Charts |
-| **Track record dashboard — per-ticker breakdown** | Show accuracy per ticker; identifies whether system performs better on familiar names vs new picks | Low | Group `analysis_history/` JSON files by ticker; pure Python aggregation |
-| **Track record dashboard — options vs equity split** | Separate win rate for pure equity decisions vs options decisions; options have different success criteria (directional correct + magnitude + timing) | Medium | `analysis_history/` JSON files already record whether options pipeline ran; filter on that field |
-| **Trade outcome auto-close on Alpaca** | After N days, query Alpaca paper account to compute position P&L and auto-mark the logged decision as WIN/LOSS/OPEN | Medium | Alpaca `TradingClient.get_all_positions()` returns current unrealized P&L; compare to entry fill price |
+- 5 parallel equity analysts (Market, Technical, Social, News, Fundamentals) writing to `AgentState` keys
+- 7 options agents running after Trader in a sequential chain
+- `enable_options` toggle in ConfigSidebar that gates both the options pipeline and 7 report tabs
+- `REPORT_TABS` with `optionsOnly` flag on 6 tabs; `getNodeList(enableOptions: boolean)` conditional
+- `_safe_options_node()` wrapper in `setup.py` for graceful failure isolation
+- `AgentState` with per-analyst report keys and 6 options pipeline keys
+- `vol_context` field is NOT yet in `AgentState` — new for this milestone
+
+Features below are scoped to what NEW behavior this milestone introduces.
 
 ---
 
-## Anti-Features
+## Feature Landscape
 
-Features to explicitly NOT build in v1.2.
+### Table Stakes (Users Expect These)
 
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| **Full TradingView Advanced Charting Library** | Requires application to TradingView for private access; proprietary, requires server-side data connector, 100kB+ overhead, and bespoke build pipeline; overkill for a companion chart | Use TradingView Lightweight Charts (MIT, 35kB, OSS, no application needed) |
-| **TradingView embed widget (iframe)** | Iframe widget displays TradingView's own data, not the project's yfinance data; cannot overlay agent signals or paper trade markers; no programmatic control from React | Use `lightweight-charts` npm package directly — full programmatic control |
-| **Live / real-money Alpaca trading** | Real-money execution requires regulatory compliance, additional account verification, and substantially higher risk surface; not the goal of this milestone | Paper-only; separate `ALPACA_PAPER=true` flag; live path never implemented in v1.2 |
-| **Custom backtesting against historical paper trades** | Backtesting deferred to v1.3+ per PROJECT.md; options backtesting has data availability issues | Accumulate paper trade history in v1.2; backtest engine is separate milestone |
-| **Portfolio rebalancing / position sizing engine** | No persistent portfolio model in the system; adding one is a distinct product requiring portfolio theory implementation | Paper orders use fixed size (configurable dollar amount or share count); no dynamic position sizing |
-| **Broker integration other than Alpaca** | Multiple broker integrations multiply maintenance surface; Alpaca has the best free paper trading API in the space for algorithmic use | Alpaca only for v1.2; vendor-abstract the execution interface so future brokers can be added |
-| **Real-time P&L ticker / WebSocket streaming** | Existing SSE streaming covers analysis progress, not live portfolio state; adding WebSocket introduces a second real-time protocol | Poll Alpaca REST for position updates on user action; no persistent WebSocket connection needed |
-| **Social comparison / leaderboard** | No multi-user architecture; each instance tracks its own paper account | Single-account track record only |
-| **Natural language outcome entry ("it went up 3%")** | Fragile LLM parsing for a task that is trivially solved by fetching actual price data from yfinance | Auto-compute outcomes from price history on a scheduled basis |
+Features that, once the milestone goal is stated ("vol-aware analysts"), users assume exist. Missing these makes the feature feel broken or incomplete.
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Vol Context pre-fetch node in pipeline | If vol is "always on", every analyst must receive it — a toggle-off state is incoherent | MEDIUM | New graph node before analyst fan-out. Uses existing `get_options_chain()` + `get_historical_iv()`. Must write `vol_context` to `AgentState`. |
+| IV rank, IV/HV ratio, P/C ratio, skew in vol narrative | These are the 4 standard metrics every options-informed trader expects in a vol summary (tastytrade, thinkorswim both surface these as a primary unit) | LOW | Computed from already-fetched chain data — no new data calls needed beyond what options pipeline uses |
+| Vol narrative as human-readable paragraph | Raw numbers alone (IV=0.38, HV=0.22) are not actionable for an LLM analyst; a briefing-note format is the standard professional idiom | LOW | Example: "IV is at the 78th percentile — options are pricing in significantly more volatility than realized. P/C ratio of 1.3 suggests defensive positioning." |
+| Vol context injected into all 5 analyst system prompts | A "vol-aware system" where analysts don't actually see vol context is not vol-aware | MEDIUM | Requires editing 5 analyst factory functions. Hybrid prompt structure (D-09): system message sets directive weight, user message delivers the narrative |
+| Per-analyst directive strength (Strong / Moderate / Weak) | Different analysts have different vol relevance; a blanket directive risks making the news analyst over-weight vol on non-vol-driven news days | LOW | Market=Strong, Technical=Moderate, Social=Moderate, News=Weak, Fundamentals=Weak (per D-11). Achieved by varying system message framing text only |
+| `vol_note` field in analyst output | Without a structured field, there is no way to audit whether the analyst actually engaged with vol context or ignored it; debate/risk stages have no traceability | MEDIUM | Must be explicitly prompted in each analyst's output instructions. Nullable for Weak-strength analysts (News, Fundamentals) but still solicited. Free-text extraction in this milestone (structured enforcement deferred per D-12) |
+| Options always-on (toggle removed) | The milestone explicitly makes options mandatory; a toggle that can disable it contradicts the feature | LOW | Remove `enable_options` from `ConfigSidebar`, `AnalyzeRequest`, `schemas.py` config passthrough. Set always `True` in backend. Four touch-points: ConfigSidebar.tsx, App.tsx, types.ts, schemas.py |
+| Vol Context node visible in progress stepper | Named nodes are the system's contract with the user — a silent pre-fetch hides latency and prevents failure visibility | LOW | Add "Vol Context" to node list in `types.ts`. Add to `ProgressCallbackHandler._GRAPH_NODES` in backend. Aligns with D-04 rationale: debuggability + consistent architecture |
+| Graceful degradation if vol fetch fails | Tickers without options data (some ETFs, recently listed stocks) must not break the pipeline | LOW | Uses existing `_safe_options_node()` pattern. Failure leaves `vol_context` empty string; analysts fall back to no-vol-context behavior. Risk Judge can weight accordingly per D-05 |
+
+### Differentiators (Competitive Advantage)
+
+Features that go beyond what a user would assume and create genuine analytical edge.
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Analyst-role-calibrated directive strength | Prevents over-weighting vol in analysts where it is tertiary (news analyst reading macro when IV spikes for unrelated reasons); creates more coherent cross-analyst reasoning | LOW | System message wording only — no architectural change. E.g., Fundamentals directive: "Flag only if IV rank >90 — extreme vol regimes can distort earnings-based valuations." |
+| Soft directive embedded in narrative text | "Consider these conditions when forming your assessment" inside the narrative itself creates a second layer of grounding distinct from the system prompt directive | LOW | Part of vol narrative template. Specified in D-01 and 17-CONTEXT specifics. No extra implementation — wording baked into template |
+| Vol banner collapsible at top of every analyst tab | Users can read each analyst's report in the context of the vol conditions that analyst was operating under — analyst reports and vol context become a unified artifact | MEDIUM | Requires `ReportPane.tsx` modification. Vol context string passed as prop. Default: expanded on first view, collapsed on revisit (localStorage key). No new data fetch — reads `vol_context` from `AnalysisResult` |
+| Tab grouping with section headers (Equity / Options / Decision) | 13 flat tabs is cognitively expensive; grouped sections match the analyst's mental model of the pipeline stages | LOW | Section header dividers above tab row in `ReportTabs`. CSS-only or minimal React change. `REPORT_TABS` gains a `group` field |
+| Traceability from vol narrative to final decision | `vol_note` in each analyst output creates an audit trail: vol narrative → analyst acknowledgment → debate → risk judge → final decision. No published multi-agent trading system reviewed provides this level of within-pipeline auditability | MEDIUM | Requires prompt engineering + output parsing for 5 analysts. Downstream stages (Debate, Risk Judge) inherit traceability via conversation history |
+| Pipeline architecture: named pre-fetch node before parallel fan-out | Vol Context runs as a visible named node in the graph, not silent initialization code. Failure is observable and debuggable. Architecture matches the pattern used by peer multi-agent systems (TradingGroup, ATLAS) | LOW | `workflow.add_node("Vol Context", vol_context_node)` + edge before analyst fan-out. Follows existing `add_node` + `add_edge` pattern |
+
+### Anti-Features (Commonly Requested, Often Problematic)
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Vol Context as its own report tab | Seems natural — "there's a new node, give it a tab" | Vol context is shared input to analysts, not an analyst output. A tab implies it is a peer to Market Analyst or Volatility Analyst — wrong mental model. Also burns a tab slot when total count is explicitly held at 13 (D-13) | Pin as collapsible banner inside every analyst tab (D-08). Vol context is ambient context, not an output |
+| Per-analyst vol narrative (5 different paragraphs, one per analyst) | Seems more "personalized" per analyst | Identical shared narrative is the correct design (D-02): analysts stay connected because they reason from the same facts. Divergent narratives introduce inconsistency in cross-analyst debate and in the Risk Judge synthesis | One narrative paragraph for all 5 analysts; directive strength varies via system message only |
+| LLM-generated vol narrative (call an LLM to write the briefing) | LLM might write better prose than a template | Adds a 6th LLM call before analysts even start — latency and cost with no advantage. Vol metrics are deterministic facts; a template is faster, cheaper, deterministic, and easier to debug | Template-computed narrative from structured vol metrics (IV rank, IV/HV, P/C, skew direction) |
+| Blocking pipeline on vol fetch failure | "If vol fails, the analysis is incomplete — stop" | Kills analysis for any ticker without clean options data. Degrades UX severely for what is context enrichment, not a critical gate | Non-blocking: empty `vol_context` + Risk Judge flag. Analysts run without vol context; result is still valid equity analysis |
+| Structured output enforcement for `vol_note` via function calling | Guarantees the field exists and is well-formed | Adds schema complexity to 5 analysts that currently use free-form tool-calling patterns. High risk of breaking existing output flows in this milestone | Free-text extraction of `vol_note` in this milestone; structured output enforcement deferred explicitly per D-12 in 17-CONTEXT |
+| Vol regime classification ("low / normal / elevated / extreme") | Seems like a useful abstraction for analysts | Requires defining thresholds per ticker / sector / VIX regime — non-trivial and highly debatable. A misclassification ("normal" when market views it as "elevated") poisons all 5 analyst prompts simultaneously | IV rank number + soft narrative direction covers the same ground without threshold risk. Regime classification explicitly deferred in 17-CONTEXT deferred items |
+| Cross-run vol context cache (reuse vol across multiple ticker runs in a screener sequence) | Efficiency when running screener picks in sequence | Market-wide vol (VIX, sector vol) is reusable but ticker-specific IV rank is not. Mixing them creates staleness bugs. Single-ticker flow does not need this | Per-run fetch with existing `yfinance_cache.py` smart caching (15-min TTL already handles within-session freshness) |
 
 ---
 
 ## Feature Dependencies
 
 ```
-Existing: analysis_history/TICKER/DATE.json (final decision JSON per analysis run)
-  └── Recommendation scoring
-        └── Outcome field added to JSON schema (WIN/LOSS/OPEN, pnl_pct)
-        └── Win rate aggregation endpoint  GET /api/track-record/summary
-        └── Trade history endpoint          GET /api/track-record/trades
-              └── Track record dashboard — summary stats
-              └── Track record dashboard — trade history table
-              └── Track record dashboard — per-ticker breakdown
-              └── Track record dashboard — equity curve (needs filled P&L from Alpaca)
+[AgentState.vol_context field] (new — prerequisite for all other features)
+    └── required by: [Vol Context Node]
+    └── required by: [Per-Analyst Vol Directive injection]
+    └── required by: [Vol Banner in ReportPane]
 
-Existing: AgentState final decision (ticker, direction, confidence)
-  └── Alpaca paper trading
-        └── TradingClient(paper=True)  — alpaca-py SDK
-              └── MarketOrderRequest → submit_order()  (equity)
-              └── Mleg OrderRequest → submit_order()   (options, maps from OptionsLegsBuilderReport)
-              └── Order fill response (fill price, fill time)
-                    └── Chart marker overlay (TradingView series.setMarkers())
-                    └── Outcome computation (Alpaca positions API for unrealized P&L)
+[Vol Context Node]
+    └── requires: [AgentState.vol_context field]
+    └── requires: [get_options_chain() + get_historical_iv()] (already exist)
+    └── requires: [_safe_options_node() wrapper] (already exists — reuse pattern)
+    └── enables: [Per-Analyst Vol Directive injection]
+    └── enables: [ProgressStepper "Vol Context" node]
 
-Existing: yfinance OHLCV data (already fetched in analysis pipeline)
-  └── TradingView Lightweight Charts
-        └── createChart() + addCandlestickSeries()  (React useRef + useEffect)
-        └── Volume bars  (addHistogramSeries(), priceScaleId: 'volume')
-        └── Trade markers overlay (series.setMarkers(), depends on Alpaca fill data)
-        └── Multi-timeframe toggle (re-fetch yfinance with different interval param)
+[Per-Analyst Vol Directive injection] (all 5 analysts)
+    └── requires: [Vol Context Node] (must run first)
+    └── requires: [vol_context in AgentState] (must be populated)
+    └── enables: [vol_note field in analyst output]
 
-Alpaca paper account portfolio history
-  └── Track record equity curve (GET /api/track-record/equity-curve)
-        └── Lightweight Charts line series in track record dashboard
+[vol_note field in analyst output]
+    └── requires: [Per-Analyst Vol Directive injection] (analysts must be prompted for it)
+    └── enhances: [Debate/Risk Judge stages] (traceability benefit — implicit via conversation history)
+
+[Always-On Options — toggle removal]
+    └── conflicts with: [getNodeList(enableOptions)] (must be simplified — remove param)
+    └── conflicts with: [REPORT_TABS optionsOnly flag] (must be removed)
+    └── requires: [Remove enable_options from ConfigSidebar, App.tsx, types.ts, schemas.py]
+
+[Tab Grouping (Equity / Options / Decision)]
+    └── requires: [Always-On Options] (grouping only makes sense when all 13 tabs are always present)
+    └── enhances: [Vol Banner] (visual coherence — banner + grouping together)
+
+[Vol Banner in ReportPane]
+    └── requires: [vol_context in AnalysisResult type] (new field exposed via SSE complete event)
+    └── requires: [Vol Context Node] (must produce the string)
+    └── enhances: [Tab Grouping] (context visible alongside each section)
+
+[ProgressStepper "Vol Context" node]
+    └── requires: [Vol Context Node registered in graph]
+    └── requires: [getNodeList() updated] (always includes "Vol Context", not conditional)
+
+[vol_context in AnalysisResult + SSE payload]
+    └── requires: [Vol Context Node writes to AgentState.vol_context]
+    └── required by: [Vol Banner in ReportPane]
 ```
 
----
+### Dependency Notes
 
-## MVP Recommendation
-
-Prioritize in this order:
-
-1. **TradingView Lightweight Charts — candlestick + volume** — Direct value, zero broker dependency, renders using data already in the pipeline. OHLCV payload is available from yfinance. Simple `useRef` + `createChart()` pattern in React. Delivers professional chart appearance immediately.
-
-2. **Alpaca paper trading — equity order submission** — `TradingClient(paper=True)` + `MarketOrderRequest`; triggered after the full analysis pipeline completes and user confirms "Execute Paper Trade." Writes fill response back to the analysis JSON log. Foundation for everything else in the milestone.
-
-3. **Recommendation scoring — outcome field + win rate endpoint** — Extend JSON log schema; add `GET /api/track-record/summary` returning aggregate stats. Pure Python, no new infrastructure. Enables the track record dashboard.
-
-4. **Track record dashboard — summary stats + trade history table** — New React tab ("Track Record") reading from `/api/track-record/summary` and `/api/track-record/trades`. Uses existing table/card component patterns.
-
-5. **TradingView — paper trade markers** — Once Alpaca fill price is available (step 2), annotate the chart. Closes the loop between execution and visualization.
-
-Defer to follow-up phases within v1.2:
-
-- **Options multi-leg paper order** — Alpaca mleg support is available, but the translation layer from `OptionsLegsBuilderReport` to Alpaca legs array requires careful mapping; tackle after equity orders are stable.
-- **Equity curve chart** — Requires Alpaca portfolio history accumulation over time; meaningful only after several paper trades have been made.
-- **Per-agent accuracy scoring** — Requires extracting individual agent votes from existing report text (not fully structured); add after core win rate works.
+- **AgentState.vol_context is the root prerequisite.** The new field must exist in `agent_states.py` before Vol Context node can write to it, and before any analyst can read from it. This change should be done first in implementation ordering.
+- **Vol Context Node must run before analyst fan-out.** LangGraph topology: `START → Vol Context → [Market, Technical, Social, News, Fundamentals parallel] → ...`. Edge ordering in `setup.py` enforces this.
+- **Always-On Options is a prerequisite for Tab Grouping.** Grouping tabs into Equity / Options / Decision sections only makes visual sense when all 13 tabs are always present. Do not add grouping while the toggle still exists.
+- **optionsOnly flag removal is a simplification, not a risk.** The `optionsOnly` conditional in `REPORT_TABS` and `getNodeList(enableOptions)` disappears. Frontend becomes simpler. No new logic introduced.
 
 ---
 
-## Complexity Notes
+## MVP Definition
 
-| Feature Area | Complexity Driver | Risk |
-|---|---|---|
-| TradingView chart | Low-to-medium; pure frontend, well-documented OSS library, data already exists | Chart imperative API vs React declarative model requires useEffect cleanup discipline |
-| Alpaca equity paper trade | Medium; SDK is straightforward but order lifecycle (submitted → filled → rejected) must be handled | Paper fills are simulated and may lag real quotes; fill price ≠ current quote in fast markets |
-| Alpaca options multi-leg | High; requires mapping from existing `OptionsLegsBuilderReport` (strategy + legs dict) to Alpaca's `legs` array format with `symbol` (OCC format), `side`, `ratio_qty` | OCC option symbol format (e.g., `AAPL250117C00150000`) must be constructed from strike/expiry/type stored in existing legs output |
-| Recommendation scoring | Low; pure Python aggregation over JSON files that already exist | Outcome determination timing matters — "was the call right?" is ambiguous without a defined close rule (e.g., 5-day hold period) |
-| Track record dashboard | Medium; new React tab with table + stats cards; API aggregation logic in Python | Performance at scale if `analysis_history/` grows large; add simple in-memory aggregation cache |
+This milestone is a single deliverable, not a product launch. "MVP" here means the minimum implementation that fully delivers the stated milestone goal.
+
+### Launch With (this milestone — all P1)
+
+- [ ] `AgentState.vol_context` field added to `agent_states.py`
+- [ ] Vol Context graph node — pre-fetch IV rank, IV/HV, P/C ratio, skew; write narrative to `vol_context`
+- [ ] "Vol Context" added to node list in `types.ts` (always-present, not conditional) and to backend `ProgressCallbackHandler._GRAPH_NODES`
+- [ ] All 5 analyst system prompts updated with vol directive (directive strength calibrated per D-11 table)
+- [ ] `vol_note` field solicited in analyst prompt outputs (free-text extraction, not enforced structured output)
+- [ ] `enable_options` toggle removed from ConfigSidebar.tsx, App.tsx, types.ts, schemas.py
+- [ ] `REPORT_TABS` `optionsOnly` flags removed; `getNodeList()` simplified to always include OPTIONS_NODES
+- [ ] Tab grouping section headers (Equity / Options / Decision) in ReportTabs component
+- [ ] Collapsible vol context banner in ReportPane (reads `vol_context` from `AnalysisResult`)
+- [ ] `vol_context` exposed in `AnalysisResult` type (TypeScript) and SSE complete event payload
+
+### Add After Validation (follow-on)
+
+- [ ] Structured output enforcement for `vol_note` (function calling / Pydantic schema) — add when free-text extraction proves unreliable across LLM providers
+- [ ] Vol note values surfaced in Debate/Risk Judge tab UI alongside each analyst's acknowledgment — adds auditability visualization
+
+### Future Consideration (v2+)
+
+- [ ] Vol regime classification ("low / normal / elevated / extreme") with per-regime analyst behavior adjustment — requires threshold research and A/B validation
+- [ ] Cross-run vol context cache for multi-ticker screener sequences — only valuable once bulk analysis mode is added
+- [ ] Vol narrative comparison across tickers in track record dashboard — meaningful only with sufficient trade history
+
+---
+
+## Feature Prioritization Matrix
+
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| `AgentState.vol_context` field | HIGH | LOW | P1 |
+| Vol Context node (pre-fetch + narrative compute) | HIGH | MEDIUM | P1 |
+| ProgressStepper "Vol Context" node (frontend + backend) | MEDIUM | LOW | P1 |
+| Per-analyst prompt injection (all 5 analysts) | HIGH | MEDIUM | P1 |
+| Directive strength calibration (Strong / Moderate / Weak) | HIGH | LOW | P1 |
+| `vol_note` field solicited in analyst outputs | MEDIUM | LOW | P1 |
+| Always-on options — toggle removal (4 touch-points) | HIGH | LOW | P1 |
+| `getNodeList()` simplification (remove enableOptions param) | MEDIUM | LOW | P1 |
+| `REPORT_TABS` optionsOnly flag removal | MEDIUM | LOW | P1 |
+| Tab grouping (Equity / Options / Decision headers) | MEDIUM | LOW | P1 |
+| Collapsible vol banner in ReportPane | MEDIUM | MEDIUM | P1 |
+| `vol_context` in AnalysisResult type + SSE payload | HIGH | LOW | P1 |
+| Structured output enforcement for `vol_note` | MEDIUM | HIGH | P2 |
+| Vol note values in Debate/Risk Judge UI | LOW | MEDIUM | P3 |
+
+**Priority key:**
+- P1: Must have for milestone — all P1 items together constitute the complete milestone
+- P2: Add after validation of free-text approach
+- P3: Nice to have, future consideration
+
+---
+
+## Domain Context: How Vol-Aware Multi-Agent Systems Work
+
+Based on research into current multi-agent LLM trading systems (TradingGroup 2025, ATLAS 2026, QuantAgent 2025):
+
+**Shared pre-computation before parallel agents is the established pattern.** Pre-computing market regime context before specialist agents run is accepted in academic multi-agent trading systems. TradingGroup injects volatility coefficients computed from 10-day HV into per-agent take-profit thresholds before parallel agents execute. ATLAS uses ATR as a shared input that conditions all agent behavior under volatile regimes. The "Vol Context node before parallel analyst fan-out" architecture (D-03) matches this consensus.
+
+**Narrative format outperforms raw numbers for LLM consumption.** Published systems and professional platforms (tastytrade IVx summary, thinkorswim vol scan) both present vol as a narrative summary, not a raw float dump. The briefing-note format specified in 17-CONTEXT matches what LLMs reason best from.
+
+**Role-calibrated directive strength is not standard in published research — this is a genuine differentiator.** Published systems inject a single vol signal uniformly across all agents. Per-analyst directive strength calibrated to relevance (Market=Strong, News=Weak) is above current SOTA and is the primary architectural differentiator of this milestone.
+
+**Professional platforms surface IV rank as a prominently-displayed ambient indicator.** tastytrade pins IV rank alongside every options chain view; thinkorswim exposes it as a watchlist column always visible during analysis. The collapsible vol banner pinned at the top of every analyst tab mirrors this convention: vol context is ambient and always accessible, not buried in a sub-menu.
+
+**`vol_note` field for auditability reflects emerging best practice in financial multi-agent systems.** 2025 research on role-based multi-agent financial pipelines highlights per-agent decision logging and episodic verbal memory as key for compliance and audit trails. The `vol_note` field implements the same principle at individual analyst output level — making it possible to trace whether a bullish Market Analyst actually engaged with elevated IV or reasoned around it.
 
 ---
 
 ## Sources
 
-- [TradingView Lightweight Charts — Official Library Page](https://www.tradingview.com/lightweight-charts/)
-- [Lightweight Charts v5 Release Notes — TradingView Blog](https://www.tradingview.com/blog/en/tradingview-lightweight-charts-version-5-50837/)
-- [Lightweight Charts React Basic Tutorial](https://tradingview.github.io/lightweight-charts/tutorials/react/simple)
-- [Lightweight Charts React Advanced Tutorial](https://tradingview.github.io/lightweight-charts/tutorials/react/advanced)
-- [Lightweight Charts Series Types](https://tradingview.github.io/lightweight-charts/docs/series-types)
-- [TradingView Widget vs Library Product Comparison](https://www.tradingview.com/charting-library-docs/latest/getting_started/product-comparison/)
-- [Alpaca Paper Trading — Official Docs](https://docs.alpaca.markets/docs/paper-trading)
-- [Alpaca Options Trading — Official Docs](https://docs.alpaca.markets/docs/options-trading)
-- [Alpaca Multi-Leg Options Level 3 Trading — Official Docs](https://docs.alpaca.markets/docs/options-level-3-trading)
-- [Alpaca Multi-Leg Level 3 in Paper Changelog](https://docs.alpaca.markets/changelog/multi-leg-level-3-options-trading-in-paper)
-- [alpaca-py Python SDK — GitHub](https://github.com/alpacahq/alpaca-py)
-- [alpaca-py SDK Trading Reference](https://alpaca.markets/sdks/python/trading.html)
-- [Trading Performance Metrics — Babypips](https://www.babypips.com/trading/trading-performance-metrics)
-- [Top 5 Metrics for Evaluating Trading Strategies — LuxAlgo](https://www.luxalgo.com/blog/top-5-metrics-for-evaluating-trading-strategies/)
-- [Complete Guide to Trading Performance Tracking — TradeFundrr](https://tradefundrr.com/trading-performance-tracking/)
-- [AI Trading Tool That Keeps Score — DEV Community](https://dev.to/tradehorde/we-built-an-ai-trading-tool-that-actually-keeps-score-53ap)
+- 17-CONTEXT.md (codebase, 2026-04-09) — All implementation decisions D-01 through D-13. Primary source, HIGH confidence.
+- `frontend/src/types.ts` (codebase) — Existing REPORT_TABS, getNodeList, AnalysisResult. Verified current state.
+- `tradingagents/agents/utils/agent_states.py` (codebase) — AgentState schema. Verified current state.
+- `tradingagents/graph/setup.py` (codebase) — `_safe_options_node`, OPTIONS_NODES, GraphSetup. Verified current state.
+- `tradingagents/agents/analysts/market_analyst.py` (codebase) — Analyst prompt structure. Verified current state.
+- TradingGroup (August 2025): https://arxiv.org/html/2508.17565v1 — vol coefficient injection pattern before parallel agents
+- ATLAS (January 2026): https://arxiv.org/html/2510.15949v2 — ATR-based shared vol context across agents, sentiment+technical stability under vol
+- QuantAgent (September 2025): https://arxiv.org/html/2509.09995v3 — RiskAgent vol integration pattern
+- tastytrade volatility metrics help: https://support.tastytrade.com/support/s/solutions/articles/43000539059 — IV rank, IVx, HV professional presentation conventions (MEDIUM confidence — official docs)
+- Role-based multi-agent LLM evaluation (FinNLP 2025): https://aclanthology.org/2025.finnlp-2.19.pdf — auditability and episodic verbal memory patterns (MEDIUM confidence)
+
+---
+
+*Feature research for: vol-aware multi-agent analysis pipeline (Phase 17)*
+*Researched: 2026-04-09*
