@@ -128,6 +128,12 @@ export function useAnalysis() {
         options_legs: data.state?.options_legs ?? '',
         options_pricing_report: data.state?.options_pricing_report ?? '',
         greeks_report: data.state?.greeks_report ?? '',
+        vol_context: data.state?.vol_context ?? '',
+        vol_note_market: data.state?.vol_note_market ?? '',
+        vol_note_technical: data.state?.vol_note_technical ?? '',
+        vol_note_social: data.state?.vol_note_social ?? '',
+        vol_note_news: data.state?.vol_note_news ?? '',
+        vol_note_fundamentals: data.state?.vol_note_fundamentals ?? '',
         signal: data.signal ?? '',
       };
       isRunningRef.current = false;
