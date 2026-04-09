@@ -14,9 +14,9 @@
 
 ### Analyst Integration
 
-- [ ] **ANALYST-01**: All 5 equity analysts receive vol context narrative in their prompt via `prompt.partial()` injection
-- [ ] **ANALYST-02**: System message directive strength varies per analyst role (Market=Strong, Technical/Social=Moderate, News/Fundamentals=Weak)
-- [ ] **ANALYST-03**: Each analyst produces a `vol_note` field (1 sentence) referencing how vol context influenced their analysis, extracted via regex
+- [x] **ANALYST-01**: All 5 equity analysts receive vol context narrative in their prompt via `prompt.partial()` injection
+- [x] **ANALYST-02**: System message directive strength varies per analyst role (Market=Strong, Technical/Social=Moderate, News/Fundamentals=Weak)
+- [x] **ANALYST-03**: Each analyst produces a `vol_note` field (1 sentence) referencing how vol context influenced their analysis, extracted via regex
 
 ### Options Always-On
 
@@ -53,9 +53,9 @@
 | VOL-02 | Phase 17 | Complete |
 | VOL-03 | Phase 17 | Complete |
 | VOL-04 | Phase 17 | Complete |
-| ANALYST-01 | Phase 18 | Pending |
-| ANALYST-02 | Phase 18 | Pending |
-| ANALYST-03 | Phase 18 | Pending |
+| ANALYST-01 | Phase 18 | Complete |
+| ANALYST-02 | Phase 18 | Complete |
+| ANALYST-03 | Phase 18 | Complete |
 | OPT-01 | Phase 19 | Pending |
 | OPT-02 | Phase 17 | Complete |
 | OPT-03 | Phase 17 | Complete |

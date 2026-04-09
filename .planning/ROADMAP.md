@@ -102,7 +102,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 18-01-PLAN.md — vol_note_utils helper + Market and Technical analyst vol injection (Strong/Moderate)
+- [x] 18-01-PLAN.md — vol_note_utils helper + Market and Technical analyst vol injection (Strong/Moderate)
 - [ ] 18-02-PLAN.md — Social, News, and Fundamentals analyst vol injection (Moderate/Weak)
 
 **Success Criteria** (what must be TRUE):
@@ -128,7 +128,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 17. Vol Context Backend | 3/3 | Complete    | 2026-04-09 |
-| 18. Analyst Prompt Integration | 0/2 | In progress | - |
+| 18. Analyst Prompt Integration | 1/2 | In Progress|  |
 | 19. Frontend Restructure | 0/? | Not started | - |
 
 ---
