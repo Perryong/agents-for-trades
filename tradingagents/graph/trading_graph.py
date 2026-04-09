@@ -266,6 +266,13 @@ class TradingAgentsGraph:
             "options_legs": final_state.get("options_legs", ""),
             "options_pricing_report": final_state.get("options_pricing_report", ""),
             "greeks_report": final_state.get("greeks_report", ""),
+            # Vol-context pipeline fields
+            "vol_context": final_state.get("vol_context"),
+            "vol_note_market": final_state.get("vol_note_market"),
+            "vol_note_technical": final_state.get("vol_note_technical"),
+            "vol_note_social": final_state.get("vol_note_social"),
+            "vol_note_news": final_state.get("vol_note_news"),
+            "vol_note_fundamentals": final_state.get("vol_note_fundamentals"),
         }
 
         # Save to file

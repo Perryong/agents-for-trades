@@ -61,6 +61,7 @@ def create_social_media_analyst(llm):
         result = chain.invoke(state["messages"])
 
         report = ""
+        vol_note = None
 
         if len(result.tool_calls) == 0:
             report = result.content
@@ -69,7 +70,7 @@ def create_social_media_analyst(llm):
         return {
             "messages": [result],
             "sentiment_report": report,
-            "vol_note_social": vol_note if len(result.tool_calls) == 0 else None,
+            "vol_note_social": vol_note,
         }
 
     return social_media_analyst_node

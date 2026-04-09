@@ -65,6 +65,7 @@ def create_fundamentals_analyst(llm):
         result = chain.invoke(state["messages"])
 
         report = ""
+        vol_note = None
 
         if len(result.tool_calls) == 0:
             report = result.content
@@ -73,7 +74,7 @@ def create_fundamentals_analyst(llm):
         return {
             "messages": [result],
             "fundamentals_report": report,
-            "vol_note_fundamentals": vol_note if len(result.tool_calls) == 0 else None,
+            "vol_note_fundamentals": vol_note,
         }
 
     return fundamentals_analyst_node
