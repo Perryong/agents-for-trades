@@ -3,6 +3,7 @@ import time
 import json
 from tradingagents.agents.utils.agent_utils import get_stock_data, get_indicators
 from tradingagents.dataflows.config import get_config
+from tradingagents.agents.utils.vol_note_utils import extract_vol_note
 
 
 def create_market_analyst(llm):
@@ -11,6 +12,14 @@ def create_market_analyst(llm):
         current_date = state["trade_date"]
         ticker = state["company_of_interest"]
         company_name = state["company_of_interest"]
+
+        vol_context = state.get("vol_context")
+        vol_block = f"\n\n## Vol Context\n{vol_context}\n" if vol_context else ""
+        vol_directive = (
+            "Volatility conditions are a primary market signal. "
+            "Weight IV rank, IV/HV ratio, and put/call flow as primary inputs alongside price action. "
+            "Conclude your report with an exact line: **Vol Note:** [one sentence on how vol conditions affect your assessment]."
+        ) if vol_context else ""
 
         tools = [
             get_stock_data,
@@ -57,7 +66,9 @@ Volume-Based Indicators:
                     " If you or any other assistant has the FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** or deliverable,"
                     " prefix your response with FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** so the team knows to stop."
                     " You have access to the following tools: {tool_names}.\n{system_message}"
-                    "For your reference, the current date is {current_date}. The company we want to look at is {ticker}",
+                    "{vol_directive}"
+                    "For your reference, the current date is {current_date}. The company we want to look at is {ticker}"
+                    "\n{vol_block}",
                 ),
                 MessagesPlaceholder(variable_name="messages"),
             ]
@@ -67,6 +78,8 @@ Volume-Based Indicators:
         prompt = prompt.partial(tool_names=", ".join([tool.name for tool in tools]))
         prompt = prompt.partial(current_date=current_date)
         prompt = prompt.partial(ticker=ticker)
+        prompt = prompt.partial(vol_directive=vol_directive)
+        prompt = prompt.partial(vol_block=vol_block)
 
         chain = prompt | llm.bind_tools(tools)
 
@@ -77,9 +90,12 @@ Volume-Based Indicators:
         if len(result.tool_calls) == 0:
             report = result.content
 
+        vol_note = extract_vol_note(report)
+
         return {
             "messages": [result],
             "market_report": report,
+            "vol_note_market": vol_note,
         }
 
     return market_analyst_node
