@@ -10,14 +10,14 @@ from .validators import validate_model
 logger = logging.getLogger(__name__)
 
 # Retry settings for transient Gemini errors (429 / 503)
-_MAX_RETRIES = 3
-_BASE_DELAY = 15  # seconds
+_MAX_RETRIES = 5
+_BASE_DELAY = 5  # seconds
 
 # Fallback chain: when all retries fail on primary model, try the next model.
 # Ordered from most capable → least capable within each family.
 _FALLBACK_CHAINS = {
-    "gemini-2.5-pro": ["gemini-2.5-flash", "gemini-2.5-flash-lite"],
-    "gemini-2.5-flash": ["gemini-2.5-flash-lite"],
+    "gemini-2.5-pro": ["gemini-3-flash-preview", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
+    "gemini-2.5-flash": ["gemini-3-flash-preview", "gemini-2.5-flash-lite"],
     "gemini-3-flash-preview": ["gemini-2.5-flash", "gemini-2.5-flash-lite"],
     "gemini-3.1-pro-preview": ["gemini-3-flash-preview", "gemini-2.5-flash"],
     "gemini-3.1-flash-lite-preview": ["gemini-2.5-flash-lite"],
@@ -30,7 +30,16 @@ def _is_retryable(err: str) -> bool:
         or "RESOURCE_EXHAUSTED" in err
         or "503" in err
         or "UNAVAILABLE" in err
+        or "499" in err
+        or "CANCELLED" in err
     )
+
+
+# Models that use extended thinking and may need a longer default timeout.
+# langchain_google_genai defaults timeout=None which maps to httpx's default
+# of ~5s read timeout — far too short for thinking-enabled requests.
+_LONG_TIMEOUT_MODELS = {"gemini-3.1-pro-preview", "gemini-3-flash-preview"}
+_DEFAULT_THINKING_TIMEOUT = 300  # seconds
 
 
 class NormalizedChatGoogleGenerativeAI(ChatGoogleGenerativeAI):
@@ -154,21 +163,32 @@ class GoogleClient(BaseLLMClient):
             if key in self.kwargs:
                 llm_kwargs[key] = self.kwargs[key]
 
+        # Thinking-enabled models can take several minutes; ensure a generous
+        # default timeout so the client doesn't cancel the request (499) before
+        # the server has time to finish. Callers can still override via kwargs.
+        if "timeout" not in llm_kwargs and self.model in _LONG_TIMEOUT_MODELS:
+            llm_kwargs["timeout"] = _DEFAULT_THINKING_TIMEOUT
+
         # Map thinking_level to appropriate API param based on model
         # Gemini 3 Pro: low, high
         # Gemini 3 Flash: minimal, low, medium, high
         # Gemini 2.5: thinking_budget (0=disable, -1=dynamic)
         thinking_level = self.kwargs.get("thinking_level")
-        if thinking_level:
-            model_lower = self.model.lower()
-            if "gemini-3" in model_lower:
-                # Gemini 3 Pro doesn't support "minimal", use "low" instead
-                if "pro" in model_lower and thinking_level == "minimal":
-                    thinking_level = "low"
-                llm_kwargs["thinking_level"] = thinking_level
-            else:
-                # Gemini 2.5: map to thinking_budget
-                llm_kwargs["thinking_budget"] = -1 if thinking_level == "high" else 0
+        model_lower = self.model.lower()
+        if "gemini-3" in model_lower:
+            # Gemini 3 thinking models REQUIRE an explicit thinking_level for tool
+            # calling to work correctly (the API needs thought_signature handling).
+            # Default to "low" when the caller doesn't specify — "low" gives the
+            # fastest latency while still enabling proper thinking/tool-call flow.
+            if not thinking_level:
+                thinking_level = "low"
+            # Gemini 3 Pro doesn't support "minimal", coerce to "low"
+            if "pro" in model_lower and thinking_level == "minimal":
+                thinking_level = "low"
+            llm_kwargs["thinking_level"] = thinking_level
+        elif thinking_level:
+            # Gemini 2.5: map to thinking_budget
+            llm_kwargs["thinking_budget"] = -1 if thinking_level == "high" else 0
 
         return NormalizedChatGoogleGenerativeAI(**llm_kwargs)
 
