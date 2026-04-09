@@ -8,7 +8,7 @@
 ### Vol Context Pipeline
 
 - [x] **VOL-01**: Vol Context node computes IV rank, IV/HV ratio, P/C ratio, and skew narrative from yfinance data
-- [ ] **VOL-02**: Vol Context node runs before all equity analysts as a visible graph node in the progress stepper
+- [x] **VOL-02**: Vol Context node runs before all equity analysts as a visible graph node in the progress stepper
 - [x] **VOL-03**: Vol Context output stored in `state["vol_context"]` as a narrative paragraph with soft directive
 - [x] **VOL-04**: Vol Context fetch is non-blocking — analysts run without vol context if fetch fails, failure flagged in state
 
@@ -21,8 +21,8 @@
 ### Options Always-On
 
 - [ ] **OPT-01**: `enable_options` toggle removed from frontend ConfigSidebar — options always enabled
-- [ ] **OPT-02**: Backend always runs full options pipeline — no conditional `if enable_options` blocks in setup.py
-- [ ] **OPT-03**: `getNodeList()` returns all nodes (equity + options + vol context) unconditionally
+- [x] **OPT-02**: Backend always runs full options pipeline — no conditional `if enable_options` blocks in setup.py
+- [x] **OPT-03**: `getNodeList()` returns all nodes (equity + options + vol context) unconditionally
 
 ### Frontend Restructure
 
@@ -50,15 +50,15 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | VOL-01 | Phase 17 | Complete |
-| VOL-02 | Phase 17 | Pending |
+| VOL-02 | Phase 17 | Complete |
 | VOL-03 | Phase 17 | Complete |
 | VOL-04 | Phase 17 | Complete |
 | ANALYST-01 | Phase 18 | Pending |
 | ANALYST-02 | Phase 18 | Pending |
 | ANALYST-03 | Phase 18 | Pending |
 | OPT-01 | Phase 19 | Pending |
-| OPT-02 | Phase 17 | Pending |
-| OPT-03 | Phase 17 | Pending |
+| OPT-02 | Phase 17 | Complete |
+| OPT-03 | Phase 17 | Complete |
 | UI-01 | Phase 19 | Pending |
 | UI-02 | Phase 19 | Pending |
 | UI-03 | Phase 19 | Pending |

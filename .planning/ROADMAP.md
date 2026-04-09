@@ -71,7 +71,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 
 ## v2.0 Vol-Aware Analysis Pipeline (Phases 17-19) — IN PROGRESS
 
-- [ ] **Phase 17: Vol Context Backend** — AgentState extension, Vol Context graph node, options always-on backend wiring
+- [x] **Phase 17: Vol Context Backend** — AgentState extension, Vol Context graph node, options always-on backend wiring (completed 2026-04-09)
 - [ ] **Phase 18: Analyst Prompt Integration** — All 5 analysts receive vol directive with per-role strength; vol_note field in output
 - [ ] **Phase 19: Frontend Restructure** — Remove enable_options toggle, group tabs, collapsible vol banner, update node list
 
@@ -85,8 +85,8 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 
 Plans:
 - [x] 17-01-PLAN.md — AgentState vol fields + Vol Context node module (pure Python narrative builder)
-- [ ] 17-02-PLAN.md — Graph wiring: Vol Context into setup.py, progress.py, schemas.py (always-on options)
-- [ ] 17-03-PLAN.md — Frontend types: remove enable_options, add vol fields, PRE_NODES, group-based REPORT_TABS
+- [x] 17-02-PLAN.md — Graph wiring: Vol Context into setup.py, progress.py, schemas.py (always-on options)
+- [x] 17-03-PLAN.md — Frontend types: remove enable_options, add vol fields, PRE_NODES, group-based REPORT_TABS
 
 **Success Criteria** (what must be TRUE):
   1. Running analysis against any ticker produces a vol context string in AgentState before any analyst node executes
@@ -123,7 +123,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 17. Vol Context Backend | 1/3 | In Progress|  |
+| 17. Vol Context Backend | 3/3 | Complete   | 2026-04-09 |
 | 18. Analyst Prompt Integration | 0/? | Not started | - |
 | 19. Frontend Restructure | 0/? | Not started | - |
 
