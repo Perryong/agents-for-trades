@@ -81,41 +81,49 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 **Goal**: The pipeline computes a vol narrative before analysts run and makes options always active, with no conditional gating in the graph
 **Depends on**: Nothing (first phase of milestone)
 **Requirements**: VOL-01, VOL-02, VOL-03, VOL-04, OPT-02, OPT-03
+**Plans**: 3 plans
+
+Plans:
+- [ ] 17-01-PLAN.md — AgentState vol fields + Vol Context node module (pure Python narrative builder)
+- [ ] 17-02-PLAN.md — Graph wiring: Vol Context into setup.py, progress.py, schemas.py (always-on options)
+- [ ] 17-03-PLAN.md — Frontend types: remove enable_options, add vol fields, PRE_NODES, group-based REPORT_TABS
+
 **Success Criteria** (what must be TRUE):
   1. Running analysis against any ticker produces a vol context string in AgentState before any analyst node executes
   2. The progress stepper shows "Vol Context" as a named node that completes before analyst nodes appear
   3. If vol data fetch fails (e.g., no options chain for ticker), analysts still run and a failure flag is set in state — the pipeline does not abort
   4. Options pipeline always executes — no `enable_options` conditional block in setup.py or graph wiring
   5. `getNodeList()` returns the complete node set (equity + options + vol context) unconditionally — no runtime flag gates the list
-**Plans**: TBD
 
 #### Phase 18: Analyst Prompt Integration
 **Goal**: All five equity analysts reason with vol awareness, with each analyst's system message calibrated to its vol relevance, and each analyst's output contains an auditable vol_note
 **Depends on**: Phase 17 (vol_context field must exist in AgentState)
 **Requirements**: ANALYST-01, ANALYST-02, ANALYST-03
+**Plans**: TBD
+
 **Success Criteria** (what must be TRUE):
   1. Each analyst's output in the final JSON log contains a `vol_note` sentence (or a null/empty marker for weak-relevance analysts when vol context is absent)
   2. Market analyst output demonstrates reasoning about IV conditions — its `vol_note` references the vol directive ("Strong" weight)
   3. News and Fundamentals analyst outputs reference vol context only when relevant — their `vol_note` is present but brief, consistent with Weak directive strength
   4. When vol context fetch fails (Phase 17 fallback), analysts run without vol reference in their prompts and produce output without a vol_note — no prompt errors
-**Plans**: TBD
 
 #### Phase 19: Frontend Restructure
 **Goal**: The frontend reflects that options are always on — the toggle is gone, tabs are visually grouped into Equity/Options/Decision sections, and vol context is visible at the top of every analyst report
 **Depends on**: Phase 17 (types.ts node list changes), Phase 18 (vol_note field available for display)
 **Requirements**: OPT-01, UI-01, UI-02, UI-03
+**Plans**: TBD
+
 **Success Criteria** (what must be TRUE):
   1. ConfigSidebar contains no "Enable Options" toggle — opening the config panel shows no options-gating control
   2. Report tab area shows three visible section headers — "Equity", "Options", "Decision" — above the relevant tab groups
   3. Every analyst report tab (Market, Technical, Social, News, Fundamentals) displays a collapsible vol context banner at the top; the banner can be expanded and collapsed independently
   4. Vol context banner defaults to expanded on first view; a user who collapses it sees the analyst report content without the banner occupying space
-**Plans**: TBD
 
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 17. Vol Context Backend | 0/? | Not started | - |
+| 17. Vol Context Backend | 0/3 | Not started | - |
 | 18. Analyst Prompt Integration | 0/? | Not started | - |
 | 19. Frontend Restructure | 0/? | Not started | - |
 
