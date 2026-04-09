@@ -4,7 +4,6 @@ import type { AnalysisStatus } from '../types';
 interface ProgressStepperProps {
   completedNodes: string[];
   currentNode: string | null;
-  enableOptions: boolean;
   status: AnalysisStatus;
 }
 
@@ -46,7 +45,6 @@ function StatusDot({ nodeStatus }: { nodeStatus: NodeStatus }) {
 export function ProgressStepper({
   completedNodes,
   currentNode,
-  enableOptions,
   status,
 }: ProgressStepperProps) {
   if (status === 'idle') {
@@ -57,7 +55,7 @@ export function ProgressStepper({
     );
   }
 
-  const nodes = getNodeList(enableOptions);
+  const nodes = getNodeList();
 
   return (
     <div className="space-y-1">

@@ -3,15 +3,13 @@ import { REPORT_TABS } from '../types';
 interface ReportTabsProps {
   activeTab: string;
   onTabChange: (tabId: string) => void;
-  enableOptions: boolean;
 }
 
 export function ReportTabs({
   activeTab,
   onTabChange,
-  enableOptions,
 }: ReportTabsProps) {
-  const visibleTabs = REPORT_TABS.filter(t => !t.optionsOnly || enableOptions);
+  const visibleTabs = REPORT_TABS;
 
   return (
     <div className="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
