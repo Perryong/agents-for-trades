@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Vol-Aware Analysis Pipeline
-status: defining_requirements
+status: roadmap_created
 stopped_at: null
 last_updated: "2026-04-09"
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -23,10 +23,24 @@ See: .planning/PROJECT.md (updated 2026-04-09)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 17 — Vol Context Backend (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-04-09 — Milestone v2.0 started
+Status: Roadmap created, ready for planning
+Last activity: 2026-04-09 — Roadmap created for v2.0
+
+```
+Progress: [ ] [ ] [ ]  0/3 phases
+          P17 P18 P19
+```
+
+## Performance Metrics
+
+| Metric | Value |
+|--------|-------|
+| Phases total | 3 |
+| Phases complete | 0 |
+| Plans complete | 0 |
+| Requirements mapped | 13/13 |
 
 ## Accumulated Context
 
@@ -55,7 +69,13 @@ Last activity: 2026-04-09 — Milestone v2.0 started
 | D-12 | Required `vol_note` field in analyst output |
 | D-13 | 13 total tabs unchanged |
 
+### Phase Boundary Notes
+
+- Phase 17 owns OPT-02 and OPT-03 (backend always-on) alongside VOL-* because they all touch the same graph wiring files (setup.py, types.ts) — atomic change is cleaner than splitting across phases
+- Phase 19 owns OPT-01 (frontend toggle removal) since it is a pure frontend change that belongs with the UI restructure work
+- enable_options removal spans 6 files — execute atomically within Phase 17 (backend) and Phase 19 (frontend)
+
 ## Session Continuity
 
 Last session: 2026-04-09
-Next action: Define requirements, then create roadmap
+Next action: Plan Phase 17 — run `/gsd:plan-phase 17`

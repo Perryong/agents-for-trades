@@ -49,25 +49,25 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| VOL-01 | TBD | Pending |
-| VOL-02 | TBD | Pending |
-| VOL-03 | TBD | Pending |
-| VOL-04 | TBD | Pending |
-| ANALYST-01 | TBD | Pending |
-| ANALYST-02 | TBD | Pending |
-| ANALYST-03 | TBD | Pending |
-| OPT-01 | TBD | Pending |
-| OPT-02 | TBD | Pending |
-| OPT-03 | TBD | Pending |
-| UI-01 | TBD | Pending |
-| UI-02 | TBD | Pending |
-| UI-03 | TBD | Pending |
+| VOL-01 | Phase 17 | Pending |
+| VOL-02 | Phase 17 | Pending |
+| VOL-03 | Phase 17 | Pending |
+| VOL-04 | Phase 17 | Pending |
+| ANALYST-01 | Phase 18 | Pending |
+| ANALYST-02 | Phase 18 | Pending |
+| ANALYST-03 | Phase 18 | Pending |
+| OPT-01 | Phase 19 | Pending |
+| OPT-02 | Phase 17 | Pending |
+| OPT-03 | Phase 17 | Pending |
+| UI-01 | Phase 19 | Pending |
+| UI-02 | Phase 19 | Pending |
+| UI-03 | Phase 19 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 13 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 13
+- Mapped to phases: 13
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-09*
-*Last updated: 2026-04-09 after initial definition*
+*Last updated: 2026-04-09 after roadmap creation*
