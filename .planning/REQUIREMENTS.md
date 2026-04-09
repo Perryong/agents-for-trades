@@ -26,8 +26,8 @@
 
 ### Frontend Restructure
 
-- [ ] **UI-01**: Report tabs grouped into 3 visual sections with headers: Equity (5) | Options (6) | Decision (2)
-- [ ] **UI-02**: Collapsible vol context banner pinned at top of every analyst report tab, showing the vol narrative
+- [x] **UI-01**: Report tabs grouped into 3 visual sections with headers: Equity (5) | Options (6) | Decision (2)
+- [x] **UI-02**: Collapsible vol context banner pinned at top of every analyst report tab, showing the vol narrative
 - [x] **UI-03**: Progress stepper includes "Vol Context" node as the first node before analysts
 
 ## Future Requirements
@@ -59,8 +59,8 @@
 | OPT-01 | Phase 19 | Complete |
 | OPT-02 | Phase 17 | Complete |
 | OPT-03 | Phase 17 | Complete |
-| UI-01 | Phase 19 | Pending |
-| UI-02 | Phase 19 | Pending |
+| UI-01 | Phase 19 | Complete |
+| UI-02 | Phase 19 | Complete |
 | UI-03 | Phase 19 | Complete |
 
 **Coverage:**

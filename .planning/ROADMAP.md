@@ -73,7 +73,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 
 - [x] **Phase 17: Vol Context Backend** — AgentState extension, Vol Context graph node, options always-on backend wiring (completed 2026-04-09)
 - [x] **Phase 18: Analyst Prompt Integration** — All 5 analysts receive vol directive with per-role strength; vol_note field in output (completed 2026-04-09)
-- [ ] **Phase 19: Frontend Restructure** — Remove enable_options toggle, group tabs, collapsible vol banner, update node list
+- [x] **Phase 19: Frontend Restructure** — Remove enable_options toggle, group tabs, collapsible vol banner, update node list (completed 2026-04-09)
 
 ### Phase Details
 
@@ -119,7 +119,7 @@ Plans:
 
 Plans:
 - [x] 19-01-PLAN.md — TypeScript fixes: remove enableOptions from App/ProgressStepper/ReportTabs, wire vol fields in useAnalysis
-- [ ] 19-02-PLAN.md — UI features: grouped tab section headers (EQUITY/OPTIONS/DECISION) + collapsible vol context banner
+- [x] 19-02-PLAN.md — UI features: grouped tab section headers (EQUITY/OPTIONS/DECISION) + collapsible vol context banner
 
 **Success Criteria** (what must be TRUE):
   1. ConfigSidebar contains no "Enable Options" toggle — opening the config panel shows no options-gating control
@@ -133,7 +133,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 17. Vol Context Backend | 3/3 | Complete    | 2026-04-09 |
 | 18. Analyst Prompt Integration | 2/2 | Complete    | 2026-04-09 |
-| 19. Frontend Restructure | 1/2 | In Progress|  |
+| 19. Frontend Restructure | 2/2 | Complete   | 2026-04-09 |
 
 ---
 
