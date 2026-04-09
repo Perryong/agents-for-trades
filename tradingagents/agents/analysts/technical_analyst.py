@@ -2,12 +2,22 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage
 
 from tradingagents.dataflows.technical_analysis import get_technical_analysis as fetch_technical_data
+from tradingagents.agents.utils.vol_note_utils import extract_vol_note
 
 
 def create_technical_analyst(llm):
     def technical_analyst_node(state):
         current_date = state["trade_date"]
         ticker = state["company_of_interest"]
+
+        vol_context = state.get("vol_context")
+        vol_block = f"\n\n## Vol Context\n{vol_context}\n" if vol_context else ""
+        vol_directive = (
+            "Elevated or compressed volatility can confirm or contradict price action signals. "
+            "If vol context is present, explicitly integrate IV rank and IV/HV ratio as a confirmation or contradiction signal "
+            "for your technical read. "
+            "Conclude your report with an exact line: **Vol Note:** [one sentence on whether vol conditions confirm or contradict your technical signals]."
+        ) if vol_context else ""
 
         # Pre-fetch technical data so the LLM doesn't need tool calling
         # (Gemini and some models struggle with LangChain tool invocation)
@@ -37,8 +47,10 @@ def create_technical_analyst(llm):
                     " If you or any other assistant has the FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** or deliverable,"
                     " prefix your response with FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** so the team knows to stop."
                     "\n{system_message}"
+                    "{vol_directive}"
                     "\nFor your reference, the current date is {current_date}. The company we want to look at is {ticker}."
-                    "\n\nHere is the technical analysis data:\n\n{tech_data}",
+                    "\n\nHere is the technical analysis data:\n\n{tech_data}"
+                    "\n{vol_block}",
                 ),
                 MessagesPlaceholder(variable_name="messages"),
             ]
@@ -48,6 +60,8 @@ def create_technical_analyst(llm):
         prompt = prompt.partial(current_date=current_date)
         prompt = prompt.partial(ticker=ticker)
         prompt = prompt.partial(tech_data=tech_data)
+        prompt = prompt.partial(vol_directive=vol_directive)
+        prompt = prompt.partial(vol_block=vol_block)
 
         chain = prompt | llm
 
@@ -55,9 +69,12 @@ def create_technical_analyst(llm):
 
         report = result.content if isinstance(result.content, str) else str(result.content)
 
+        vol_note = extract_vol_note(report)
+
         return {
             "messages": [result],
             "technical_report": report,
+            "vol_note_technical": vol_note,
         }
 
     return technical_analyst_node
