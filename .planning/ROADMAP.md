@@ -99,7 +99,11 @@ Plans:
 **Goal**: All five equity analysts reason with vol awareness, with each analyst's system message calibrated to its vol relevance, and each analyst's output contains an auditable vol_note
 **Depends on**: Phase 17 (vol_context field must exist in AgentState)
 **Requirements**: ANALYST-01, ANALYST-02, ANALYST-03
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 18-01-PLAN.md — vol_note_utils helper + Market and Technical analyst vol injection (Strong/Moderate)
+- [ ] 18-02-PLAN.md — Social, News, and Fundamentals analyst vol injection (Moderate/Weak)
 
 **Success Criteria** (what must be TRUE):
   1. Each analyst's output in the final JSON log contains a `vol_note` sentence (or a null/empty marker for weak-relevance analysts when vol context is absent)
@@ -111,7 +115,7 @@ Plans:
 **Goal**: The frontend reflects that options are always on — the toggle is gone, tabs are visually grouped into Equity/Options/Decision sections, and vol context is visible at the top of every analyst report
 **Depends on**: Phase 17 (types.ts node list changes), Phase 18 (vol_note field available for display)
 **Requirements**: OPT-01, UI-01, UI-02, UI-03
-**Plans**: TBD
+**Plans**: 2 plans
 
 **Success Criteria** (what must be TRUE):
   1. ConfigSidebar contains no "Enable Options" toggle — opening the config panel shows no options-gating control
@@ -124,7 +128,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 17. Vol Context Backend | 3/3 | Complete    | 2026-04-09 |
-| 18. Analyst Prompt Integration | 0/? | Not started | - |
+| 18. Analyst Prompt Integration | 0/2 | In progress | - |
 | 19. Frontend Restructure | 0/? | Not started | - |
 
 ---
