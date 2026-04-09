@@ -52,13 +52,20 @@ class Propagator:
             "fundamentals_report": "",
             "sentiment_report": "",
             "news_report": "",
-            # Options pipeline fields — empty string default, populated only when enable_options=True
+            # Options pipeline fields — always active (enable_options toggle removed)
             "volatility_report": "",
             "options_flow_report": "",
             "options_strategy": "",
             "options_legs": "",
             "options_pricing_report": "",
             "greeks_report": "",
+            # Vol-context pipeline fields — None until Vol Context node populates them
+            "vol_context": None,
+            "vol_note_market": None,
+            "vol_note_technical": None,
+            "vol_note_social": None,
+            "vol_note_news": None,
+            "vol_note_fundamentals": None,
         }
 
     def get_graph_args(self, callbacks: Optional[List] = None) -> Dict[str, Any]:
