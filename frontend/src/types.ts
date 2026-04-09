@@ -12,7 +12,6 @@ export interface AnalyzeRequest {
   ticker: string;
   date: string;
   analysts: string[];
-  enable_options: boolean;
   llm_provider: string;
   deep_think_llm: string;
   quick_think_llm: string;
@@ -28,7 +27,7 @@ export interface AnalysisResult {
   investment_plan: string;
   trader_investment_plan: string;
   final_trade_decision: string;
-  // Options fields (empty string when options disabled)
+  // Options fields (always enabled)
   volatility_report: string;
   options_flow_report: string;
   options_strategy: string;
@@ -36,6 +35,13 @@ export interface AnalysisResult {
   options_pricing_report: string;
   greeks_report: string;
   signal?: string;
+  // Vol Context pre-analysis (empty string when vol fetch failed)
+  vol_context: string;
+  vol_note_market: string;
+  vol_note_technical: string;
+  vol_note_social: string;
+  vol_note_news: string;
+  vol_note_fundamentals: string;
 }
 
 // State for useReducer in useAnalysis hook
@@ -57,6 +63,8 @@ export const EQUITY_NODES = [
   'News Analyst',
   'Fundamentals Analyst',
 ] as const;
+
+export const PRE_NODES = ['Vol Context'] as const;
 
 export const OPTIONS_NODES = [
   'Options - Volatility Analyst',
@@ -80,13 +88,14 @@ export const RISK_NODES = [
   'Aggressive Analyst',
   'Conservative Analyst',
   'Neutral Analyst',
-  'Portfolio Manager',
+  'Risk Judge',
 ] as const;
 
-export function getNodeList(enableOptions: boolean): string[] {
+export function getNodeList(): string[] {
   return [
+    ...PRE_NODES,
     ...EQUITY_NODES,
-    ...(enableOptions ? OPTIONS_NODES : []),
+    ...OPTIONS_NODES,
     ...RESEARCH_NODES,
     ...TRADING_NODES,
     ...RISK_NODES,
@@ -98,23 +107,23 @@ export interface ReportTab {
   id: string;
   label: string;
   stateKey: keyof AnalysisResult;
-  optionsOnly?: boolean;
+  group: 'equity' | 'options' | 'decision';
 }
 
 export const REPORT_TABS: ReportTab[] = [
-  { id: 'market', label: 'Market', stateKey: 'market_report' },
-  { id: 'technical', label: 'Technical', stateKey: 'technical_report' },
-  { id: 'social', label: 'Social', stateKey: 'sentiment_report' },
-  { id: 'news', label: 'News', stateKey: 'news_report' },
-  { id: 'fundamentals', label: 'Fundamentals', stateKey: 'fundamentals_report' },
-  { id: 'volatility', label: 'Volatility', stateKey: 'volatility_report', optionsOnly: true },
-  { id: 'flow', label: 'Flow', stateKey: 'options_flow_report', optionsOnly: true },
-  { id: 'strategy', label: 'Strategy', stateKey: 'options_strategy', optionsOnly: true },
-  { id: 'legs', label: 'Legs/Order', stateKey: 'options_legs', optionsOnly: true },
-  { id: 'pricing', label: 'Pricing', stateKey: 'options_pricing_report', optionsOnly: true },
-  { id: 'greeks', label: 'Greeks', stateKey: 'greeks_report', optionsOnly: true },
-  { id: 'debate', label: 'Debate History', stateKey: 'investment_plan' },
-  { id: 'decision', label: 'Final Decision', stateKey: 'final_trade_decision' },
+  { id: 'market',       label: 'Market',          stateKey: 'market_report',          group: 'equity' },
+  { id: 'technical',    label: 'Technical',        stateKey: 'technical_report',       group: 'equity' },
+  { id: 'social',       label: 'Social',           stateKey: 'sentiment_report',       group: 'equity' },
+  { id: 'news',         label: 'News',             stateKey: 'news_report',            group: 'equity' },
+  { id: 'fundamentals', label: 'Fundamentals',     stateKey: 'fundamentals_report',    group: 'equity' },
+  { id: 'volatility',   label: 'Volatility',       stateKey: 'volatility_report',      group: 'options' },
+  { id: 'flow',         label: 'Flow',             stateKey: 'options_flow_report',    group: 'options' },
+  { id: 'strategy',     label: 'Strategy',         stateKey: 'options_strategy',       group: 'options' },
+  { id: 'legs',         label: 'Legs/Order',       stateKey: 'options_legs',           group: 'options' },
+  { id: 'pricing',      label: 'Pricing',          stateKey: 'options_pricing_report', group: 'options' },
+  { id: 'greeks',       label: 'Greeks',           stateKey: 'greeks_report',          group: 'options' },
+  { id: 'debate',       label: 'Debate History',   stateKey: 'investment_plan',        group: 'decision' },
+  { id: 'decision',     label: 'Final Decision',   stateKey: 'final_trade_decision',   group: 'decision' },
 ];
 
 // --- Trade types (Phase 14) ---
