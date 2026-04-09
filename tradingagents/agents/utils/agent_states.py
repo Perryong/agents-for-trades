@@ -87,3 +87,13 @@ class AgentState(MessagesState):
     options_legs: Annotated[str, _last_value]
     options_pricing_report: Annotated[str, _last_value]
     greeks_report: Annotated[str, _last_value]
+
+    # Vol Context pre-analysis — populated by Vol Context node before analysts run
+    vol_context: Annotated[Optional[str], _last_value]
+
+    # Per-analyst vol acknowledgment (audit trail) — extracted from analyst output
+    vol_note_market: Annotated[Optional[str], _last_value]
+    vol_note_technical: Annotated[Optional[str], _last_value]
+    vol_note_social: Annotated[Optional[str], _last_value]
+    vol_note_news: Annotated[Optional[str], _last_value]
+    vol_note_fundamentals: Annotated[Optional[str], _last_value]
