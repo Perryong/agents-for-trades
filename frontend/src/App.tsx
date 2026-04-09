@@ -78,6 +78,7 @@ function App() {
   const reportContent = state.result && currentTab
     ? (state.result[currentTab.stateKey] as string) || null
     : null;
+  const isEquityTab = currentTab?.group === 'equity';
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
@@ -188,6 +189,8 @@ function App() {
                 content={reportContent}
                 status={state.status}
                 tabLabel={currentTab?.label ?? 'Report'}
+                volContext={state.result?.vol_context}
+                isEquityTab={isEquityTab}
               />
             </div>
 

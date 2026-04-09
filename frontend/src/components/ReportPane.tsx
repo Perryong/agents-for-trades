@@ -6,6 +6,8 @@ interface ReportPaneProps {
   content: string | null;
   status: AnalysisStatus;
   tabLabel?: string;
+  volContext?: string;    // Vol narrative string; undefined or empty = no banner
+  isEquityTab?: boolean; // Only equity tabs show the banner
 }
 
 function CopyButton({ content }: { content: string }) {
@@ -109,7 +111,7 @@ function PdfButton({ contentRef, tabLabel }: { contentRef: React.RefObject<HTMLD
   );
 }
 
-export function ReportPane({ content, status, tabLabel = 'Report' }: ReportPaneProps) {
+export function ReportPane({ content, status, tabLabel = 'Report', volContext, isEquityTab }: ReportPaneProps) {
   const contentRef = useRef<HTMLDivElement>(null);
 
   if (status === 'error') {
@@ -138,6 +140,22 @@ export function ReportPane({ content, status, tabLabel = 'Report' }: ReportPaneP
 
   return (
     <div>
+      {/* Vol Context Banner — equity tabs only, hidden when vol context unavailable */}
+      {isEquityTab && volContext && (
+        <details
+          open
+          className="mb-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 vol-context-banner"
+        >
+          <summary className="cursor-pointer px-4 py-2 text-xs font-semibold text-blue-700 dark:text-blue-300 select-none list-none flex items-center justify-between">
+            <span>Vol Context</span>
+            <span className="text-blue-400 dark:text-blue-500 font-normal">click to collapse</span>
+          </summary>
+          <div className="px-4 pb-3 pt-1 text-xs text-blue-800 dark:text-blue-200 leading-relaxed font-mono whitespace-pre-wrap">
+            {volContext}
+          </div>
+        </details>
+      )}
+
       {/* Action bar */}
       <div className="flex gap-2 mb-4">
         <CopyButton content={content} />
