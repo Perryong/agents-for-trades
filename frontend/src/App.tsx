@@ -22,7 +22,6 @@ function getInitialDark(): boolean {
 function App() {
   const { state, startAnalysis, cancelAnalysis } = useAnalysis();
   const [activeTab, setActiveTab] = useState('market');
-  const [enableOptions, setEnableOptions] = useState(false);
   const [dark, setDark] = useState(getInitialDark);
   const [mainSection, setMainSection] = useState<'analysis' | 'screener' | 'chart' | 'trackrecord'>('analysis');
   const [prefillTicker, setPrefillTicker] = useState<string | undefined>(undefined);
@@ -34,7 +33,12 @@ function App() {
   const lastAnalyzedTicker = useRef<string>('');
 
   const { state: screenerState, runScreen } = useScreener();
-  const totalNodes = getNodeList(enableOptions).length;
+  const nodeList = getNodeList();
+  const totalNodes = nodeList.length;
+  // Only count predefined analyst nodes — backend emits node_end for internal
+  // LangGraph nodes (Msg Clear, tools_, routing chains) that must not be counted.
+  const nodeSet = new Set(nodeList);
+  const completedCount = new Set(state.completedNodes.filter(n => nodeSet.has(n))).size;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -58,7 +62,6 @@ function App() {
   }, [state.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAnalyze = (request: AnalyzeRequest) => {
-    setEnableOptions(request.enable_options);
     setLlmProvider(request.llm_provider);
     setQuickModel(request.quick_think_llm);
     lastAnalyzedTicker.current = request.ticker;
@@ -146,7 +149,7 @@ function App() {
 
         <GlobalStatusBar
           status={state.status}
-          completedCount={state.completedNodes.length}
+          completedCount={completedCount}
           totalCount={totalNodes}
           ticker={lastAnalyzedTicker.current}
           onCancel={cancelAnalysis}
@@ -160,7 +163,6 @@ function App() {
               <ProgressStepper
                 completedNodes={state.completedNodes}
                 currentNode={state.currentNode}
-                enableOptions={enableOptions}
                 status={state.status}
               />
             </div>
@@ -177,7 +179,6 @@ function App() {
               <ReportTabs
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
-                enableOptions={enableOptions}
               />
             </div>
 
