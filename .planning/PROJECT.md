@@ -77,7 +77,14 @@ The trader receives a complete, executable options recommendation — strategy, 
 
 ### Active
 
-*(No active milestone — run /gsd:new-milestone to start next)*
+*(v2.0 Vol-Aware Analysis Pipeline — started 2026-04-09)*
+
+- [ ] Vol Context graph node pre-fetches volatility narrative (IV rank, IV/HV, P/C ratio, skew) before analysts run
+- [ ] All 5 equity analysts receive vol narrative with per-analyst directive strength (Strong/Moderate/Weak)
+- [ ] Analysts produce `vol_note` field in output for auditability
+- [ ] Options analysis always-on — `enable_options` toggle removed
+- [ ] Frontend tabs grouped into Equity | Options | Decision sections
+- [ ] Collapsible vol context banner pinned at top of every analyst tab
 
 ### Out of Scope
 
