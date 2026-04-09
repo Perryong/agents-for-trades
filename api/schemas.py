@@ -6,7 +6,6 @@ class AnalyzeRequest(BaseModel):
     ticker: str
     date: str  # "YYYY-MM-DD"
     analysts: List[str] = ["market", "technical", "social", "news", "fundamentals"]
-    enable_options: bool = False
     llm_provider: str = "openai"
     deep_think_llm: str = "gpt-5.2"
     quick_think_llm: str = "gpt-5-mini"
@@ -14,7 +13,7 @@ class AnalyzeRequest(BaseModel):
     def config_dict(self) -> Dict[str, Any]:
         from tradingagents.default_config import DEFAULT_CONFIG
         cfg = dict(DEFAULT_CONFIG)
-        cfg["enable_options"] = self.enable_options
+        cfg["enable_options"] = True  # options always enabled (D-06)
         cfg["llm_provider"] = self.llm_provider
         cfg["deep_think_llm"] = self.deep_think_llm
         cfg["quick_think_llm"] = self.quick_think_llm
