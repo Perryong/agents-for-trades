@@ -16,7 +16,7 @@ from tradingagents.agents.options import (
     create_options_legs_builder,
     create_greeks_monitor,
 )
-from tradingagents.dataflows.config import get_config
+from tradingagents.agents.pre_analysis import create_vol_context_node
 
 from .conditional_logic import ConditionalLogic
 
@@ -183,55 +183,30 @@ class GraphSetup:
         workflow.add_node("Risk Judge", risk_manager_node)
 
         # Define edges
-        # Start with the first analyst
-        first_analyst = selected_analysts[0]
-
-        # Read enable_options from config
-        cfg = get_config()
-        enable_options = cfg.get("enable_options", False)
-
-        first_equity = f"{first_analyst.capitalize()} Analyst"
-
         # Build list of all parallel branch entry points (equity analysts)
         equity_entries = [f"{a.capitalize()} Analyst" for a in selected_analysts]
 
-        if enable_options:
-            # Add all 7 options nodes with graceful error wrapping
-            for node_name, factory_fn in OPTIONS_NODES:
-                state_key = _OPTIONS_STATE_KEYS[factory_fn.__name__]
-                workflow.add_node(
-                    node_name,
-                    _safe_options_node(factory_fn, state_key, self.quick_thinking_llm),
-                )
+        # Vol Context pre-analysis node (runs before all analysts)
+        workflow.add_node("Vol Context", create_vol_context_node())
 
-            # Sequential chain within options branch
-            for i in range(len(OPTIONS_NODES) - 1):
-                workflow.add_edge(OPTIONS_NODES[i][0], OPTIONS_NODES[i + 1][0])
-
-            # Fan-in: last options node -> Bull Researcher
-            workflow.add_edge("Options - Greeks Monitor", "Bull Researcher")
-
-            # Fan-out from START to all equity analysts + options branch in parallel
-            all_branches = equity_entries + ["Options - Volatility Analyst"]
-
-            def route_from_start(state):
-                return all_branches
-
-            workflow.add_conditional_edges(
-                START,
-                route_from_start,
-                all_branches,
+        # Options pipeline — always registered unconditionally (D-06)
+        for node_name, factory_fn in OPTIONS_NODES:
+            state_key = _OPTIONS_STATE_KEYS[factory_fn.__name__]
+            workflow.add_node(
+                node_name,
+                _safe_options_node(factory_fn, state_key, self.quick_thinking_llm),
             )
-        else:
-            # Fan-out from START to all equity analysts in parallel
-            def route_equity_start(state):
-                return equity_entries
 
-            workflow.add_conditional_edges(
-                START,
-                route_equity_start,
-                equity_entries,
-            )
+        # START connects to Vol Context; Vol Context fans out to all equity analysts
+        def route_equity_start(state):
+            return equity_entries
+
+        workflow.add_edge(START, "Vol Context")
+        workflow.add_conditional_edges(
+            "Vol Context",
+            route_equity_start,
+            equity_entries,
+        )
 
         # Analysts that pre-fetch data and don't need tool-calling loops
         no_tool_analysts = {"technical"}
@@ -275,7 +250,13 @@ class GraphSetup:
             },
         )
         workflow.add_edge("Research Manager", "Trader")
-        workflow.add_edge("Trader", "Aggressive Analyst")
+
+        # Always wire: Trader -> options pipeline -> Aggressive Analyst (D-06)
+        workflow.add_edge("Trader", OPTIONS_NODES[0][0])
+        for i in range(len(OPTIONS_NODES) - 1):
+            workflow.add_edge(OPTIONS_NODES[i][0], OPTIONS_NODES[i + 1][0])
+        workflow.add_edge(OPTIONS_NODES[-1][0], "Aggressive Analyst")
+
         workflow.add_conditional_edges(
             "Aggressive Analyst",
             self.conditional_logic.should_continue_risk_analysis,
