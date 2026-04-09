@@ -26,17 +26,24 @@ const PROVIDER_MODELS: Record<string, { deep: string[]; quick: string[]; default
   },
   google: {
     label: 'Google',
-    deep: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'],
-    quick: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'],
+    deep: ['gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'],
+    quick: ['gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-3.1-flash-lite-preview', 'gemini-2.5-flash-lite'],
     defaultDeep: 'gemini-2.5-pro',
     defaultQuick: 'gemini-2.5-flash',
   },
   anthropic: {
     label: 'Anthropic',
-    deep: ['claude-sonnet-4-5-20250514', 'claude-opus-4-20250514'],
-    quick: ['claude-haiku-4-5-20251001', 'claude-sonnet-4-5-20250514'],
-    defaultDeep: 'claude-sonnet-4-5-20250514',
-    defaultQuick: 'claude-haiku-4-5-20251001',
+    deep: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-opus-4-5', 'claude-sonnet-4-5'],
+    quick: ['claude-sonnet-4-6', 'claude-haiku-4-5', 'claude-sonnet-4-5'],
+    defaultDeep: 'claude-sonnet-4-6',
+    defaultQuick: 'claude-haiku-4-5',
+  },
+  test: {
+    label: 'Test (Mock)',
+    deep: ['test-mock'],
+    quick: ['test-mock'],
+    defaultDeep: 'test-mock',
+    defaultQuick: 'test-mock',
   },
 };
 
@@ -54,7 +61,6 @@ export function ConfigSidebar({ onAnalyze, isRunning, prefillTicker }: ConfigSid
     'news',
     'fundamentals',
   ]);
-  const [enableOptions, setEnableOptions] = useState(false);
   const [llmProvider, setLlmProvider] = useState('openai');
   const [deepThinkLlm, setDeepThinkLlm] = useState('gpt-5.2');
   const [quickThinkLlm, setQuickThinkLlm] = useState('gpt-5-mini');
@@ -83,7 +89,6 @@ export function ConfigSidebar({ onAnalyze, isRunning, prefillTicker }: ConfigSid
       ticker,
       date,
       analysts,
-      enable_options: enableOptions,
       llm_provider: llmProvider,
       deep_think_llm: deepThinkLlm,
       quick_think_llm: quickThinkLlm,
@@ -135,19 +140,6 @@ export function ConfigSidebar({ onAnalyze, isRunning, prefillTicker }: ConfigSid
           </label>
         ))}
       </fieldset>
-
-      {/* Enable Options Analysis */}
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={enableOptions}
-          onChange={e => setEnableOptions(e.target.checked)}
-          className="rounded border-gray-300 dark:border-gray-600 text-blue-600"
-        />
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          Enable Options Analysis
-        </span>
-      </label>
 
       {/* LLM Provider */}
       <div className="space-y-1">
