@@ -72,7 +72,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 ## v2.0 Vol-Aware Analysis Pipeline (Phases 17-19) — IN PROGRESS
 
 - [x] **Phase 17: Vol Context Backend** — AgentState extension, Vol Context graph node, options always-on backend wiring (completed 2026-04-09)
-- [ ] **Phase 18: Analyst Prompt Integration** — All 5 analysts receive vol directive with per-role strength; vol_note field in output
+- [x] **Phase 18: Analyst Prompt Integration** — All 5 analysts receive vol directive with per-role strength; vol_note field in output (completed 2026-04-09)
 - [ ] **Phase 19: Frontend Restructure** — Remove enable_options toggle, group tabs, collapsible vol banner, update node list
 
 ### Phase Details
@@ -103,7 +103,7 @@ Plans:
 
 Plans:
 - [x] 18-01-PLAN.md — vol_note_utils helper + Market and Technical analyst vol injection (Strong/Moderate)
-- [ ] 18-02-PLAN.md — Social, News, and Fundamentals analyst vol injection (Moderate/Weak)
+- [x] 18-02-PLAN.md — Social, News, and Fundamentals analyst vol injection (Moderate/Weak)
 
 **Success Criteria** (what must be TRUE):
   1. Each analyst's output in the final JSON log contains a `vol_note` sentence (or a null/empty marker for weak-relevance analysts when vol context is absent)
@@ -128,7 +128,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 17. Vol Context Backend | 3/3 | Complete    | 2026-04-09 |
-| 18. Analyst Prompt Integration | 1/2 | In Progress|  |
+| 18. Analyst Prompt Integration | 2/2 | Complete   | 2026-04-09 |
 | 19. Frontend Restructure | 0/? | Not started | - |
 
 ---
