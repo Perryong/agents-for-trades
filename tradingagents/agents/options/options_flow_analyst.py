@@ -9,12 +9,14 @@ narrative). No tool binding. No message thread. No placeholder injection.
 """
 
 import io
+from datetime import date
 from typing import Optional
 
 import pandas as pd
 from langchain_core.prompts import ChatPromptTemplate
 
 from tradingagents.dataflows.interface import route_to_vendor
+from tradingagents.agents.options.constants import DTE_BUCKETS
 
 
 # ---------------------------------------------------------------------------
@@ -66,6 +68,12 @@ def _parse_tabular_string(s: str) -> Optional[pd.DataFrame]:
     # Sentinel check — data layer returns "No options data available..." etc.
     if stripped.lower().startswith("no "):
         return None
+    # Strip optional "# SPOT:<value>" metadata line from chain output
+    lines = stripped.splitlines()
+    if lines and lines[0].startswith("# SPOT:"):
+        stripped = "\n".join(lines[1:]).strip()
+        if not stripped:
+            return None
     try:
         return pd.read_csv(io.StringIO(stripped), sep=r'\s+', engine='python')
     except Exception:
@@ -146,6 +154,75 @@ def _compute_flow_metrics(chain_df: pd.DataFrame) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Helper: build multi-bucket flow data content string
+# ---------------------------------------------------------------------------
+
+def _build_flow_data_content(
+    ticker: str,
+    trade_date: str,
+    bucket_results: list,
+    primary_exp: Optional[str],
+) -> str:
+    """Build the data_content string for the LLM from per-bucket flow results.
+
+    Args:
+        ticker: Ticker symbol.
+        trade_date: Analysis date string (YYYY-MM-DD).
+        bucket_results: List of dicts. Each dict has:
+            - "label" (str): DTE bucket label
+            - "expiry" (str|None): selected expiry for this bucket
+            - "dte" (int|None): DTE of selected expiry
+            - "metrics" (dict|None): formatted metrics dict (keys: pc_ratio_str,
+              unusual_count, unusual_details, net_bias)
+            - "error" (str|None): error message if bucket failed
+        primary_exp: The nearest bucket's expiry (first bucket with valid data).
+
+    Returns:
+        Formatted string ready for LLM HumanMessage.
+    """
+    lines = [
+        f"Ticker: {ticker}",
+        f"Analysis date: {trade_date}",
+        "",
+        "## Term Structure Flow Summary",
+        "",
+    ]
+
+    for br in bucket_results:
+        label = br["label"]
+        error = br.get("error")
+        expiry = br.get("expiry")
+        dte = br.get("dte")
+        metrics = br.get("metrics")
+
+        if error is not None:
+            if error == "No data":
+                lines.append(f"### {label} -- [No data]")
+                lines.append("No expirations available in this window.")
+            else:
+                lines.append(f"### {label} -- {expiry} ({dte} DTE)" if expiry else f"### {label}")
+                lines.append(f"No chain data: {error}")
+        else:
+            lines.append(f"### {label} -- {expiry} ({dte} DTE)")
+            lines.append(f"- P/C Ratio: {metrics['pc_ratio_str']}")
+            lines.append(
+                f"- Unusual volume contracts (volume > 2x OI): {metrics['unusual_count']}"
+            )
+            lines.append(f"- Top unusual contracts: {metrics['unusual_details']}")
+            lines.append(f"- Net flow bias: {metrics['net_bias']}")
+
+        lines.append("")
+
+    primary_label = primary_exp if primary_exp else "N/A (no chain data)"
+    lines.append(f"Primary expiry (nearest bucket): {primary_label}")
+    lines.append(
+        f"Write the one-paragraph options flow report for {ticker} on {trade_date}."
+    )
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Factory
 # ---------------------------------------------------------------------------
 
@@ -190,69 +267,109 @@ def create_options_flow_analyst(llm):
             return {"options_flow_report": result.content}
 
         # ------------------------------------------------------------------
-        # Step 3: Fetch nearest expiry chain (most active)
+        # Step 3: Build exp_with_dte — pair each expiry with its DTE
         # ------------------------------------------------------------------
-        chain_str: str = route_to_vendor("get_options_chain", ticker, expirations[0])
+        trade_date_obj = date.fromisoformat(trade_date)
+        exp_with_dte = []
+        for exp_str in expirations:
+            try:
+                exp_date = date.fromisoformat(exp_str)
+                dte = (exp_date - trade_date_obj).days
+                if dte >= 0:
+                    exp_with_dte.append((exp_str, dte))
+            except (ValueError, TypeError):
+                continue
 
         # ------------------------------------------------------------------
-        # Step 4: Parse chain
+        # Step 4: Loop over DTE_BUCKETS — fetch, parse, compute metrics
         # ------------------------------------------------------------------
-        chain_df = _parse_tabular_string(chain_str)
+        bucket_results = []
+        primary_exp = None
 
-        # ------------------------------------------------------------------
-        # Step 5: Compute metrics (or fall back to empty-data narrative)
-        # ------------------------------------------------------------------
-        if chain_df is None or chain_df.empty:
-            pc_ratio_str = "N/A"
-            unusual_count = 0
-            unusual_details = "no chain data"
-            net_bias = "N/A"
-        else:
-            metrics = _compute_flow_metrics(chain_df)
+        for bucket in DTE_BUCKETS:
+            bucket_expiries = [
+                (exp, dte) for exp, dte in exp_with_dte
+                if bucket["min"] <= dte <= bucket["max"]
+            ]
 
-            # P/C ratio string
-            if metrics["pc_ratio"] is None:
-                pc_ratio_str = "N/A (no call volume)"
-                pc_label = "no calls traded"
-            else:
-                ratio_val = metrics["pc_ratio"]
-                if ratio_val > 1.20:
-                    pc_label = "put-heavy"
-                elif ratio_val < 0.80:
-                    pc_label = "call-heavy"
+            if not bucket_expiries:
+                bucket_results.append({"label": bucket["label"], "error": "No data"})
+                continue
+
+            # Pick expiry closest to bucket center
+            center = (bucket["min"] + bucket["max"]) / 2.0
+            best_exp, best_dte = min(bucket_expiries, key=lambda x: abs(x[1] - center))
+
+            try:
+                chain_str: str = route_to_vendor("get_options_chain", ticker, best_exp)
+                chain_df = _parse_tabular_string(chain_str)
+
+                if chain_df is None or chain_df.empty:
+                    bucket_results.append({
+                        "label": bucket["label"],
+                        "expiry": best_exp,
+                        "dte": best_dte,
+                        "error": "No chain data",
+                    })
+                    continue
+
+                metrics = _compute_flow_metrics(chain_df)
+
+                # Format P/C ratio string
+                if metrics["pc_ratio"] is None:
+                    pc_ratio_str = "N/A (no call volume)"
                 else:
-                    pc_label = "neutral"
-                pc_ratio_str = f"{ratio_val:.2f} ({pc_label})"
+                    ratio_val = metrics["pc_ratio"]
+                    if ratio_val > 1.20:
+                        pc_label = "put-heavy"
+                    elif ratio_val < 0.80:
+                        pc_label = "call-heavy"
+                    else:
+                        pc_label = "neutral"
+                    pc_ratio_str = f"{ratio_val:.2f} ({pc_label})"
 
-            unusual_count = metrics["unusual_count"]
-            if metrics["unusual_top3"]:
-                top = metrics["unusual_top3"]
-                details_parts = []
-                for c in top:
-                    details_parts.append(
-                        f"{c['option_type'].upper()} ${c['strike']} "
-                        f"vol={c['volume']:,} OI={c['open_interest']:,}"
-                    )
-                unusual_details = "; ".join(details_parts)
-            else:
-                unusual_details = "none"
+                # Format unusual details string
+                if metrics["unusual_top3"]:
+                    top = metrics["unusual_top3"]
+                    details_parts = []
+                    for c in top:
+                        details_parts.append(
+                            f"{c['option_type'].upper()} ${c['strike']} "
+                            f"vol={c['volume']:,} OI={c['open_interest']:,}"
+                        )
+                    unusual_details = "; ".join(details_parts)
+                else:
+                    unusual_details = "none"
 
-            net_bias = metrics["net_bias"]
+                formatted_metrics = {
+                    "pc_ratio_str": pc_ratio_str,
+                    "unusual_count": metrics["unusual_count"],
+                    "unusual_details": unusual_details,
+                    "net_bias": metrics["net_bias"],
+                }
+                bucket_results.append({
+                    "label": bucket["label"],
+                    "expiry": best_exp,
+                    "dte": best_dte,
+                    "metrics": formatted_metrics,
+                })
+
+                # First successful bucket becomes primary (nearest)
+                if primary_exp is None:
+                    primary_exp = best_exp
+
+            except Exception as e:
+                bucket_results.append({
+                    "label": bucket["label"],
+                    "expiry": best_exp,
+                    "dte": best_dte,
+                    "error": str(e),
+                })
 
         # ------------------------------------------------------------------
-        # Step 6: Build data template and invoke LLM
+        # Step 5: Build data_content and invoke LLM
         # ------------------------------------------------------------------
-        data_content = (
-            f"Ticker: {ticker}\n"
-            f"Analysis date: {trade_date}\n"
-            f"Expiration analyzed: {expirations[0]}\n\n"
-            f"Computed metrics:\n"
-            f"- P/C Ratio: {pc_ratio_str}\n"
-            f"- Unusual volume contracts (volume > 2x OI): {unusual_count}\n"
-            f"- Top unusual contracts: {unusual_details}\n"
-            f"- Net flow bias: {net_bias}\n\n"
-            f"Write the one-paragraph options flow report for {ticker} on {trade_date}."
-        )
+        data_content = _build_flow_data_content(ticker, trade_date, bucket_results, primary_exp)
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", SYSTEM_PROMPT),
