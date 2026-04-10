@@ -80,6 +80,27 @@ See: `.planning/milestones/v2.0-ROADMAP.md` for full details.
 
 </details>
 
+## v3.0 Multi-Expiry Options Intelligence
+
+### Phase 1: Multi-expiry options data for flow and vol analysts to support complex strategies
+
+**Goal:** Expand options_flow_analyst and volatility_analyst to fetch chains across multiple DTE buckets (matching strike_expiry_selector's pattern), so the final decision agent has full term-structure context to recommend multi-leg strategies (iron condors, calendar spreads, straddles, etc.)
+**Requirements**: [MEX-01, MEX-02, MEX-03, MEX-04, MEX-05]
+**Depends on:** v2.0 shipped
+**Plans:** 3 plans
+
+Requirements:
+- MEX-01: Extract DTE_BUCKETS to shared constants module, update strike_expiry_selector to import from it
+- MEX-02: options_flow_analyst fetches chains across 4 DTE buckets, computes per-bucket flow metrics (P/C ratio, unusual activity, net bias), includes Term Structure Flow Summary in report
+- MEX-03: volatility_analyst fetches chains across 4 DTE buckets, computes per-bucket IV/skew metrics, includes per-bucket term structure table in report
+- MEX-04: Both agents label per-bucket metrics with DTE range and expiry date; buckets with no available expiry are noted as "No data" (not silently omitted)
+- MEX-05: Individual bucket fetch failures do not block other buckets (error isolation per bucket)
+
+Plans:
+- [ ] 01-01-PLAN.md — Extract DTE_BUCKETS to shared constants.py, update strike_expiry_selector
+- [ ] 01-02-PLAN.md — Refactor options_flow_analyst for multi-bucket flow metrics
+- [ ] 01-03-PLAN.md — Refactor volatility_analyst for multi-bucket IV/skew metrics
+
 ---
 
 *Roadmap created: 2026-03-31*
