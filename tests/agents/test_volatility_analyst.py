@@ -432,3 +432,197 @@ def test_full_node_integration():
     assert "messages" not in result
     assert len(result) == 1, f"Result should have exactly 1 key, got {list(result.keys())}"
     assert "IV Rank" in result["volatility_report"]
+
+
+# ---------------------------------------------------------------------------
+# Multi-bucket tests (Task 1 — TDD RED: these will FAIL until Task 2 is done)
+# ---------------------------------------------------------------------------
+
+# Expirations that cover all 4 DTE buckets when trade_date="2026-04-10":
+#   2026-04-12 => DTE 2 => Short-term (0-5 DTE)
+#   2026-04-20 => DTE 10 => Weekly (5-14 DTE)
+#   2026-05-10 => DTE 30 => Monthly (14-45 DTE)
+#   2026-06-15 => DTE 66 => Longer-term (45-90 DTE)
+
+MULTI_BUCKET_EXPIRATIONS = ["2026-04-12", "2026-04-20", "2026-05-10", "2026-06-15"]
+
+# Different chain strings per expiry so we can verify per-bucket processing
+_CHAIN_BY_EXPIRY = {
+    "2026-04-12": (
+        "strike  option_type  volume  open_interest  iv  delta\n"
+        "145.0  call  1000  500  0.28  0.55\n"
+        "145.0  put  900  450  0.32  -0.45\n"
+    ),
+    "2026-04-20": (
+        "strike  option_type  volume  open_interest  iv  delta\n"
+        "145.0  call  800  400  0.26  0.53\n"
+        "145.0  put  700  350  0.30  -0.47\n"
+    ),
+    "2026-05-10": (
+        "strike  option_type  volume  open_interest  iv  delta\n"
+        "145.0  call  600  300  0.24  0.50\n"
+        "145.0  put  500  250  0.27  -0.50\n"
+    ),
+    "2026-06-15": (
+        "strike  option_type  volume  open_interest  iv  delta\n"
+        "145.0  call  400  200  0.31  0.48\n"
+        "145.0  put  350  180  0.34  -0.52\n"
+    ),
+}
+
+
+def _make_route_side_effect_multi_bucket(iv_str=VALID_IV_STR):
+    """Route side effect that dispatches different chains per expiry date."""
+
+    def _side_effect(method, *args, **kwargs):
+        if method == "get_historical_iv":
+            return iv_str
+        elif method == "get_options_expirations":
+            return MULTI_BUCKET_EXPIRATIONS
+        elif method == "get_options_chain":
+            expiry = args[1] if len(args) > 1 else None
+            return _CHAIN_BY_EXPIRY.get(expiry, VALID_CHAIN_STR)
+        return ""
+
+    return _side_effect
+
+
+def test_multi_bucket_iv_table_present():
+    """Node's LLM input must include all 4 DTE bucket labels when all buckets are covered."""
+    from tradingagents.agents.options.volatility_analyst import create_volatility_analyst
+
+    mock_llm, mock_chain, mock_response = _make_mock_llm("multi-bucket volatility report")
+    mock_yf = _make_mock_yf()
+
+    state = {
+        "company_of_interest": "AAPL",
+        "trade_date": "2026-04-10",
+        "messages": [],
+    }
+
+    captured_messages = []
+
+    def capturing_llm(messages):
+        captured_messages.extend(messages)
+        return mock_response
+
+    capturing_llm.invoke = capturing_llm
+
+    with patch("tradingagents.agents.options.volatility_analyst.route_to_vendor",
+               side_effect=_make_route_side_effect_multi_bucket()):
+        with patch("tradingagents.agents.options.volatility_analyst.yf", mock_yf):
+            node = create_volatility_analyst(capturing_llm)
+            result = node(state)
+
+    assert "volatility_report" in result
+
+    # Gather the full text sent to the LLM
+    full_text = " ".join(
+        m.content if hasattr(m, "content") else str(m)
+        for m in captured_messages
+    )
+
+    assert "Short-term (0-5 DTE)" in full_text, (
+        f"Expected 'Short-term (0-5 DTE)' in LLM input. Got: {full_text[:500]}"
+    )
+    assert "Weekly (5-14 DTE)" in full_text, (
+        f"Expected 'Weekly (5-14 DTE)' in LLM input. Got: {full_text[:500]}"
+    )
+    assert "Monthly (14-45 DTE)" in full_text, (
+        f"Expected 'Monthly (14-45 DTE)' in LLM input. Got: {full_text[:500]}"
+    )
+    assert "Longer-term (45-90 DTE)" in full_text, (
+        f"Expected 'Longer-term (45-90 DTE)' in LLM input. Got: {full_text[:500]}"
+    )
+
+
+def test_missing_bucket_noted_in_vol_report():
+    """When only SHORT bucket has expirations, missing buckets must contain 'No data' or 'N/A'."""
+    from tradingagents.agents.options.volatility_analyst import create_volatility_analyst
+
+    mock_llm, mock_chain, mock_response = _make_mock_llm("short-term only report")
+    mock_yf = _make_mock_yf()
+
+    state = {
+        "company_of_interest": "AAPL",
+        "trade_date": "2026-04-10",
+        "messages": [],
+    }
+
+    # Only one expiry in SHORT bucket (DTE=2)
+    short_only_expirations = ["2026-04-12"]
+
+    def short_only_route(method, *args, **kwargs):
+        if method == "get_historical_iv":
+            return VALID_IV_STR
+        elif method == "get_options_expirations":
+            return short_only_expirations
+        elif method == "get_options_chain":
+            return _CHAIN_BY_EXPIRY["2026-04-12"]
+        return ""
+
+    captured_messages = []
+
+    def capturing_llm(messages):
+        captured_messages.extend(messages)
+        return mock_response
+
+    capturing_llm.invoke = capturing_llm
+
+    with patch("tradingagents.agents.options.volatility_analyst.route_to_vendor",
+               side_effect=short_only_route):
+        with patch("tradingagents.agents.options.volatility_analyst.yf", mock_yf):
+            node = create_volatility_analyst(capturing_llm)
+            result = node(state)
+
+    assert "volatility_report" in result
+
+    full_text = " ".join(
+        m.content if hasattr(m, "content") else str(m)
+        for m in captured_messages
+    )
+
+    # For the 3 missing buckets, the table should show N/A or No data
+    assert "N/A" in full_text or "No data" in full_text, (
+        f"Expected 'N/A' or 'No data' for missing buckets. Got: {full_text[:600]}"
+    )
+
+
+def test_compute_multi_bucket_term_structure_output():
+    """_compute_multi_bucket_term_structure returns a string with table headers and all 4 labels."""
+    from tradingagents.agents.options.volatility_analyst import _compute_multi_bucket_term_structure
+
+    bucket_results = [
+        {"label": "Short-term (0-5 DTE)", "median_iv": 0.28, "dte": 2, "skew": "Put skew elevated (+5.00%)", "expiry": "2026-04-12"},
+        {"label": "Weekly (5-14 DTE)", "median_iv": 0.26, "dte": 10, "skew": "Flat skew (0.00%)", "expiry": "2026-04-20"},
+        {"label": "Monthly (14-45 DTE)", "median_iv": None, "dte": None, "skew": "N/A", "expiry": None},
+        {"label": "Longer-term (45-90 DTE)", "median_iv": 0.30, "dte": 66, "skew": "Put skew elevated (+3.00%)", "expiry": "2026-06-15"},
+    ]
+
+    output = _compute_multi_bucket_term_structure(bucket_results)
+
+    assert isinstance(output, str), "Output must be a string"
+    assert "Bucket" in output, f"Expected 'Bucket' header in output. Got: {output}"
+    assert "Median IV" in output, f"Expected 'Median IV' header in output. Got: {output}"
+    assert "Short-term (0-5 DTE)" in output
+    assert "Weekly (5-14 DTE)" in output
+    assert "Monthly (14-45 DTE)" in output
+    assert "Longer-term (45-90 DTE)" in output
+    assert "N/A" in output, "Monthly bucket (None median_iv) should show 'N/A'"
+
+
+def test_existing_term_structure_unchanged():
+    """_compute_term_structure(near_df, far_df) is still callable with 2 args (backward compat)."""
+    from tradingagents.agents.options.volatility_analyst import _compute_term_structure
+
+    near_data = {"iv": [0.25, 0.26, 0.24], "option_type": ["call", "put", "call"]}
+    far_data = {"iv": [0.30, 0.31, 0.32], "option_type": ["call", "put", "call"]}
+
+    near_df = pd.DataFrame(near_data)
+    far_df = pd.DataFrame(far_data)
+
+    result = _compute_term_structure(near_df, far_df)
+    assert isinstance(result, str), "_compute_term_structure must return a string"
+    assert "Contango" in result or "Backwardation" in result or "Flat" in result or "N/A" in result, (
+        f"Result must be one of the known term structure patterns, got: {result}"
+    )
