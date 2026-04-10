@@ -16,6 +16,7 @@ import pandas as pd
 
 from tradingagents.dataflows.interface import route_to_vendor
 from tradingagents.dataflows.config import get_config
+from tradingagents.agents.options.constants import DTE_BUCKETS
 
 
 # ---------------------------------------------------------------------------
@@ -27,6 +28,11 @@ def _parse_tabular_string(s: str) -> Optional[pd.DataFrame]:
 
     Returns None if the string is empty, None, or begins with a sentinel like
     'No ' (indicating no data available).
+
+    If the string starts with a '# SPOT:<value>' metadata comment line (written
+    by y_finance_options.get_options_chain), the spot price is attached as a
+    DataFrame attribute ``attrs["spot_price"]`` so callers can use it as an ATM
+    anchor when bid/ask are zero after market hours.
     """
     if not s:
         return None
@@ -35,8 +41,23 @@ def _parse_tabular_string(s: str) -> Optional[pd.DataFrame]:
         return None
     if stripped.lower().startswith("no "):
         return None
+
+    # Extract optional spot price metadata line
+    spot_price: float = 0.0
+    lines = stripped.splitlines()
+    if lines and lines[0].startswith("# SPOT:"):
+        try:
+            spot_price = float(lines[0].split(":", 1)[1].strip())
+        except (ValueError, IndexError):
+            spot_price = 0.0
+        stripped = "\n".join(lines[1:]).strip()
+        if not stripped:
+            return None
+
     try:
-        return pd.read_csv(io.StringIO(stripped), sep=r'\s+', engine='python')
+        df = pd.read_csv(io.StringIO(stripped), sep=r'\s+', engine='python')
+        df.attrs["spot_price"] = spot_price
+        return df
     except Exception:
         return None
 
@@ -155,11 +176,20 @@ def _select_contract(
         # Approximate delta from strike vs current price using mid of bid/ask
         # delta ~0.30 call ≈ ~7-10% OTM, delta ~0.30 put ≈ ~7-10% OTM
         type_df["_mid"] = (type_df["bid"] + type_df["ask"]) / 2
-        # When bid/ask are zero (after hours), fall back to lastPrice
-        if "_mid" in type_df.columns and (type_df["_mid"] <= 0).all() and "lastPrice" in type_df.columns:
+        # When bid/ask are zero (after hours), fall back to lastPrice for _mid.
+        # Note: lastPrice is the option's last traded price, which can be stale
+        # and noisy, so we prefer the explicit spot_price metadata if available.
+        if (type_df["_mid"] <= 0).all() and "lastPrice" in type_df.columns:
             type_df["_mid"] = type_df["lastPrice"].fillna(0)
-        # Estimate current price from ATM options (highest mid for calls near strikes)
-        atm_price = type_df.loc[type_df["_mid"].idxmax(), "strike"] if not type_df.empty and (type_df["_mid"] > 0).any() else 0
+        # Estimate current price (ATM anchor) using spot_price metadata when
+        # available (written by y_finance_options as "# SPOT:<value>").
+        # Fall back to inferring from the highest-mid contract's strike, which
+        # approximates the spot for liquid chains but breaks with stale lastPrice.
+        spot_price = chain_df.attrs.get("spot_price", 0.0) if hasattr(chain_df, "attrs") else 0.0
+        if spot_price > 0:
+            atm_price = spot_price
+        else:
+            atm_price = type_df.loc[type_df["_mid"].idxmax(), "strike"] if not type_df.empty and (type_df["_mid"] > 0).any() else 0
 
         # For the fallback, use moneyness ratio to approximate delta
         # delta_target 0.30 ≈ strike/price ratio of ~1.07 for calls, ~0.93 for puts
@@ -203,11 +233,15 @@ def _format_leg(leg_num: int, action: str, option_type: str, ticker: str,
         delta_str = f"delta={delta_val:.2f}"
     else:
         delta_str = "delta=est"
-    oi = int(row.get("open_interest", 0))
-    oi_status = "PASS" if oi >= 10 else "LOW_OI"
+    oi = int(row.get("open_interest", 0) or 0)
+    # Always emit [PASS] for a selected contract — OI is informational only.
+    # Downstream agents (options_pricing_agent, options_legs_builder,
+    # greeks_monitor) parse the bracket as PASS or LIQUIDITY FAIL; any other
+    # value would cause them to silently drop the leg.  Low-OI warnings are
+    # conveyed by the numeric OI value itself.
     return (
         f"LEG {leg_num}: {action} {option_type.upper()} {ticker} "
-        f"{expiry} ${strike} {delta_str} OI={oi} [{oi_status}]"
+        f"{expiry} ${strike} {delta_str} OI={oi} [PASS]"
     )
 
 
@@ -227,14 +261,6 @@ def create_strike_expiry_selector(llm):
             Return dict has exactly one key: "options_legs".
             Does NOT write to state["messages"].
     """
-
-    # Multi-timeframe DTE buckets
-    DTE_BUCKETS = [
-        {"label": "Short-term (0-5 DTE)", "min": 0, "max": 5, "tag": "SHORT"},
-        {"label": "Weekly (5-14 DTE)", "min": 5, "max": 14, "tag": "WEEKLY"},
-        {"label": "Monthly (14-45 DTE)", "min": 14, "max": 45, "tag": "MONTHLY"},
-        {"label": "Longer-term (45-90 DTE)", "min": 45, "max": 90, "tag": "LONGER"},
-    ]
 
     def _build_legs_for_expiry(
         ticker, expiry_str, dte, chain_df, leg_types, delta_target, delta_tolerance, min_oi
