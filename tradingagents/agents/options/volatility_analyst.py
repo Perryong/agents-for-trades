@@ -10,6 +10,7 @@ narrative). Does NOT use bind_tools, MessagesPlaceholder, or messages thread.
 
 import io
 import math
+from datetime import date
 from typing import Optional
 
 import pandas as pd
@@ -17,6 +18,7 @@ import yfinance as yf
 from langchain_core.prompts import ChatPromptTemplate
 
 from tradingagents.dataflows.interface import route_to_vendor
+from tradingagents.agents.options.constants import DTE_BUCKETS
 
 
 # ---------------------------------------------------------------------------
@@ -56,8 +58,10 @@ DATA_TEMPLATE = (
     "- Current IV (from near-term chain or historical): {current_iv}\n"
     "- 30-day Historical Volatility (HV30): {hv30}\n"
     "- IV vs HV comparison: {iv_hv_label} (difference: {iv_hv_diff}pp)\n"
-    "- Skew shape: {skew_desc}\n"
-    "- Term structure: {term_desc}\n"
+    "- Skew shape (primary): {skew_desc}\n"
+    "- Term structure (legacy): {term_desc}\n\n"
+    "## Term Structure (per DTE bucket)\n"
+    "{bucket_term_structure}\n\n"
     "- IV history note: {iv_history_note}\n\n"
     "Write the one-paragraph volatility report for {ticker} on {trade_date}."
 )
@@ -78,9 +82,13 @@ def _parse_tabular_string(s: str) -> Optional[pd.DataFrame]:
     stripped = s.strip()
     if not stripped:
         return None
-    # Sentinel check — data layer returns "No options data available..." etc.
     if stripped.lower().startswith("no "):
         return None
+    lines = stripped.splitlines()
+    if lines and lines[0].startswith("# SPOT:"):
+        stripped = "\n".join(lines[1:]).strip()
+        if not stripped:
+            return None
     try:
         return pd.read_csv(io.StringIO(stripped), sep=r'\s+', engine='python')
     except Exception:
@@ -243,6 +251,31 @@ def _compute_term_structure(
 
 
 # ---------------------------------------------------------------------------
+# Helper: multi-bucket term structure table
+# ---------------------------------------------------------------------------
+
+def _compute_multi_bucket_term_structure(bucket_results: list) -> str:
+    """Build a term structure table from per-bucket median IV and skew values.
+
+    bucket_results: list of dicts with keys:
+        label (str), median_iv (float | None), dte (int | None), skew (str),
+        expiry (str | None)
+    Returns a markdown table string.
+    """
+    lines = [
+        "| Bucket | Expiry | DTE | Median IV | Skew |",
+        "|--------|--------|-----|-----------|------|",
+    ]
+    for b in bucket_results:
+        iv_str = f"{b['median_iv']:.1%}" if b.get("median_iv") is not None else "N/A"
+        skew_str = b.get("skew", "N/A")
+        expiry_str = b.get("expiry") or "No data"
+        dte_str = str(b["dte"]) if b.get("dte") is not None else "---"
+        lines.append(f"| {b['label']} | {expiry_str} | {dte_str} | {iv_str} | {skew_str} |")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Helper: IV rank label
 # ---------------------------------------------------------------------------
 
@@ -287,23 +320,84 @@ def create_volatility_analyst(llm):
         iv_str: str = route_to_vendor("get_historical_iv", ticker)
         expirations: list = route_to_vendor("get_options_expirations", ticker)
 
-        near_chain_str: str = ""
-        far_chain_str: str = ""
-
-        if expirations:
-            near_chain_str = route_to_vendor("get_options_chain", ticker, expirations[0])
-            if len(expirations) > 1:
-                far_chain_str = route_to_vendor("get_options_chain", ticker, expirations[-1])
-
         # ------------------------------------------------------------------
-        # Step 2: Parse tabular strings into DataFrames
+        # Step 2: Parse historical IV
         # ------------------------------------------------------------------
         iv_df = _parse_tabular_string(iv_str)
-        near_chain_df = _parse_tabular_string(near_chain_str) if near_chain_str else None
-        far_chain_df = _parse_tabular_string(far_chain_str) if far_chain_str else None
 
         # ------------------------------------------------------------------
-        # Step 3: Compute metrics
+        # Step 3: Build exp_with_dte list and loop over DTE_BUCKETS
+        # ------------------------------------------------------------------
+        trade_date_obj = date.fromisoformat(trade_date)
+        exp_with_dte = []
+        for exp_str in (expirations or []):
+            try:
+                exp_date = date.fromisoformat(exp_str)
+                dte = (exp_date - trade_date_obj).days
+                if dte >= 0:
+                    exp_with_dte.append((exp_str, dte))
+            except (ValueError, TypeError):
+                continue
+
+        bucket_results = []
+        near_chain_df = None   # first bucket with valid data (for skew, current_iv)
+        far_chain_df = None    # last bucket with valid data (for legacy term structure)
+
+        for bucket in DTE_BUCKETS:
+            bucket_expiries = [
+                (exp, dte) for exp, dte in exp_with_dte
+                if bucket["min"] <= dte <= bucket["max"]
+            ]
+            if not bucket_expiries:
+                bucket_results.append({
+                    "label": bucket["label"],
+                    "median_iv": None,
+                    "dte": None,
+                    "skew": "N/A",
+                    "expiry": None,
+                })
+                continue
+
+            # Pick expiry closest to bucket center
+            center = (bucket["min"] + bucket["max"]) / 2.0
+            best_exp, best_dte = min(bucket_expiries, key=lambda x: abs(x[1] - center))
+
+            try:
+                chain_str = route_to_vendor("get_options_chain", ticker, best_exp)
+                chain_df = _parse_tabular_string(chain_str)
+                if chain_df is not None and not chain_df.empty and "iv" in chain_df.columns:
+                    iv_clean = chain_df["iv"].dropna()
+                    median_iv = float(iv_clean.median()) if not iv_clean.empty else None
+                    skew = _compute_skew(chain_df)
+                    # Track near/far for legacy _compute_term_structure
+                    if near_chain_df is None:
+                        near_chain_df = chain_df
+                    far_chain_df = chain_df
+                else:
+                    median_iv = None
+                    skew = "N/A"
+                    chain_df = None
+                bucket_results.append({
+                    "label": bucket["label"],
+                    "expiry": best_exp,
+                    "dte": best_dte,
+                    "median_iv": median_iv,
+                    "skew": skew,
+                })
+            except Exception:
+                bucket_results.append({
+                    "label": bucket["label"],
+                    "median_iv": None,
+                    "dte": None,
+                    "skew": "N/A",
+                    "expiry": None,
+                })
+
+        # Build the multi-bucket term structure table
+        bucket_term_structure = _compute_multi_bucket_term_structure(bucket_results)
+
+        # ------------------------------------------------------------------
+        # Step 4: Compute metrics
         # ------------------------------------------------------------------
 
         # IV rank and percentile
@@ -324,6 +418,13 @@ def create_volatility_analyst(llm):
         else:
             iv_history_note = "No historical IV data available"
 
+        # If historical IV is unavailable, fall back to first bucket's median_iv
+        if current_iv_val == "N/A":
+            for b in bucket_results:
+                if b.get("median_iv") is not None:
+                    current_iv_val = round(b["median_iv"] * 100, 1)
+                    break
+
         # 30-day HV
         hv30 = _compute_hv30(ticker)
         hv30_str = f"{hv30:.1f}%" if hv30 is not None else "N/A"
@@ -342,10 +443,10 @@ def create_volatility_analyst(llm):
             else:
                 iv_hv_label = "Fair"
 
-        # Skew
+        # Primary skew from near-term bucket chain
         skew_desc = _compute_skew(near_chain_df)
 
-        # Term structure
+        # Legacy 2-point term structure (preserved for backward compat)
         term_desc = _compute_term_structure(near_chain_df, far_chain_df)
 
         # IV rank label
@@ -356,7 +457,7 @@ def create_volatility_analyst(llm):
         )
 
         # ------------------------------------------------------------------
-        # Step 4: Single LLM call
+        # Step 5: Single LLM call
         # ------------------------------------------------------------------
         data_content = DATA_TEMPLATE.format(
             ticker=ticker,
@@ -370,6 +471,7 @@ def create_volatility_analyst(llm):
             iv_hv_diff=iv_hv_diff,
             skew_desc=skew_desc,
             term_desc=term_desc,
+            bucket_term_structure=bucket_term_structure,
             iv_history_note=iv_history_note if iv_history_note else "Sufficient IV history",
         )
 
