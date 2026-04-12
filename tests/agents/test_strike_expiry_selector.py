@@ -327,3 +327,54 @@ def test_multi_leg_spread():
     legs = result["options_legs"]
     assert "LEG 1" in legs, f"Expected LEG 1 in spread output, got: {legs}"
     assert "LEG 2" in legs, f"Expected LEG 2 in spread output, got: {legs}"
+
+
+# ---------------------------------------------------------------------------
+# Test 12: Strike/expiry selector emits anchor_strike, width, near_expiry, far_expiry
+# ---------------------------------------------------------------------------
+
+def test_anchor_width_output():
+    """Strike/expiry selector must return anchor_strike, width, near_expiry, far_expiry keys."""
+    from tradingagents.agents.options.strike_expiry_selector import create_strike_expiry_selector
+    from unittest.mock import patch, MagicMock
+
+    # Mock expirations
+    mock_expirations = ["2026-05-10", "2026-06-20"]
+
+    # Mock chain data
+    chain_str = (
+        "# SPOT:150.0\n"
+        "strike  option_type  bid    ask    volume  open_interest  delta\n"
+        "150.0   call         8.00   8.90   500     300            0.30\n"
+        "155.0   call         4.80   5.60   400     200            0.22\n"
+        "145.0   put          3.50   4.20   350     250            -0.28\n"
+    )
+
+    def route_side_effect(method, *args, **kwargs):
+        if method == "get_options_expirations":
+            return mock_expirations
+        if method == "get_options_chain":
+            return chain_str
+        return ""
+
+    state = {
+        "company_of_interest": "AAPL",
+        "trade_date": "2026-04-12",
+        "options_strategy": "long call",
+        "messages": [],
+    }
+
+    with patch("tradingagents.agents.options.strike_expiry_selector.route_to_vendor",
+               side_effect=route_side_effect), \
+         patch("tradingagents.agents.options.strike_expiry_selector.get_config",
+               return_value={"options_delta_target": 0.30, "options_min_oi": 100}):
+        node = create_strike_expiry_selector(MagicMock())
+        result = node(state)
+
+    assert "anchor_strike" in result, f"Missing anchor_strike key, got keys: {list(result.keys())}"
+    assert "width" in result, f"Missing width key"
+    assert "near_expiry" in result, f"Missing near_expiry key"
+    assert "far_expiry" in result, f"Missing far_expiry key"
+    # anchor_strike should be a float when legs were found
+    if result["anchor_strike"] is not None:
+        assert isinstance(result["anchor_strike"], float), f"anchor_strike must be float, got {type(result['anchor_strike'])}"
