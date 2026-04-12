@@ -3,7 +3,7 @@
 All LLM calls are mocked. No live API calls are made in any test.
 """
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 
 # ---------------------------------------------------------------------------
@@ -64,7 +64,10 @@ def test_node_returns_options_strategy():
 
     mock_llm, _ = _make_mock_llm("bull call spread -- IV moderate, bias bullish")
     node = create_options_strategy_selector(mock_llm)
-    result = node(_make_state())
+
+    with patch("tradingagents.agents.options.options_strategy_selector.get_config",
+               return_value={}):
+        result = node(_make_state())
 
     assert isinstance(result, dict), "Node must return a dict"
     assert "options_strategy" in result, "Return dict must contain 'options_strategy' key"
@@ -72,24 +75,26 @@ def test_node_returns_options_strategy():
 
 
 # ---------------------------------------------------------------------------
-# Test 3: Output contains a valid strategy name
+# Test 3: Output normalizes to a valid registry strategy key
 # ---------------------------------------------------------------------------
 
 def test_output_contains_valid_strategy_name():
-    """When mock LLM returns 'bull call spread -- ...', output contains 'bull call spread'."""
+    """When mock LLM returns 'bull call spread -- ...', normalized key is in registry."""
     from tradingagents.agents.options.options_strategy_selector import (
         create_options_strategy_selector,
-        STRATEGY_LIST,
     )
+    from tradingagents.agents.options.strategies import REGISTRY, normalize_strategy_key
 
     mock_llm, _ = _make_mock_llm("bull call spread -- IV moderate, bias bullish")
     node = create_options_strategy_selector(mock_llm)
-    result = node(_make_state())
 
-    output = result["options_strategy"].lower()
-    matched = any(strategy in output for strategy in STRATEGY_LIST)
-    assert matched, (
-        f"Output '{result['options_strategy']}' must contain one of STRATEGY_LIST: {STRATEGY_LIST}"
+    with patch("tradingagents.agents.options.options_strategy_selector.get_config",
+               return_value={}):
+        result = node(_make_state())
+
+    normalized = normalize_strategy_key(result["options_strategy"])
+    assert normalized in REGISTRY.strategies, (
+        f"Normalized key '{normalized}' not found in registry"
     )
 
 
@@ -105,7 +110,10 @@ def test_no_messages_written():
 
     mock_llm, _ = _make_mock_llm("iron condor -- IV high, neutral bias")
     node = create_options_strategy_selector(mock_llm)
-    result = node(_make_state())
+
+    with patch("tradingagents.agents.options.options_strategy_selector.get_config",
+               return_value={}):
+        result = node(_make_state())
 
     assert "messages" not in result, (
         f"Return dict must NOT contain 'messages' key, got keys: {list(result.keys())}"
@@ -130,21 +138,25 @@ def test_empty_reports_no_crash():
         options_flow_report="",
         investment_plan="",
     )
-    # Must not raise
-    result = node(state)
+
+    with patch("tradingagents.agents.options.options_strategy_selector.get_config",
+               return_value={}):
+        # Must not raise
+        result = node(state)
+
     assert "options_strategy" in result, "Must return options_strategy even with empty reports"
 
 
 # ---------------------------------------------------------------------------
-# Test 6: STRATEGY_LIST has 10 entries
+# Test 6: Registry has at least 30 strategies (replaces old STRATEGY_LIST==10 test)
 # ---------------------------------------------------------------------------
 
-def test_strategy_list_has_ten_entries():
-    """STRATEGY_LIST must contain exactly 10 strategy names."""
-    from tradingagents.agents.options.options_strategy_selector import STRATEGY_LIST
+def test_registry_has_at_least_30_strategies():
+    """Registry must have at least 30 strategies (replacing old 10-strategy list)."""
+    from tradingagents.agents.options.strategies import REGISTRY
 
-    assert len(STRATEGY_LIST) == 10, (
-        f"STRATEGY_LIST must have 10 entries, got {len(STRATEGY_LIST)}: {STRATEGY_LIST}"
+    assert len(REGISTRY.strategies) >= 30, (
+        f"Registry must have >= 30 strategies, got {len(REGISTRY.strategies)}"
     )
 
 
