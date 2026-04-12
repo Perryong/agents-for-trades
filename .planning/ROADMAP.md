@@ -103,15 +103,20 @@ Plans:
 
 ### Phase 2: Strategy agent enhancement — registry-driven eligibility gate with declarative legs builder
 
-**Goal:** Replace the 10-strategy hardcoded selector with a 40-strategy YAML registry, rule-based eligibility gate (hard gates + soft scoring), and declarative legs builder that eliminates all if/elif dispatch code
-**Requirements**: [GATE-01, GATE-02, GATE-03, GATE-04, GATE-05, REG-01, REG-02, REG-03, LEGS-01, LEGS-02, LEGS-03, SEL-01, SEL-02]
+**Goal:** Replace the 10-strategy hardcoded selector with a 40-strategy YAML registry, rule-based eligibility gate (hard gates + soft scoring), declarative legs builder that eliminates all if/elif dispatch code, and enhanced risk manager with strategy context and paper trading stop-loss enforcement
+**Requirements**: [GATE-01, GATE-02, GATE-03, GATE-04, GATE-05, REG-01, REG-02, REG-03, LEGS-01, LEGS-02, LEGS-03, SEL-01, SEL-02, RISK-01, RISK-02]
 **Depends on:** Phase 1
-**Plans:** 3 plans
+**Plans:** 4 plans
+
+Requirements:
+- RISK-01: Risk manager receives full strategy context (margin_intensive flag, max loss profile) from registry per D-24
+- RISK-02: Paper trading stop-loss enforcement rule added to risk manager for all strategies, with mandatory enforcement for margin-intensive strategies per D-02/D-23
 
 Plans:
-- [ ] 02-01-PLAN.md — Strategy registry YAML + Pydantic models + eligibility gate + tests (TDD)
+- [ ] 02-01-PLAN.md — Strategy registry YAML + Pydantic models + eligibility gate + config defaults + tests (TDD)
 - [ ] 02-02-PLAN.md — Strategy selector gate integration + AgentState update + test updates
 - [ ] 02-03-PLAN.md — Declarative legs builder + strike/expiry selector anchor/width output + tests
+- [ ] 02-04-PLAN.md — Risk manager strategy context + paper trading stop-loss enforcement (D-02/D-23/D-24)
 
 ---
 
