@@ -101,6 +101,18 @@ Plans:
 - [x] 01-02-PLAN.md — Refactor options_flow_analyst for multi-bucket flow metrics
 - [ ] 01-03-PLAN.md — Refactor volatility_analyst for multi-bucket IV/skew metrics
 
+### Phase 2: Strategy agent enhancement — registry-driven eligibility gate with declarative legs builder
+
+**Goal:** Replace the 10-strategy hardcoded selector with a 40-strategy YAML registry, rule-based eligibility gate (hard gates + soft scoring), and declarative legs builder that eliminates all if/elif dispatch code
+**Requirements**: [GATE-01, GATE-02, GATE-03, GATE-04, GATE-05, REG-01, REG-02, REG-03, LEGS-01, LEGS-02, LEGS-03, SEL-01, SEL-02]
+**Depends on:** Phase 1
+**Plans:** 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Strategy registry YAML + Pydantic models + eligibility gate + tests (TDD)
+- [ ] 02-02-PLAN.md — Strategy selector gate integration + AgentState update + test updates
+- [ ] 02-03-PLAN.md — Declarative legs builder + strike/expiry selector anchor/width output + tests
+
 ---
 
 *Roadmap created: 2026-03-31*
