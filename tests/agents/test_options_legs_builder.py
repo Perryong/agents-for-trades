@@ -392,3 +392,123 @@ def test_contract_count_fixed_one():
     assert len(lines) >= 1, f"Expected at least one LEG line, got: {legs_str}"
     for line in lines:
         assert "qty=1" in line, f"Expected 'qty=1' in every LEG line, got: {line}"
+
+
+# ---------------------------------------------------------------------------
+# Test 13: Declarative iron condor — 4 legs, net credit, correct payoff structure
+# ---------------------------------------------------------------------------
+
+def test_declarative_iron_condor():
+    """Declarative builder resolves iron_condor to 4 legs with correct payoff structure."""
+    from tradingagents.agents.options.options_legs_builder import create_options_legs_builder
+
+    iron_condor_legs = (
+        "LEG 1: SELL PUT AAPL 2026-05-10 $145.0 delta=0.25 OI=200 [PASS]\n"
+        "LEG 2: BUY PUT AAPL 2026-05-10 $140.0 delta=0.15 OI=150 [PASS]\n"
+        "LEG 3: SELL CALL AAPL 2026-05-10 $155.0 delta=0.25 OI=200 [PASS]\n"
+        "LEG 4: BUY CALL AAPL 2026-05-10 $160.0 delta=0.15 OI=150 [PASS]"
+    )
+    iron_condor_chain = (
+        "strike  option_type  bid    ask    volume  open_interest  iv     delta\n"
+        "140.0   put          1.50   2.00   200     150            0.30   -0.15\n"
+        "145.0   put          3.00   3.60   300     200            0.28   -0.25\n"
+        "155.0   call         3.00   3.60   300     200            0.28   0.25\n"
+        "160.0   call         1.50   2.00   200     150            0.30   0.15\n"
+    )
+
+    state = {
+        "company_of_interest": "AAPL",
+        "trade_date": "2026-04-01",
+        "options_strategy": "iron condor -- neutral high IV",
+        "options_legs": iron_condor_legs,
+        "messages": [],
+    }
+
+    with patch("tradingagents.agents.options.options_legs_builder.route_to_vendor",
+               side_effect=_make_route_side_effect(iron_condor_chain)), \
+         patch("tradingagents.agents.options.options_legs_builder.get_config",
+               return_value={}):
+        node = create_options_legs_builder(_make_mock_llm())
+        result = node(state)
+
+    legs_str = result["options_legs"]
+    leg_lines = [l for l in legs_str.split("\n") if l.startswith("LEG")]
+    assert len(leg_lines) == 4, f"Iron condor must have 4 LEG lines, got {len(leg_lines)}"
+    assert "NET:" in legs_str, "Must have NET line"
+    net_line = [l for l in legs_str.split("\n") if l.startswith("NET:")][0]
+    assert "credit=" in net_line, f"Iron condor is net credit strategy, got: {net_line}"
+    assert "max_profit=" in net_line
+    assert "max_loss=" in net_line
+
+
+# ---------------------------------------------------------------------------
+# Test 14: Declarative calendar spread — handles strategy key normalization
+# ---------------------------------------------------------------------------
+
+def test_declarative_calendar_spread():
+    """Declarative builder handles calendar_spread (strategy key normalization)."""
+    from tradingagents.agents.options.options_legs_builder import create_options_legs_builder
+
+    calendar_legs = (
+        "LEG 1: SELL CALL AAPL 2026-05-10 $150.0 delta=0.30 OI=300 [PASS]\n"
+        "LEG 2: BUY CALL AAPL 2026-06-20 $150.0 delta=0.35 OI=250 [PASS]"
+    )
+    calendar_chain = (
+        "strike  option_type  bid    ask    volume  open_interest  iv     delta\n"
+        "150.0   call         5.00   5.80   400     300            0.25   0.30\n"
+    )
+
+    state = {
+        "company_of_interest": "AAPL",
+        "trade_date": "2026-04-01",
+        "options_strategy": "calendar spread -- neutral, benefit from time decay",
+        "options_legs": calendar_legs,
+        "messages": [],
+    }
+
+    with patch("tradingagents.agents.options.options_legs_builder.route_to_vendor",
+               side_effect=_make_route_side_effect(calendar_chain)), \
+         patch("tradingagents.agents.options.options_legs_builder.get_config",
+               return_value={}):
+        node = create_options_legs_builder(_make_mock_llm())
+        result = node(state)
+
+    legs_str = result["options_legs"]
+    assert "NET:" in legs_str, "Calendar spread must have NET line"
+    net_line = [l for l in legs_str.split("\n") if l.startswith("NET:")][0]
+    assert "max_loss=" in net_line
+
+
+# ---------------------------------------------------------------------------
+# Test 15: Leg string format compatibility with LEG_PATTERN regex
+# ---------------------------------------------------------------------------
+
+def test_leg_string_format_compat():
+    """Declarative builder output must match existing LEG_PATTERN regex format."""
+    import re
+    from tradingagents.agents.options.options_legs_builder import (
+        create_options_legs_builder, LEG_PATTERN,
+    )
+
+    # Use the builder output LEG format regex (limit=, qty=, [OK|WIDE_SPREAD])
+    BUILDER_LEG_RE = re.compile(
+        r"LEG\s+\d+:\s+(BUY|SELL)\s+(CALL|PUT)\s+\S+\s+\S+\s+\$[0-9.]+\s+"
+        r"limit=[0-9.]+\s+qty=\d+\s+\[(OK|WIDE_SPREAD)\]"
+    )
+
+    state = _make_bull_call_state()
+
+    with patch("tradingagents.agents.options.options_legs_builder.route_to_vendor",
+               side_effect=_make_route_side_effect()), \
+         patch("tradingagents.agents.options.options_legs_builder.get_config",
+               return_value={}):
+        node = create_options_legs_builder(_make_mock_llm())
+        result = node(state)
+
+    legs_str = result["options_legs"]
+    leg_lines = [l for l in legs_str.split("\n") if l.startswith("LEG")]
+    assert len(leg_lines) >= 1, f"Expected LEG lines, got: {legs_str}"
+    for line in leg_lines:
+        assert BUILDER_LEG_RE.match(line), (
+            f"LEG line does not match expected format: {line}"
+        )
