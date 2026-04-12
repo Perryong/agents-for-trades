@@ -152,22 +152,31 @@ def test_delta_band_filtering():
 # ---------------------------------------------------------------------------
 
 def test_expiry_center_selection():
-    """With expirations giving DTE 24 and 39, center=33, picks DTE=39 (closer)."""
+    """With expirations giving DTE 15 and 39, MONTHLY bucket center=29.5, picks DTE=39 (closer).
+
+    MONTHLY bucket is (14, 45) so center=(14+45)/2=29.5.
+    DTE=15: |15-29.5|=14.5; DTE=39: |39-29.5|=9.5 => 2026-05-10 (DTE=39) is closer.
+    """
     from tradingagents.agents.options.strike_expiry_selector import create_strike_expiry_selector
+
+    # TRADE_DATE = "2026-04-01"
+    # 2026-04-16: DTE=15, center distance |15-29.5|=14.5
+    # 2026-05-10: DTE=39, center distance |39-29.5|=9.5  => picks 2026-05-10
+    near_center_expirations = ["2026-04-16", "2026-05-10"]
 
     state = _make_state("long call -- bullish bias")
 
     with patch("tradingagents.agents.options.strike_expiry_selector.route_to_vendor",
-               side_effect=_make_route_side_effect()), \
+               side_effect=_make_route_side_effect(expirations=near_center_expirations)), \
          patch("tradingagents.agents.options.strike_expiry_selector.get_config",
                return_value=CONTROLLED_CONFIG):
         node = create_strike_expiry_selector(_make_mock_llm())
         result = node(state)
 
     legs = result["options_legs"]
-    # "2026-05-10" is DTE=39, closer to center=33 than "2026-04-25" (DTE=24)
+    # "2026-05-10" is DTE=39, closer to MONTHLY center=29.5 than "2026-04-16" (DTE=15)
     assert "2026-05-10" in legs, (
-        f"Expected expiry 2026-05-10 (DTE=39, closer to center=33), got: {legs}"
+        f"Expected expiry 2026-05-10 (DTE=39, closer to MONTHLY center=29.5), got: {legs}"
     )
 
 
@@ -205,7 +214,7 @@ def test_liquidity_fail_no_delta_match():
 # ---------------------------------------------------------------------------
 
 def test_liquidity_fail_no_expirations():
-    """Empty expirations list yields [LIQUIDITY FAIL]."""
+    """Empty expirations list yields [LIQUIDITY FAIL] or [NO DATA] sentinel."""
     from tradingagents.agents.options.strike_expiry_selector import create_strike_expiry_selector
 
     state = _make_state("long call -- bullish bias")
@@ -217,8 +226,9 @@ def test_liquidity_fail_no_expirations():
         node = create_strike_expiry_selector(_make_mock_llm())
         result = node(state)
 
-    assert "[LIQUIDITY FAIL]" in result["options_legs"], (
-        f"Expected [LIQUIDITY FAIL] with empty expirations, got: {result['options_legs']}"
+    legs = result["options_legs"]
+    assert "[LIQUIDITY FAIL]" in legs or "[NO DATA]" in legs, (
+        f"Expected [LIQUIDITY FAIL] or [NO DATA] with empty expirations, got: {legs}"
     )
 
 

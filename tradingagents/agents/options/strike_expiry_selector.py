@@ -9,6 +9,7 @@ accepted for interface compatibility but not used.
 """
 
 import io
+import re
 from datetime import date
 from typing import Optional
 
@@ -17,6 +18,7 @@ import pandas as pd
 from tradingagents.dataflows.interface import route_to_vendor
 from tradingagents.dataflows.config import get_config
 from tradingagents.agents.options.constants import DTE_BUCKETS
+from tradingagents.agents.options.strategies import REGISTRY, normalize_strategy_key
 
 
 # ---------------------------------------------------------------------------
@@ -63,61 +65,23 @@ def _parse_tabular_string(s: str) -> Optional[pd.DataFrame]:
 
 
 # ---------------------------------------------------------------------------
-# Helper: determine leg types from strategy string
+# Helper: determine leg types from strategy string (registry-backed)
 # ---------------------------------------------------------------------------
 
 def _get_leg_types(strategy: str) -> list:
-    """Return list of (action, option_type) tuples for the given strategy.
-
-    Returns list of dicts: {"action": "BUY"|"SELL", "type": "call"|"put"}
-    """
-    s = strategy.lower()
-
-    if "iron condor" in s:
-        return [
-            {"action": "SELL", "type": "put"},
-            {"action": "BUY", "type": "put"},
-            {"action": "SELL", "type": "call"},
-            {"action": "BUY", "type": "call"},
-        ]
-    elif "bull call spread" in s:
-        return [
-            {"action": "BUY", "type": "call"},
-            {"action": "SELL", "type": "call"},
-        ]
-    elif "bear put spread" in s:
-        return [
-            {"action": "BUY", "type": "put"},
-            {"action": "SELL", "type": "put"},
-        ]
-    elif "long straddle" in s:
-        return [
-            {"action": "BUY", "type": "call"},
-            {"action": "BUY", "type": "put"},
-        ]
-    elif "long strangle" in s:
-        return [
-            {"action": "BUY", "type": "call"},
-            {"action": "BUY", "type": "put"},
-        ]
-    elif "calendar spread" in s:
-        return [
-            {"action": "BUY", "type": "call"},
-            {"action": "SELL", "type": "call"},
-        ]
-    elif "long call" in s:
+    """Return list of dicts with action/type from registry leg definitions."""
+    key = normalize_strategy_key(strategy)
+    leg_defs = REGISTRY.legs.get(key)
+    if leg_defs is None:
+        # Fallback: default to long call
         return [{"action": "BUY", "type": "call"}]
-    elif "long put" in s:
-        return [{"action": "BUY", "type": "put"}]
-    elif "covered call" in s:
-        return [{"action": "SELL", "type": "call"}]
-    elif "cash-secured put" in s or "cash secured put" in s:
-        return [{"action": "SELL", "type": "put"}]
-    elif "put" in s:
-        return [{"action": "BUY", "type": "put"}]
-    else:
-        # Default: long call
-        return [{"action": "BUY", "type": "call"}]
+    result = []
+    for leg in leg_defs:
+        result.append({
+            "action": leg.side.upper(),  # "buy" -> "BUY"
+            "type": leg.type,            # stays "call" or "put"
+        })
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -258,7 +222,8 @@ def create_strike_expiry_selector(llm):
 
     Returns:
         Callable: strike_expiry_selector_node(state: dict) -> dict
-            Return dict has exactly one key: "options_legs".
+            Return dict has keys: "options_legs", "anchor_strike", "width",
+            "near_expiry", "far_expiry".
             Does NOT write to state["messages"].
     """
 
@@ -306,7 +271,11 @@ def create_strike_expiry_selector(llm):
 
         if not expirations:
             return {
-                "options_legs": "No options expirations available for this ticker. [NO DATA]"
+                "options_legs": "No options expirations available for this ticker. [NO DATA]",
+                "anchor_strike": None,
+                "width": 5.0,
+                "near_expiry": None,
+                "far_expiry": None,
             }
 
         # ------------------------------------------------------------------
@@ -324,11 +293,22 @@ def create_strike_expiry_selector(llm):
 
         leg_types = _get_leg_types(options_strategy)
 
+        # Compute strategy width from registry
+        strategy_key = normalize_strategy_key(options_strategy)
+        strategy_meta = REGISTRY.strategies.get(strategy_key)
+        width: float = strategy_meta.default_width if strategy_meta is not None else 5.0
+
         # ------------------------------------------------------------------
         # Build recommendations per timeframe
         # ------------------------------------------------------------------
         report_sections = []
         primary_legs = None  # first successful bucket becomes the primary recommendation
+        successful_expiries = []  # collect expiry strings from successful buckets
+
+        # Regex to extract anchor strike from first LEG line
+        _strike_re = re.compile(r"\$([0-9.]+)")
+
+        anchor_strike: Optional[float] = None
 
         for bucket in DTE_BUCKETS:
             bucket_expiries = [
@@ -380,9 +360,24 @@ def create_strike_expiry_selector(llm):
                 )
 
             report_sections.append(section)
+            successful_expiries.append(best_exp)
 
             if primary_legs is None:
                 primary_legs = "\n".join(legs)
+                # Extract anchor_strike from the first LEG line
+                first_leg_line = legs[0] if legs else ""
+                m = _strike_re.search(first_leg_line)
+                if m:
+                    try:
+                        anchor_strike = float(m.group(1))
+                    except (ValueError, TypeError):
+                        anchor_strike = None
+
+        # ------------------------------------------------------------------
+        # Compute near/far expiry from successful buckets
+        # ------------------------------------------------------------------
+        near_exp: Optional[str] = successful_expiries[0] if len(successful_expiries) >= 1 else None
+        far_exp: Optional[str] = successful_expiries[1] if len(successful_expiries) >= 2 else None
 
         # ------------------------------------------------------------------
         # Compose full output
@@ -392,12 +387,22 @@ def create_strike_expiry_selector(llm):
 
         if not primary_legs:
             return {
-                "options_legs": header + "\nNo viable contracts found across any timeframe. [LIQUIDITY FAIL]"
+                "options_legs": header + "\nNo viable contracts found across any timeframe. [LIQUIDITY FAIL]",
+                "anchor_strike": None,
+                "width": width,
+                "near_expiry": None,
+                "far_expiry": None,
             }
 
         output = header + "\n".join(report_sections)
         output += "\n\n---\n*Primary recommendation uses the first available timeframe with viable contracts.*"
 
-        return {"options_legs": output}
+        return {
+            "options_legs": output,
+            "anchor_strike": anchor_strike,
+            "width": width,
+            "near_expiry": near_exp,
+            "far_expiry": far_exp,
+        }
 
     return strike_expiry_selector_node
