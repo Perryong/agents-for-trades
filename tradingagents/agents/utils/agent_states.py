@@ -97,3 +97,9 @@ class AgentState(MessagesState):
     vol_note_social: Annotated[Optional[str], _last_value]
     vol_note_news: Annotated[Optional[str], _last_value]
     vol_note_fundamentals: Annotated[Optional[str], _last_value]
+
+    # Strike/expiry selector structured output -- used by declarative legs builder
+    anchor_strike: Annotated[Optional[float], _last_value]
+    width: Annotated[Optional[float], _last_value]
+    near_expiry: Annotated[Optional[str], _last_value]
+    far_expiry: Annotated[Optional[str], _last_value]
