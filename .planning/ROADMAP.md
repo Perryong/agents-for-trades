@@ -106,7 +106,7 @@ Plans:
 **Goal:** Replace the 10-strategy hardcoded selector with a 40-strategy YAML registry, rule-based eligibility gate (hard gates + soft scoring), declarative legs builder that eliminates all if/elif dispatch code, and enhanced risk manager with strategy context and paper trading stop-loss enforcement
 **Requirements**: [GATE-01, GATE-02, GATE-03, GATE-04, GATE-05, REG-01, REG-02, REG-03, LEGS-01, LEGS-02, LEGS-03, SEL-01, SEL-02, RISK-01, RISK-02]
 **Depends on:** Phase 1
-**Plans:** 2/4 plans executed
+**Plans:** 4/4 plans complete
 
 Requirements:
 - RISK-01: Risk manager receives full strategy context (margin_intensive flag, max loss profile) from registry per D-24
@@ -116,7 +116,7 @@ Plans:
 - [x] 02-01-PLAN.md — Strategy registry YAML + Pydantic models + eligibility gate + config defaults + tests (TDD)
 - [x] 02-02-PLAN.md — Strategy selector gate integration + AgentState update + test updates
 - [x] 02-03-PLAN.md — Declarative legs builder + strike/expiry selector anchor/width output + tests
-- [ ] 02-04-PLAN.md — Risk manager strategy context + paper trading stop-loss enforcement (D-02/D-23/D-24)
+- [x] 02-04-PLAN.md — Risk manager strategy context + paper trading stop-loss enforcement (D-02/D-23/D-24)
 
 ---
 
