@@ -1,0 +1,782 @@
+# Strategy registry — single source of truth for all 40 options strategies.
+# Two top-level sections:
+#   strategies: eligibility metadata for each strategy
+#   legs:       declarative leg definitions (side, type, quantity, strike_offset, expiry)
+#
+# Strike resolution: anchor_strike + (strike_offset * width)
+# Expiry resolution: near_expiry (for "near") or far_expiry (for "far")
+#
+# Leg patterns:
+#   Verticals:    2 legs, same type, offsets 0 and +1, same expiry
+#   Butterflies:  3 legs, same type, offsets -1, 0 (qty 2), +1, same expiry
+#   Condors:      4 legs, same type, offsets -2, -1, +1, +2, same expiry
+#   Iron:         4 legs, mixed put+call, same expiry
+#   Calendar:     2 legs, same type+strike, near + far expiry
+#   Diagonal:     2 legs, same type, near + far expiry, different strikes
+#   Ratio back:   3 legs, sell 1 near ATM + buy 2 further OTM
+#   Ratio front:  3 legs, buy 1 near ATM + sell 2 further OTM
+
+strategies:
+
+  # =========================================================================
+  # SINGLES (4)
+  # =========================================================================
+
+  long_call:
+    bias: [bullish]
+    iv_env: [any]
+    legs_count: 1
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: negative    # IV crush after earnings hurts long options
+    default_width: 5.0
+    soft_score:
+      theta_env: negative
+      skew: neutral
+
+  long_put:
+    bias: [bearish]
+    iv_env: [any]
+    legs_count: 1
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: negative
+    default_width: 5.0
+    soft_score:
+      theta_env: negative
+      skew: neutral
+
+  short_call:
+    bias: [bearish, neutral]
+    iv_env: [high]
+    legs_count: 1
+    margin_intensive: true
+    requires_multi_expiry: false
+    earnings_signal: positive    # IV crush benefits short options sellers
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  short_put:
+    bias: [bullish, neutral]
+    iv_env: [high]
+    legs_count: 1
+    margin_intensive: true
+    requires_multi_expiry: false
+    earnings_signal: positive
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  # =========================================================================
+  # SPREADS (16)
+  # =========================================================================
+
+  long_call_spread:
+    bias: [bullish]
+    iv_env: [any]
+    legs_count: 2
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: neutral
+    default_width: 5.0
+    soft_score:
+      theta_env: neutral
+      skew: neutral
+
+  short_call_spread:
+    bias: [bearish]
+    iv_env: [high]
+    legs_count: 2
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: positive
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  long_put_spread:
+    bias: [bearish]
+    iv_env: [any]
+    legs_count: 2
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: neutral
+    default_width: 5.0
+    soft_score:
+      theta_env: neutral
+      skew: neutral
+
+  short_put_spread:
+    bias: [bullish]
+    iv_env: [high]
+    legs_count: 2
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: positive
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  long_straddle:
+    bias: [neutral_volatile]
+    iv_env: [low]
+    legs_count: 2
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: positive    # Big post-earnings moves benefit straddle buyers
+    default_width: 5.0
+    soft_score:
+      theta_env: negative
+      skew: neutral
+
+  short_straddle:
+    bias: [neutral_quiet]
+    iv_env: [high]
+    legs_count: 2
+    margin_intensive: true
+    requires_multi_expiry: false
+    earnings_signal: positive    # IV crush benefits short straddle sellers
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  long_strangle:
+    bias: [neutral_volatile]
+    iv_env: [low]
+    legs_count: 2
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: positive
+    default_width: 5.0
+    soft_score:
+      theta_env: negative
+      skew: neutral
+
+  short_strangle:
+    bias: [neutral_quiet]
+    iv_env: [high]
+    legs_count: 2
+    margin_intensive: true
+    requires_multi_expiry: false
+    earnings_signal: positive
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  covered_call:
+    bias: [bullish, neutral]
+    iv_env: [high]
+    legs_count: 1
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: positive
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  protective_put:
+    bias: [bullish_hedge]
+    iv_env: [any]
+    legs_count: 1
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: negative
+    default_width: 5.0
+    soft_score:
+      theta_env: negative
+      skew: neutral
+
+  collar:
+    bias: [bullish_hedge]
+    iv_env: [any]
+    legs_count: 2
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: neutral
+    default_width: 5.0
+    soft_score:
+      theta_env: neutral
+      skew: neutral
+
+  cash_secured_put:
+    bias: [bullish, neutral]
+    iv_env: [high]
+    legs_count: 1
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: positive
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  call_back_spread:
+    bias: [bullish_volatile]
+    iv_env: [any]
+    legs_count: 3
+    margin_intensive: true
+    requires_multi_expiry: false
+    earnings_signal: positive
+    default_width: 5.0
+    soft_score:
+      theta_env: negative
+      skew: neutral
+
+  put_back_spread:
+    bias: [bearish_volatile]
+    iv_env: [any]
+    legs_count: 3
+    margin_intensive: true
+    requires_multi_expiry: false
+    earnings_signal: positive
+    default_width: 5.0
+    soft_score:
+      theta_env: negative
+      skew: neutral
+
+  call_front_spread:
+    bias: [bearish, neutral]
+    iv_env: [high]
+    legs_count: 3
+    margin_intensive: true
+    requires_multi_expiry: false
+    earnings_signal: positive
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  put_front_spread:
+    bias: [bullish, neutral]
+    iv_env: [high]
+    legs_count: 3
+    margin_intensive: true
+    requires_multi_expiry: false
+    earnings_signal: positive
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  # =========================================================================
+  # BUTTERFLIES (4)
+  # =========================================================================
+
+  long_call_butterfly:
+    bias: [neutral]
+    iv_env: [low]
+    legs_count: 3
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: positive    # Max profit if stock pins near center strike
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  short_call_butterfly:
+    bias: [neutral_volatile]
+    iv_env: [any]
+    legs_count: 3
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: negative
+    default_width: 5.0
+    soft_score:
+      theta_env: negative
+      skew: neutral
+
+  long_put_butterfly:
+    bias: [neutral]
+    iv_env: [low]
+    legs_count: 3
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: positive
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  short_put_butterfly:
+    bias: [neutral_volatile]
+    iv_env: [any]
+    legs_count: 3
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: negative
+    default_width: 5.0
+    soft_score:
+      theta_env: negative
+      skew: neutral
+
+  # =========================================================================
+  # CONDORS (4)
+  # =========================================================================
+
+  long_call_condor:
+    bias: [neutral]
+    iv_env: [low]
+    legs_count: 4
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: positive
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  short_call_condor:
+    bias: [neutral_volatile]
+    iv_env: [any]
+    legs_count: 4
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: negative
+    default_width: 5.0
+    soft_score:
+      theta_env: negative
+      skew: neutral
+
+  long_put_condor:
+    bias: [neutral]
+    iv_env: [low]
+    legs_count: 4
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: positive
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  short_put_condor:
+    bias: [neutral_volatile]
+    iv_env: [any]
+    legs_count: 4
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: negative
+    default_width: 5.0
+    soft_score:
+      theta_env: negative
+      skew: neutral
+
+  # =========================================================================
+  # IRON STRATEGIES (4)
+  # =========================================================================
+
+  iron_condor:
+    bias: [neutral]
+    iv_env: [high]
+    legs_count: 4
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: positive    # IV crush benefits iron condor sellers
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  reverse_iron_condor:
+    bias: [neutral_volatile]
+    iv_env: [low]
+    legs_count: 4
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: positive
+    default_width: 5.0
+    soft_score:
+      theta_env: negative
+      skew: neutral
+
+  iron_butterfly:
+    bias: [neutral]
+    iv_env: [high]
+    legs_count: 4
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: positive
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  reverse_iron_butterfly:
+    bias: [neutral_volatile]
+    iv_env: [low]
+    legs_count: 4
+    margin_intensive: false
+    requires_multi_expiry: false
+    earnings_signal: positive
+    default_width: 5.0
+    soft_score:
+      theta_env: negative
+      skew: neutral
+
+  # =========================================================================
+  # CALENDAR SPREADS (4)
+  # =========================================================================
+
+  long_call_calendar:
+    bias: [neutral, bullish]
+    iv_env: [low]
+    legs_count: 2
+    margin_intensive: false
+    requires_multi_expiry: true
+    earnings_signal: positive    # Vega expansion from earnings can benefit
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  short_call_calendar:
+    bias: [neutral_volatile]
+    iv_env: [high]
+    legs_count: 2
+    margin_intensive: false
+    requires_multi_expiry: true
+    earnings_signal: negative
+    default_width: 5.0
+    soft_score:
+      theta_env: negative
+      skew: neutral
+
+  long_put_calendar:
+    bias: [neutral, bearish]
+    iv_env: [low]
+    legs_count: 2
+    margin_intensive: false
+    requires_multi_expiry: true
+    earnings_signal: positive
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  short_put_calendar:
+    bias: [neutral_volatile]
+    iv_env: [high]
+    legs_count: 2
+    margin_intensive: false
+    requires_multi_expiry: true
+    earnings_signal: negative
+    default_width: 5.0
+    soft_score:
+      theta_env: negative
+      skew: neutral
+
+  # =========================================================================
+  # DIAGONAL SPREADS (4)
+  # =========================================================================
+
+  long_call_diagonal:
+    bias: [bullish]
+    iv_env: [low]
+    legs_count: 2
+    margin_intensive: false
+    requires_multi_expiry: true
+    earnings_signal: neutral
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  short_call_diagonal:
+    bias: [bearish]
+    iv_env: [high]
+    legs_count: 2
+    margin_intensive: false
+    requires_multi_expiry: true
+    earnings_signal: neutral
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  long_put_diagonal:
+    bias: [bearish]
+    iv_env: [low]
+    legs_count: 2
+    margin_intensive: false
+    requires_multi_expiry: true
+    earnings_signal: neutral
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+  short_put_diagonal:
+    bias: [bullish]
+    iv_env: [high]
+    legs_count: 2
+    margin_intensive: false
+    requires_multi_expiry: true
+    earnings_signal: neutral
+    default_width: 5.0
+    soft_score:
+      theta_env: positive
+      skew: neutral
+
+
+# =============================================================================
+# LEG DEFINITIONS
+# =============================================================================
+# Each entry is an ordered list of legs.
+# Fields per leg:
+#   side:          "buy" or "sell"
+#   type:          "call" or "put"
+#   quantity:      number of contracts (default 1)
+#   strike_offset: integer multiplier applied to width (0 = ATM anchor)
+#   expiry:        "near" or "far" (default "near")
+#
+# Strike resolution: anchor_strike + (strike_offset * width)
+# Positive offset = higher strike; negative offset = lower strike
+
+legs:
+
+  # =========================================================================
+  # SINGLES
+  # =========================================================================
+
+  long_call:
+    - {side: buy,  type: call, quantity: 1, strike_offset: 0, expiry: near}
+
+  long_put:
+    - {side: buy,  type: put,  quantity: 1, strike_offset: 0, expiry: near}
+
+  short_call:
+    - {side: sell, type: call, quantity: 1, strike_offset: 0, expiry: near}
+
+  short_put:
+    - {side: sell, type: put,  quantity: 1, strike_offset: 0, expiry: near}
+
+  # =========================================================================
+  # SPREADS
+  # =========================================================================
+
+  # Bull call spread: buy lower call, sell higher call
+  long_call_spread:
+    - {side: buy,  type: call, quantity: 1, strike_offset:  0, expiry: near}
+    - {side: sell, type: call, quantity: 1, strike_offset:  1, expiry: near}
+
+  # Bear call spread: sell lower call, buy higher call
+  short_call_spread:
+    - {side: sell, type: call, quantity: 1, strike_offset:  0, expiry: near}
+    - {side: buy,  type: call, quantity: 1, strike_offset:  1, expiry: near}
+
+  # Bear put spread: buy higher put, sell lower put
+  long_put_spread:
+    - {side: buy,  type: put,  quantity: 1, strike_offset:  0, expiry: near}
+    - {side: sell, type: put,  quantity: 1, strike_offset: -1, expiry: near}
+
+  # Bull put spread: sell higher put, buy lower put
+  short_put_spread:
+    - {side: sell, type: put,  quantity: 1, strike_offset:  0, expiry: near}
+    - {side: buy,  type: put,  quantity: 1, strike_offset: -1, expiry: near}
+
+  # Long straddle: buy ATM call + buy ATM put
+  long_straddle:
+    - {side: buy,  type: call, quantity: 1, strike_offset:  0, expiry: near}
+    - {side: buy,  type: put,  quantity: 1, strike_offset:  0, expiry: near}
+
+  # Short straddle: sell ATM call + sell ATM put
+  short_straddle:
+    - {side: sell, type: call, quantity: 1, strike_offset:  0, expiry: near}
+    - {side: sell, type: put,  quantity: 1, strike_offset:  0, expiry: near}
+
+  # Long strangle: buy OTM call + buy OTM put
+  long_strangle:
+    - {side: buy,  type: call, quantity: 1, strike_offset:  1, expiry: near}
+    - {side: buy,  type: put,  quantity: 1, strike_offset: -1, expiry: near}
+
+  # Short strangle: sell OTM call + sell OTM put
+  short_strangle:
+    - {side: sell, type: call, quantity: 1, strike_offset:  1, expiry: near}
+    - {side: sell, type: put,  quantity: 1, strike_offset: -1, expiry: near}
+
+  # Covered call: sell OTM call (stock position implied)
+  covered_call:
+    - {side: sell, type: call, quantity: 1, strike_offset:  1, expiry: near}
+
+  # Protective put: buy OTM put (stock position implied)
+  protective_put:
+    - {side: buy,  type: put,  quantity: 1, strike_offset: -1, expiry: near}
+
+  # Collar: sell OTM call + buy OTM put (stock position implied)
+  collar:
+    - {side: sell, type: call, quantity: 1, strike_offset:  1, expiry: near}
+    - {side: buy,  type: put,  quantity: 1, strike_offset: -1, expiry: near}
+
+  # Cash-secured put: sell ATM/OTM put
+  cash_secured_put:
+    - {side: sell, type: put,  quantity: 1, strike_offset:  0, expiry: near}
+
+  # Call back spread: sell 1 near-ATM call, buy 2 OTM calls (net long volatility)
+  call_back_spread:
+    - {side: sell, type: call, quantity: 1, strike_offset:  0, expiry: near}
+    - {side: buy,  type: call, quantity: 2, strike_offset:  1, expiry: near}
+
+  # Put back spread: sell 1 near-ATM put, buy 2 OTM puts (net long volatility)
+  put_back_spread:
+    - {side: sell, type: put,  quantity: 1, strike_offset:  0, expiry: near}
+    - {side: buy,  type: put,  quantity: 2, strike_offset: -1, expiry: near}
+
+  # Call front spread: buy 1 near-ATM call, sell 2 OTM calls (net short volatility)
+  call_front_spread:
+    - {side: buy,  type: call, quantity: 1, strike_offset:  0, expiry: near}
+    - {side: sell, type: call, quantity: 2, strike_offset:  1, expiry: near}
+
+  # Put front spread: buy 1 near-ATM put, sell 2 OTM puts (net short volatility)
+  put_front_spread:
+    - {side: buy,  type: put,  quantity: 1, strike_offset:  0, expiry: near}
+    - {side: sell, type: put,  quantity: 2, strike_offset: -1, expiry: near}
+
+  # =========================================================================
+  # BUTTERFLIES
+  # =========================================================================
+
+  # Long call butterfly: buy low, sell 2 mid, buy high
+  long_call_butterfly:
+    - {side: buy,  type: call, quantity: 1, strike_offset: -1, expiry: near}
+    - {side: sell, type: call, quantity: 2, strike_offset:  0, expiry: near}
+    - {side: buy,  type: call, quantity: 1, strike_offset:  1, expiry: near}
+
+  # Short call butterfly: sell low, buy 2 mid, sell high
+  short_call_butterfly:
+    - {side: sell, type: call, quantity: 1, strike_offset: -1, expiry: near}
+    - {side: buy,  type: call, quantity: 2, strike_offset:  0, expiry: near}
+    - {side: sell, type: call, quantity: 1, strike_offset:  1, expiry: near}
+
+  # Long put butterfly: buy high, sell 2 mid, buy low
+  long_put_butterfly:
+    - {side: buy,  type: put,  quantity: 1, strike_offset:  1, expiry: near}
+    - {side: sell, type: put,  quantity: 2, strike_offset:  0, expiry: near}
+    - {side: buy,  type: put,  quantity: 1, strike_offset: -1, expiry: near}
+
+  # Short put butterfly: sell high, buy 2 mid, sell low
+  short_put_butterfly:
+    - {side: sell, type: put,  quantity: 1, strike_offset:  1, expiry: near}
+    - {side: buy,  type: put,  quantity: 2, strike_offset:  0, expiry: near}
+    - {side: sell, type: put,  quantity: 1, strike_offset: -1, expiry: near}
+
+  # =========================================================================
+  # CONDORS
+  # =========================================================================
+
+  # Long call condor: buy low, sell mid-low, sell mid-high, buy high
+  long_call_condor:
+    - {side: buy,  type: call, quantity: 1, strike_offset: -2, expiry: near}
+    - {side: sell, type: call, quantity: 1, strike_offset: -1, expiry: near}
+    - {side: sell, type: call, quantity: 1, strike_offset:  1, expiry: near}
+    - {side: buy,  type: call, quantity: 1, strike_offset:  2, expiry: near}
+
+  # Short call condor: sell low, buy mid-low, buy mid-high, sell high
+  short_call_condor:
+    - {side: sell, type: call, quantity: 1, strike_offset: -2, expiry: near}
+    - {side: buy,  type: call, quantity: 1, strike_offset: -1, expiry: near}
+    - {side: buy,  type: call, quantity: 1, strike_offset:  1, expiry: near}
+    - {side: sell, type: call, quantity: 1, strike_offset:  2, expiry: near}
+
+  # Long put condor: buy high, sell mid-high, sell mid-low, buy low
+  long_put_condor:
+    - {side: buy,  type: put,  quantity: 1, strike_offset:  2, expiry: near}
+    - {side: sell, type: put,  quantity: 1, strike_offset:  1, expiry: near}
+    - {side: sell, type: put,  quantity: 1, strike_offset: -1, expiry: near}
+    - {side: buy,  type: put,  quantity: 1, strike_offset: -2, expiry: near}
+
+  # Short put condor: sell high, buy mid-high, buy mid-low, sell low
+  short_put_condor:
+    - {side: sell, type: put,  quantity: 1, strike_offset:  2, expiry: near}
+    - {side: buy,  type: put,  quantity: 1, strike_offset:  1, expiry: near}
+    - {side: buy,  type: put,  quantity: 1, strike_offset: -1, expiry: near}
+    - {side: sell, type: put,  quantity: 1, strike_offset: -2, expiry: near}
+
+  # =========================================================================
+  # IRON STRATEGIES
+  # =========================================================================
+
+  # Iron condor: sell OTM put spread + sell OTM call spread
+  # Buy lower put, sell higher put (put wing), sell lower call, buy higher call (call wing)
+  iron_condor:
+    - {side: buy,  type: put,  quantity: 1, strike_offset: -2, expiry: near}
+    - {side: sell, type: put,  quantity: 1, strike_offset: -1, expiry: near}
+    - {side: sell, type: call, quantity: 1, strike_offset:  1, expiry: near}
+    - {side: buy,  type: call, quantity: 1, strike_offset:  2, expiry: near}
+
+  # Reverse iron condor: buy OTM put spread + buy OTM call spread (net long)
+  reverse_iron_condor:
+    - {side: sell, type: put,  quantity: 1, strike_offset: -2, expiry: near}
+    - {side: buy,  type: put,  quantity: 1, strike_offset: -1, expiry: near}
+    - {side: buy,  type: call, quantity: 1, strike_offset:  1, expiry: near}
+    - {side: sell, type: call, quantity: 1, strike_offset:  2, expiry: near}
+
+  # Iron butterfly: sell ATM straddle + buy OTM strangle (wings)
+  iron_butterfly:
+    - {side: buy,  type: put,  quantity: 1, strike_offset: -1, expiry: near}
+    - {side: sell, type: put,  quantity: 1, strike_offset:  0, expiry: near}
+    - {side: sell, type: call, quantity: 1, strike_offset:  0, expiry: near}
+    - {side: buy,  type: call, quantity: 1, strike_offset:  1, expiry: near}
+
+  # Reverse iron butterfly: buy ATM straddle + sell OTM strangle (wings)
+  reverse_iron_butterfly:
+    - {side: sell, type: put,  quantity: 1, strike_offset: -1, expiry: near}
+    - {side: buy,  type: put,  quantity: 1, strike_offset:  0, expiry: near}
+    - {side: buy,  type: call, quantity: 1, strike_offset:  0, expiry: near}
+    - {side: sell, type: call, quantity: 1, strike_offset:  1, expiry: near}
+
+  # =========================================================================
+  # CALENDAR SPREADS
+  # =========================================================================
+
+  # Long call calendar: sell near-term call, buy far-term call (same strike)
+  long_call_calendar:
+    - {side: sell, type: call, quantity: 1, strike_offset:  0, expiry: near}
+    - {side: buy,  type: call, quantity: 1, strike_offset:  0, expiry: far}
+
+  # Short call calendar: buy near-term call, sell far-term call
+  short_call_calendar:
+    - {side: buy,  type: call, quantity: 1, strike_offset:  0, expiry: near}
+    - {side: sell, type: call, quantity: 1, strike_offset:  0, expiry: far}
+
+  # Long put calendar: sell near-term put, buy far-term put (same strike)
+  long_put_calendar:
+    - {side: sell, type: put,  quantity: 1, strike_offset:  0, expiry: near}
+    - {side: buy,  type: put,  quantity: 1, strike_offset:  0, expiry: far}
+
+  # Short put calendar: buy near-term put, sell far-term put
+  short_put_calendar:
+    - {side: buy,  type: put,  quantity: 1, strike_offset:  0, expiry: near}
+    - {side: sell, type: put,  quantity: 1, strike_offset:  0, expiry: far}
+
+  # =========================================================================
+  # DIAGONAL SPREADS
+  # =========================================================================
+
+  # Long call diagonal: sell near-term lower call, buy far-term higher call
+  long_call_diagonal:
+    - {side: sell, type: call, quantity: 1, strike_offset:  0, expiry: near}
+    - {side: buy,  type: call, quantity: 1, strike_offset:  1, expiry: far}
+
+  # Short call diagonal: buy near-term lower call, sell far-term higher call
+  short_call_diagonal:
+    - {side: buy,  type: call, quantity: 1, strike_offset:  0, expiry: near}
+    - {side: sell, type: call, quantity: 1, strike_offset:  1, expiry: far}
+
+  # Long put diagonal: sell near-term higher put, buy far-term lower put
+  long_put_diagonal:
+    - {side: sell, type: put,  quantity: 1, strike_offset:  0, expiry: near}
+    - {side: buy,  type: put,  quantity: 1, strike_offset: -1, expiry: far}
+
+  # Short put diagonal: buy near-term higher put, sell far-term lower put
+  short_put_diagonal:
+    - {side: buy,  type: put,  quantity: 1, strike_offset:  0, expiry: near}
+    - {side: sell, type: put,  quantity: 1, strike_offset: -1, expiry: far}

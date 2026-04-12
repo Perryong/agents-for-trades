@@ -1,0 +1,18 @@
+# Risk configuration for options strategy gating.
+#
+# available_margin: float or null
+#   Total margin available for options strategies.
+#   null (default) = fail-safe mode — all margin_intensive strategies are excluded.
+#   Set to a float value to enable margin-intensive strategies up to that limit.
+#
+# exclude_margin_intensive: bool (default false)
+#   Explicit override: when true, forces exclusion of all margin_intensive
+#   strategies even if available_margin is set.
+#
+# paper_trading_stop_loss_pct: float (default 0.50)
+#   Maximum loss as a fraction of premium paid (or margin used) before
+#   paper trading auto-close triggers. 0.50 = 50% loss.
+
+available_margin: null
+exclude_margin_intensive: false
+paper_trading_stop_loss_pct: 0.50

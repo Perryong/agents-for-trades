@@ -40,4 +40,6 @@ DEFAULT_CONFIG = {
     "options_delta_target": 0.30,       # Target delta for contract selection (Phase 3)
     "options_dte_window": [0, 90],      # DTE range [min, max] — multi-timeframe buckets handle sub-ranges
     "options_min_oi": 100,              # Minimum open interest filter
+    "available_margin": None,            # Float or None; None = fail-safe (exclude all margin_intensive)
+    "exclude_margin_intensive": False,   # Explicit override: True forces exclusion even if margin is set
 }
