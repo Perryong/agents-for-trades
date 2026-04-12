@@ -1,5 +1,52 @@
 import time
 import json
+import yaml
+from pathlib import Path
+
+
+def _get_strategy_context(options_strategy: str) -> dict:
+    """Look up strategy metadata from registry for risk assessment context.
+    Returns dict with margin_intensive, legs_count, max_loss_profile, strategy_key."""
+    try:
+        from tradingagents.agents.options.strategies import REGISTRY, normalize_strategy_key
+        strategy_key = normalize_strategy_key(options_strategy)
+        meta = REGISTRY.strategies.get(strategy_key)
+        if meta:
+            # Determine max loss profile from strategy structure
+            if meta.margin_intensive:
+                max_loss_profile = "UNLIMITED or MARGIN-DEPENDENT"
+            elif meta.legs_count >= 3:
+                max_loss_profile = "DEFINED (multi-leg spread)"
+            else:
+                max_loss_profile = "DEFINED (premium paid)"
+            return {
+                "strategy_key": strategy_key,
+                "margin_intensive": meta.margin_intensive,
+                "legs_count": meta.legs_count,
+                "max_loss_profile": max_loss_profile,
+                "requires_multi_expiry": meta.requires_multi_expiry,
+            }
+    except ImportError:
+        pass
+    return {
+        "strategy_key": options_strategy,
+        "margin_intensive": False,
+        "legs_count": 0,
+        "max_loss_profile": "UNKNOWN",
+        "requires_multi_expiry": False,
+    }
+
+
+def _get_paper_trading_stop_loss_pct() -> float:
+    """Read paper_trading_stop_loss_pct from risk_config.yaml. Default 0.50."""
+    try:
+        config_path = Path(__file__).parent.parent / "options" / "risk_config.yaml"
+        if config_path.exists():
+            raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+            return float(raw.get("paper_trading_stop_loss_pct", 0.50))
+    except Exception:
+        pass
+    return 0.50
 
 
 def create_risk_manager(llm, memory):
@@ -58,6 +105,34 @@ Evaluate each rule:
 5. Negative Theta: If the position has negative theta (time decay working against the holder) and is intended to be held more than 30 days without a specific catalyst, FLAG. Otherwise PASS.
 
 Include your PASS/FLAG assessment for each rule in your final recommendation."""
+
+            strategy_ctx = _get_strategy_context(options_strategy)
+            stop_loss_pct = _get_paper_trading_stop_loss_pct()
+            margin_warning = (
+                "WARNING: This is a margin-intensive strategy. Ensure adequate margin is available "
+                "and position sizing accounts for margin requirements."
+                if strategy_ctx["margin_intensive"]
+                else "This strategy has defined risk."
+            )
+            stop_loss_detail = (
+                f"CRITICAL: This is a MARGIN-INTENSIVE strategy. Stop-loss enforcement is MANDATORY. "
+                f"Recommend closing the position when unrealized loss reaches {stop_loss_pct * 100:.0f}% "
+                f"of max loss or margin utilization exceeds safe thresholds."
+                if strategy_ctx["margin_intensive"]
+                else f"Recommend closing the position when unrealized loss reaches {stop_loss_pct * 100:.0f}% of max loss."
+            )
+            options_rules_section += f"""
+
+6. Strategy Context (D-24): This strategy is "{strategy_ctx['strategy_key']}" with {strategy_ctx['legs_count']} legs.
+   Margin Intensive: {strategy_ctx['margin_intensive']}.
+   Max Loss Profile: {strategy_ctx['max_loss_profile']}.
+   {margin_warning}
+   Evaluate whether the margin/risk profile is appropriate for the account size and risk tolerance.
+
+7. Paper Trading Stop-Loss (D-02/D-23): All options positions MUST have a stop-loss rule for paper trading execution.
+   Configured stop-loss threshold: {stop_loss_pct * 100:.0f}% of max loss.
+   {stop_loss_detail}
+   If no explicit stop-loss is documented in the trade plan, FLAG this rule."""
 
         prompt = f"""As the Risk Management Judge and Debate Facilitator, your goal is to evaluate the debate between three risk analysts—Aggressive, Neutral, and Conservative—and determine the best course of action for the trader. Your decision must result in a clear recommendation: Buy, Sell, or Hold. Choose Hold only if strongly justified by specific arguments, not as a fallback when all sides seem valid. Strive for clarity and decisiveness.
 
