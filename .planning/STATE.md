@@ -75,6 +75,7 @@ Plan: Not started
 ### Roadmap Evolution
 
 - Phase 1 added (v3.0): Multi-expiry options data for flow and vol analysts to support complex strategies
+- Phase 2 added (v3.0): Strategy agent enhancement — registry-driven eligibility gate with declarative legs builder
 
 ### Phase Boundary Notes
 
