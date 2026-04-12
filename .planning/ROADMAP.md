@@ -113,7 +113,7 @@ Requirements:
 - RISK-02: Paper trading stop-loss enforcement rule added to risk manager for all strategies, with mandatory enforcement for margin-intensive strategies per D-02/D-23
 
 Plans:
-- [ ] 02-01-PLAN.md — Strategy registry YAML + Pydantic models + eligibility gate + config defaults + tests (TDD)
+- [x] 02-01-PLAN.md — Strategy registry YAML + Pydantic models + eligibility gate + config defaults + tests (TDD)
 - [ ] 02-02-PLAN.md — Strategy selector gate integration + AgentState update + test updates
 - [ ] 02-03-PLAN.md — Declarative legs builder + strike/expiry selector anchor/width output + tests
 - [ ] 02-04-PLAN.md — Risk manager strategy context + paper trading stop-loss enforcement (D-02/D-23/D-24)
