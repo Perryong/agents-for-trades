@@ -15,6 +15,7 @@ import pandas as pd
 
 from tradingagents.dataflows.interface import route_to_vendor
 from tradingagents.dataflows.config import get_config
+from tradingagents.agents.options.strategies import REGISTRY, normalize_strategy_key
 
 
 # ---------------------------------------------------------------------------
@@ -44,6 +45,11 @@ def _parse_tabular_string(s: str) -> Optional[pd.DataFrame]:
         return None
     if stripped.lower().startswith("no "):
         return None
+    lines = stripped.splitlines()
+    if lines and lines[0].startswith("# SPOT:"):
+        stripped = "\n".join(lines[1:]).strip()
+        if not stripped:
+            return None
     try:
         return pd.read_csv(io.StringIO(stripped), sep=r'\s+', engine='python')
     except Exception:
@@ -51,190 +57,163 @@ def _parse_tabular_string(s: str) -> Optional[pd.DataFrame]:
 
 
 # ---------------------------------------------------------------------------
-# Helper: determine normalized strategy type from strategy string
+# Helper: resolve strike from anchor + offset * width (D-20)
 # ---------------------------------------------------------------------------
 
-def _get_strategy_type(strategy: str) -> str:
-    """Return normalized strategy type string from strategy description.
+def _resolve_strike(anchor: float, offset: int, width: float) -> float:
+    """Resolve a leg's strike price from anchor + (offset x width).
 
-    Returns one of: "long_call", "long_put", "bull_call_spread",
-    "bear_put_spread", "iron_condor", "long_straddle", "long_strangle",
-    "covered_call", "cash_secured_put", "calendar_spread".
+    Per D-20: all strikes are derived from anchor_strike + (strike_offset * default_width).
     """
-    s = strategy.lower()
-
-    if "iron condor" in s:
-        return "iron_condor"
-    elif "bull call spread" in s:
-        return "bull_call_spread"
-    elif "bear put spread" in s:
-        return "bear_put_spread"
-    elif "long straddle" in s:
-        return "long_straddle"
-    elif "long strangle" in s:
-        return "long_strangle"
-    elif "calendar spread" in s:
-        return "calendar_spread"
-    elif "covered call" in s:
-        return "covered_call"
-    elif "cash-secured put" in s or "cash secured put" in s:
-        return "cash_secured_put"
-    elif "long call" in s:
-        return "long_call"
-    elif "long put" in s:
-        return "long_put"
-    else:
-        return "long_call"
+    return round(anchor + (offset * width), 2)
 
 
 # ---------------------------------------------------------------------------
-# Helper: compute payoff metrics per strategy
+# Helper: compute payoff metrics via generic leg structure templates
 # ---------------------------------------------------------------------------
 
-def _compute_payoff(strategy_type: str, legs_data: list, net_debit_credit: float) -> dict:
-    """Compute max_profit, max_loss, breakeven for the given strategy.
+def _compute_payoff(strategy_key: str, legs_data: list, net_debit_credit: float) -> dict:
+    """Generic payoff computation based on leg structure analysis.
+
+    Covers all 40 strategies via 6 templates determined by leg count and structure.
 
     Args:
-        strategy_type: normalized strategy type string
+        strategy_key: normalized strategy key string (from normalize_strategy_key)
         legs_data: list of dicts with keys: action, option_type, strike, mid
         net_debit_credit: positive = net debit (cost), negative = net credit (received)
 
     Returns:
-        dict with keys: max_profit (str or float), max_loss (float), breakeven (str or float)
+        dict with keys: max_profit (str or float), max_loss (float or str), breakeven (str or float)
     """
-    net_debit = net_debit_credit  # positive = debit paid
+    net_debit = net_debit_credit
+    is_net_credit = net_debit_credit < 0
+    net_credit = abs(net_debit_credit) if is_net_credit else 0
 
-    if strategy_type == "long_call":
-        # Single BUY CALL leg
+    if len(legs_data) == 1:
+        # Single leg: long (buy) or short (sell)
         leg = legs_data[0]
         strike = leg["strike"]
-        return {
-            "max_profit": "unlimited",
-            "max_loss": round(net_debit, 2),
-            "breakeven": round(strike + net_debit, 2),
-        }
+        if leg["action"] == "BUY":
+            if leg["option_type"] == "CALL":
+                return {"max_profit": "unlimited", "max_loss": round(net_debit, 2),
+                        "breakeven": round(strike + net_debit, 2)}
+            else:  # PUT
+                return {"max_profit": round(max(strike - net_debit, 0), 2),
+                        "max_loss": round(net_debit, 2),
+                        "breakeven": round(strike - net_debit, 2)}
+        else:  # SELL
+            if leg["option_type"] == "CALL":
+                return {"max_profit": round(net_credit, 2), "max_loss": "unlimited",
+                        "breakeven": round(strike + net_credit, 2)}
+            else:  # PUT
+                return {"max_profit": round(net_credit, 2),
+                        "max_loss": round(strike - net_credit, 2),
+                        "breakeven": round(strike - net_credit, 2)}
 
-    elif strategy_type == "long_put":
-        # Single BUY PUT leg
-        leg = legs_data[0]
-        strike = leg["strike"]
-        max_profit = max(round(strike - net_debit, 2), 0.0)
-        return {
-            "max_profit": max_profit,
-            "max_loss": round(net_debit, 2),
-            "breakeven": round(strike - net_debit, 2),
-        }
+    elif len(legs_data) == 2:
+        option_types = set(l["option_type"] for l in legs_data)
+        actions = set(l["action"] for l in legs_data)
+        strikes = sorted(l["strike"] for l in legs_data)
 
-    elif strategy_type == "bull_call_spread":
-        # BUY lower strike call, SELL higher strike call
-        buy_leg = next((l for l in legs_data if l["action"] == "BUY"), legs_data[0])
-        sell_leg = next((l for l in legs_data if l["action"] == "SELL"), legs_data[1])
-        k_low = min(buy_leg["strike"], sell_leg["strike"])
-        k_high = max(buy_leg["strike"], sell_leg["strike"])
-        max_profit = round((k_high - k_low) - net_debit, 2)
-        return {
-            "max_profit": max_profit,
-            "max_loss": round(net_debit, 2),
-            "breakeven": round(k_low + net_debit, 2),
-        }
+        if option_types == {"CALL"} and actions == {"BUY", "SELL"}:
+            k_low, k_high = strikes[0], strikes[1]
+            spread_width = k_high - k_low
+            if is_net_credit:
+                return {"max_profit": round(net_credit, 2),
+                        "max_loss": round(spread_width - net_credit, 2),
+                        "breakeven": round(k_high - net_credit, 2)}
+            else:
+                return {"max_profit": round(spread_width - net_debit, 2),
+                        "max_loss": round(net_debit, 2),
+                        "breakeven": round(k_low + net_debit, 2)}
 
-    elif strategy_type == "bear_put_spread":
-        # BUY higher strike put, SELL lower strike put
-        buy_leg = next((l for l in legs_data if l["action"] == "BUY"), legs_data[0])
-        sell_leg = next((l for l in legs_data if l["action"] == "SELL"), legs_data[1])
-        k_low = min(buy_leg["strike"], sell_leg["strike"])
-        k_high = max(buy_leg["strike"], sell_leg["strike"])
-        max_profit = round((k_high - k_low) - net_debit, 2)
-        return {
-            "max_profit": max_profit,
-            "max_loss": round(net_debit, 2),
-            "breakeven": round(k_high - net_debit, 2),
-        }
+        elif option_types == {"PUT"} and actions == {"BUY", "SELL"}:
+            k_low, k_high = strikes[0], strikes[1]
+            spread_width = k_high - k_low
+            if is_net_credit:
+                return {"max_profit": round(net_credit, 2),
+                        "max_loss": round(spread_width - net_credit, 2),
+                        "breakeven": round(k_low + net_credit, 2)}
+            else:
+                return {"max_profit": round(spread_width - net_debit, 2),
+                        "max_loss": round(net_debit, 2),
+                        "breakeven": round(k_high - net_debit, 2)}
 
-    elif strategy_type == "iron_condor":
-        # Net credit strategy: net_debit_credit is negative
-        net_credit = abs(net_debit_credit)
-        # Find the spread width (distance between put strikes or call strikes)
+        elif len(option_types) == 2 and actions == {"BUY"}:
+            # Long straddle / strangle
+            call_leg = next(l for l in legs_data if l["option_type"] == "CALL")
+            put_leg = next(l for l in legs_data if l["option_type"] == "PUT")
+            lower_be = round(put_leg["strike"] - net_debit, 2)
+            upper_be = round(call_leg["strike"] + net_debit, 2)
+            return {"max_profit": "unlimited", "max_loss": round(net_debit, 2),
+                    "breakeven": f"{lower_be}/{upper_be}"}
+
+        elif len(option_types) == 2 and actions == {"SELL"}:
+            # Short straddle / strangle
+            call_leg = next(l for l in legs_data if l["option_type"] == "CALL")
+            put_leg = next(l for l in legs_data if l["option_type"] == "PUT")
+            lower_be = round(put_leg["strike"] - net_credit, 2)
+            upper_be = round(call_leg["strike"] + net_credit, 2)
+            return {"max_profit": round(net_credit, 2), "max_loss": "unlimited",
+                    "breakeven": f"{lower_be}/{upper_be}"}
+
+        elif len(option_types) == 2 and actions == {"BUY", "SELL"}:
+            # Calendar / diagonal: complex payoff
+            return {"max_profit": "complex", "max_loss": round(abs(net_debit_credit), 2),
+                    "breakeven": "complex"}
+
+        else:
+            return {"max_profit": "complex", "max_loss": round(abs(net_debit_credit), 2),
+                    "breakeven": "complex"}
+
+    elif len(legs_data) == 3:
+        if is_net_credit:
+            return {"max_profit": round(net_credit, 2),
+                    "max_loss": "complex",
+                    "breakeven": "complex"}
+        else:
+            return {"max_profit": "complex",
+                    "max_loss": round(net_debit, 2),
+                    "breakeven": "complex"}
+
+    elif len(legs_data) == 4:
         put_legs = [l for l in legs_data if l["option_type"] == "PUT"]
         call_legs = [l for l in legs_data if l["option_type"] == "CALL"]
-        put_spread = abs(put_legs[0]["strike"] - put_legs[1]["strike"]) if len(put_legs) >= 2 else 0
-        call_spread = abs(call_legs[0]["strike"] - call_legs[1]["strike"]) if len(call_legs) >= 2 else 0
-        spread_width = max(put_spread, call_spread)
-        max_loss = round(spread_width - net_credit, 2)
-        # Two breakevens
-        sell_put = next((l for l in put_legs if l["action"] == "SELL"), None)
-        sell_call = next((l for l in call_legs if l["action"] == "SELL"), None)
-        lower_be = round(sell_put["strike"] - net_credit, 2) if sell_put else 0
-        upper_be = round(sell_call["strike"] + net_credit, 2) if sell_call else 0
-        return {
-            "max_profit": round(net_credit, 2),
-            "max_loss": max_loss,
-            "breakeven": f"{lower_be}/{upper_be}",
-        }
 
-    elif strategy_type == "long_straddle":
-        # BUY CALL + BUY PUT at same strike
-        call_leg = next((l for l in legs_data if l["option_type"] == "CALL"), legs_data[0])
-        put_leg = next((l for l in legs_data if l["option_type"] == "PUT"), legs_data[1])
-        strike = call_leg["strike"]
-        lower_be = round(strike - net_debit, 2)
-        upper_be = round(strike + net_debit, 2)
-        return {
-            "max_profit": "unlimited",
-            "max_loss": round(net_debit, 2),
-            "breakeven": f"{lower_be}/{upper_be}",
-        }
+        if len(put_legs) == 2 and len(call_legs) == 2:
+            # Iron condor, iron butterfly, or similar 4-leg iron structure
+            put_spread = abs(put_legs[0]["strike"] - put_legs[1]["strike"])
+            call_spread = abs(call_legs[0]["strike"] - call_legs[1]["strike"])
+            spread_width = max(put_spread, call_spread)
 
-    elif strategy_type == "long_strangle":
-        # BUY lower strike put, BUY higher strike call
-        put_leg = next((l for l in legs_data if l["option_type"] == "PUT"), legs_data[0])
-        call_leg = next((l for l in legs_data if l["option_type"] == "CALL"), legs_data[1])
-        lower_be = round(put_leg["strike"] - net_debit, 2)
-        upper_be = round(call_leg["strike"] + net_debit, 2)
-        return {
-            "max_profit": "unlimited",
-            "max_loss": round(net_debit, 2),
-            "breakeven": f"{lower_be}/{upper_be}",
-        }
-
-    elif strategy_type == "covered_call":
-        # SELL CALL against stock holding; underlying price not available in this context
-        # Use strike as proxy for underlying price estimation
-        sell_leg = legs_data[0]
-        net_credit = abs(net_debit_credit)
-        strike = sell_leg["strike"]
-        # max_profit = net_credit + (strike - underlying); without underlying, use strike-based estimate
-        return {
-            "max_profit": round(net_credit, 2),
-            "max_loss": round(strike - net_credit, 2),
-            "breakeven": round(strike - net_credit, 2),
-        }
-
-    elif strategy_type == "cash_secured_put":
-        # SELL PUT
-        sell_leg = legs_data[0]
-        net_credit = abs(net_debit_credit)
-        strike = sell_leg["strike"]
-        return {
-            "max_profit": round(net_credit, 2),
-            "max_loss": round(strike - net_credit, 2),
-            "breakeven": round(strike - net_credit, 2),
-        }
-
-    elif strategy_type == "calendar_spread":
-        return {
-            "max_profit": "complex",
-            "max_loss": round(net_debit, 2),
-            "breakeven": "near term expiry dependent",
-        }
+            if is_net_credit:
+                sell_put = next((l for l in put_legs if l["action"] == "SELL"), put_legs[0])
+                sell_call = next((l for l in call_legs if l["action"] == "SELL"), call_legs[0])
+                lower_be = round(sell_put["strike"] - net_credit, 2)
+                upper_be = round(sell_call["strike"] + net_credit, 2)
+                return {"max_profit": round(net_credit, 2),
+                        "max_loss": round(spread_width - net_credit, 2),
+                        "breakeven": f"{lower_be}/{upper_be}"}
+            else:
+                return {"max_profit": round(spread_width - net_debit, 2),
+                        "max_loss": round(net_debit, 2),
+                        "breakeven": "complex"}
+        else:
+            # Condor (all same type) or other 4-leg structure
+            all_strikes = sorted(l["strike"] for l in legs_data)
+            spread_width = all_strikes[-1] - all_strikes[0]
+            if is_net_credit:
+                return {"max_profit": round(net_credit, 2),
+                        "max_loss": round(spread_width - net_credit, 2),
+                        "breakeven": "complex"}
+            else:
+                return {"max_profit": round(spread_width - net_debit, 2),
+                        "max_loss": round(net_debit, 2),
+                        "breakeven": "complex"}
 
     else:
-        # Default fallback: treat as single leg debit
-        return {
-            "max_profit": "unlimited",
-            "max_loss": round(net_debit, 2),
-            "breakeven": "N/A",
-        }
+        return {"max_profit": "complex", "max_loss": round(abs(net_debit_credit), 2),
+                "breakeven": "N/A"}
 
 
 # ---------------------------------------------------------------------------
@@ -339,10 +318,10 @@ def create_options_legs_builder(llm):
         net_debit_credit = sum(leg["sign"] * leg["mid"] for leg in legs_data)
 
         # ------------------------------------------------------------------
-        # Compute payoff via strategy type
+        # Compute payoff via registry-aware generic templates
         # ------------------------------------------------------------------
-        strategy_type = _get_strategy_type(options_strategy)
-        payoff = _compute_payoff(strategy_type, legs_data, net_debit_credit)
+        strategy_key = normalize_strategy_key(options_strategy)
+        payoff = _compute_payoff(strategy_key, legs_data, net_debit_credit)
 
         max_profit = payoff["max_profit"]
         max_loss = payoff["max_loss"]
@@ -362,13 +341,13 @@ def create_options_legs_builder(llm):
         else:
             mp_str = f"{max_profit:.2f}"
 
-        # Format max_loss: float
+        # Format max_loss: float or string ("complex", "unlimited")
         if isinstance(max_loss, (int, float)):
             ml_str = f"{max_loss:.2f}"
         else:
             ml_str = str(max_loss)
 
-        # Format breakeven: may be string ("lower/upper", "near term...") or float
+        # Format breakeven: may be string ("lower/upper", "complex") or float
         if isinstance(breakeven, str):
             be_str = breakeven
         else:
