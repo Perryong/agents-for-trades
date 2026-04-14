@@ -31,6 +31,8 @@ import yfinance as yf
 from pydantic import BaseModel
 from yfinance.exceptions import YFRateLimitError
 
+from .yfinance_session import yf_session
+
 # ---------------------------------------------------------------------------
 # Module-level constants
 # ---------------------------------------------------------------------------
@@ -125,6 +127,7 @@ def _fetch_chunk(tickers: list[str], period: str = "25d") -> dict[str, pd.DataFr
                 auto_adjust=True,
                 progress=False,
                 group_by="ticker",
+                session=yf_session(),
             )
             result: dict[str, pd.DataFrame] = {}
             for ticker in tickers:

@@ -6,6 +6,7 @@ import pandas as pd
 import yfinance as yf
 
 from .yfinance_cache import get_cached_dataframe
+from .yfinance_session import yf_session
 
 
 MARKET_DATA_CACHE_TTL_SECONDS = 6 * 60 * 60
@@ -27,6 +28,7 @@ def _download_cached(symbol: str, interval: str, period: str) -> pd.DataFrame:
             progress=False,
             multi_level_index=False,
             auto_adjust=False,
+            session=yf_session(),
         )
         if data.empty:
             return data

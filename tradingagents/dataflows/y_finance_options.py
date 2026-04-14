@@ -14,6 +14,7 @@ import pandas as pd
 import math
 
 from .yfinance_cache import get_cached_text
+from .yfinance_session import yf_session
 
 
 def _norm_cdf(x: float) -> float:
@@ -49,7 +50,7 @@ def _bs_greeks(S: float, K: float, T: float, r: float, sigma: float,
         "vega": round(vega, 4),
     }
 
-OPTIONS_CHAIN_CACHE_TTL_SECONDS = 6 * 60 * 60
+OPTIONS_CHAIN_CACHE_TTL_SECONDS = 30 * 60      # 30 minutes — fresher data during market hours
 HISTORICAL_IV_CACHE_TTL_SECONDS = 6 * 60 * 60
 
 
@@ -61,7 +62,7 @@ def get_options_expirations(symbol: str) -> list[str]:
         available or an error occurs.
     """
     try:
-        ticker = yf.Ticker(symbol.upper())
+        ticker = yf.Ticker(symbol.upper(), session=yf_session())
         expirations = ticker.options
         if not expirations:
             return []
@@ -85,7 +86,7 @@ def get_options_chain(symbol: str, expiration: str) -> str:
     """
 
     def _fetch() -> str:
-        ticker = yf.Ticker(symbol.upper())
+        ticker = yf.Ticker(symbol.upper(), session=yf_session())
         chain = ticker.option_chain(expiration)
 
         calls = chain.calls.copy()
@@ -153,13 +154,17 @@ def get_options_chain(symbol: str, expiration: str) -> str:
         combined["theta"] = thetas
         combined["vega"] = vegas
 
-        # Select only the target columns
+        # Select only the target columns.
+        # lastPrice (last traded price) is included so the moneyness-based
+        # fallback in strike_expiry_selector._select_contract can derive a
+        # valid ATM price when bid/ask are both zero after market hours.
         output_columns = [
             "strike",
             "expiration_date",
             "option_type",
             "bid",
             "ask",
+            "lastPrice",
             "volume",
             "open_interest",
             "delta",
@@ -175,13 +180,40 @@ def get_options_chain(symbol: str, expiration: str) -> str:
         if result_df.empty:
             return f"No options data available for {symbol} expiring {expiration}"
 
-        return result_df.to_string(index=False)
+        # Prepend spot price as a metadata comment so the selector can use it
+        # as an ATM anchor when bid/ask are zero after market hours.
+        spot_line = f"# SPOT:{spot:.4f}" if spot > 0 else "# SPOT:0"
+        return spot_line + "\n" + result_df.to_string(index=False)
+
+    def _has_live_quotes(text: str) -> bool:
+        """Return True if >=10% of rows have a non-zero bid or ask.
+        After hours, yfinance zeros out most quotes — a handful of deep-ITM
+        stragglers shouldn't count as 'live'. We prefer cached market-hours
+        data over that."""
+        total = 0
+        live = 0
+        for line in text.splitlines():
+            if line.startswith("#") or not line.strip():
+                continue
+            if "bid" in line.lower() and "ask" in line.lower():
+                continue
+            parts = line.split()
+            try:
+                bid = float(parts[3])
+                ask = float(parts[4])
+                total += 1
+                if bid > 0 or ask > 0:
+                    live += 1
+            except (IndexError, ValueError):
+                continue
+        return total > 0 and (live / total) >= 0.10
 
     return get_cached_text(
         prefix="yfinance_options_chain",
         payload={"symbol": symbol.upper(), "expiration": expiration},
         max_age_seconds=OPTIONS_CHAIN_CACHE_TTL_SECONDS,
         fetcher=_fetch,
+        is_good=_has_live_quotes,
     )
 
 
@@ -205,7 +237,7 @@ def get_historical_iv(symbol: str, weeks: int = 52) -> str:
         records = []
         for exp in expirations:
             try:
-                ticker = yf.Ticker(symbol.upper())
+                ticker = yf.Ticker(symbol.upper(), session=yf_session())
                 chain = ticker.option_chain(exp)
                 calls = chain.calls
                 if calls.empty or "impliedVolatility" not in calls.columns:

@@ -4,6 +4,7 @@ import yfinance as yf
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from .yfinance_cache import get_cached_text
+from .yfinance_session import yf_session
 
 
 TICKER_NEWS_CACHE_TTL_SECONDS = 30 * 60
@@ -68,7 +69,7 @@ def get_news_yfinance(
         Formatted string containing news articles
     """
     def _fetch() -> str:
-        stock = yf.Ticker(ticker)
+        stock = yf.Ticker(ticker, session=yf_session())
         news = stock.get_news(count=20)
 
         if not news:
@@ -147,6 +148,7 @@ def get_global_news_yfinance(
                 query=query,
                 news_count=limit,
                 enable_fuzzy_query=True,
+                session=yf_session(),
             )
 
             if search.news:

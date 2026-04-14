@@ -5,6 +5,7 @@ import yfinance as yf
 import pandas as pd
 from .stockstats_utils import StockstatsUtils, _clean_dataframe
 from .yfinance_cache import get_cached_dataframe, get_cached_text
+from .yfinance_session import yf_session
 
 
 MARKET_DATA_CACHE_TTL_SECONDS = 6 * 60 * 60
@@ -22,7 +23,7 @@ def get_YFin_data_online(
     datetime.strptime(end_date, "%Y-%m-%d")
 
     def _fetch() -> pd.DataFrame:
-        ticker = yf.Ticker(symbol.upper())
+        ticker = yf.Ticker(symbol.upper(), session=yf_session())
         data = ticker.history(start=start_date, end=end_date)
         if data.empty:
             return data
@@ -226,6 +227,7 @@ def _get_stock_stats_bulk(
             multi_level_index=False,
             progress=False,
             auto_adjust=True,
+            session=yf_session(),
         )
         return data.reset_index()
 
@@ -295,7 +297,7 @@ def get_fundamentals(
 ):
     """Get company fundamentals overview from yfinance."""
     def _fetch() -> str:
-        ticker_obj = yf.Ticker(ticker.upper())
+        ticker_obj = yf.Ticker(ticker.upper(), session=yf_session())
         info = ticker_obj.info
 
         if not info:
@@ -360,7 +362,7 @@ def get_balance_sheet(
 ):
     """Get balance sheet data from yfinance."""
     def _fetch() -> str:
-        ticker_obj = yf.Ticker(ticker.upper())
+        ticker_obj = yf.Ticker(ticker.upper(), session=yf_session())
 
         if freq.lower() == "quarterly":
             data = ticker_obj.quarterly_balance_sheet
@@ -395,7 +397,7 @@ def get_cashflow(
 ):
     """Get cash flow data from yfinance."""
     def _fetch() -> str:
-        ticker_obj = yf.Ticker(ticker.upper())
+        ticker_obj = yf.Ticker(ticker.upper(), session=yf_session())
 
         if freq.lower() == "quarterly":
             data = ticker_obj.quarterly_cashflow
@@ -430,7 +432,7 @@ def get_income_statement(
 ):
     """Get income statement data from yfinance."""
     def _fetch() -> str:
-        ticker_obj = yf.Ticker(ticker.upper())
+        ticker_obj = yf.Ticker(ticker.upper(), session=yf_session())
 
         if freq.lower() == "quarterly":
             data = ticker_obj.quarterly_income_stmt
@@ -463,7 +465,7 @@ def get_insider_transactions(
 ):
     """Get insider transactions data from yfinance."""
     def _fetch() -> str:
-        ticker_obj = yf.Ticker(ticker.upper())
+        ticker_obj = yf.Ticker(ticker.upper(), session=yf_session())
         data = ticker_obj.insider_transactions
 
         if data is None or data.empty:

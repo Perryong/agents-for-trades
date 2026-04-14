@@ -42,6 +42,7 @@ class StockstatsUtils:
         end_date_str = end_date.strftime("%Y-%m-%d")
 
         def _fetch() -> pd.DataFrame:
+            from .yfinance_session import yf_session
             data = yf.download(
                 symbol,
                 start=start_date_str,
@@ -49,6 +50,7 @@ class StockstatsUtils:
                 multi_level_index=False,
                 progress=False,
                 auto_adjust=True,
+                session=yf_session(),
             )
             return data.reset_index()
 

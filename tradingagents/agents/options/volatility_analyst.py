@@ -141,7 +141,8 @@ def _compute_hv30(ticker: str) -> Optional[float]:
     Returns the HV as a percentage (e.g. 25.3 means 25.3%), or None on error.
     """
     try:
-        tk = yf.Ticker(ticker)
+        from tradingagents.dataflows.yfinance_session import yf_session
+        tk = yf.Ticker(ticker, session=yf_session())
         hist = tk.history(period="3mo")
         if hist.empty or "Close" not in hist.columns:
             return None
