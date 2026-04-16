@@ -128,11 +128,17 @@ async def list_recommendations(session: SessionDep):
         status = p.approval_status or "pending"
         if status == "pending" and p.valid_until:
             try:
-                if datetime.fromisoformat(p.valid_until) < datetime.utcnow():
+                from datetime import timezone
+                vu = datetime.fromisoformat(p.valid_until)
+                now = datetime.now(timezone.utc)
+                # Make both tz-aware for safe comparison
+                if vu.tzinfo is None:
+                    vu = vu.replace(tzinfo=timezone.utc)
+                if vu < now:
                     status = "expired"
                     p.approval_status = "expired"
                     await session.commit()
-            except ValueError:
+            except (ValueError, TypeError):
                 pass
 
         recommendations.append(RecommendationResponse(
