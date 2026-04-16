@@ -172,7 +172,7 @@ development_status:
   epic-14: in-progress
   14-1-compute-microstructure-features: review
   14-2-ols-volatility-forecast-model: review
-  14-3-integrate-microstructure-forecast: backlog
+  14-3-integrate-microstructure-forecast: review
   epic-14-retrospective: optional
 
   # Epic 16: Earnings Volatility Edge Detection

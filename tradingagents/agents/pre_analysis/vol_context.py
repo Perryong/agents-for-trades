@@ -163,6 +163,54 @@ def create_vol_context_node():
             ivhv_ratio = _compute_ivhv_ratio(ivs, current_iv)
 
             narrative = _build_narrative(iv_rank, current_iv, ivhv_ratio, pc_ratio, skew_desc)
+
+            # --- Microstructure forecast integration (Story 14.3) ---
+            try:
+                from tradingagents.services.microstructure import (
+                    compute_microstructure_features,
+                    forecast_volatility,
+                )
+
+                micro_feat = compute_microstructure_features(ticker, date=state.get("trade_date", ""))
+                micro_forecast = forecast_volatility(ticker)
+
+                if micro_feat is not None:
+                    narrative += (
+                        f"\n\nMicrostructure Features: "
+                        f"RangeVol={micro_feat.range_volatility:.4f}, "
+                        f"Roll={micro_feat.roll_measure:.4f}, "
+                        f"PriceImpact={micro_feat.price_impact:.6f}, "
+                        f"Dispersion={micro_feat.price_dispersion:.4f}."
+                    )
+
+                if micro_forecast is not None:
+                    rv_pct = micro_forecast.predicted_rv * 100
+                    narrative += (
+                        f"\n\nMicrostructure Forecast: "
+                        f"predicted RV = {rv_pct:.2f}%, "
+                        f"R² = {micro_forecast.r_squared:.3f}, "
+                        f"dominant factor: {micro_forecast.dominant_factor} "
+                        f"(sample: {micro_forecast.sample_days} days)."
+                    )
+
+                    # Divergence detection: compare OLS predicted RV vs current IV
+                    if current_iv > 0.001:
+                        divergence_pct = abs(micro_forecast.predicted_rv - current_iv) / current_iv
+                        if divergence_pct > 0.20:
+                            rv_str = f"{micro_forecast.predicted_rv:.1%}"
+                            iv_str = f"{current_iv:.1%}"
+                            div_str = f"{divergence_pct:.0%}"
+                            narrative += (
+                                f"\n\nVOLATILITY DIVERGENCE: "
+                                f"OLS microstructure forecast ({rv_str}) diverges from IV ({iv_str}) "
+                                f"by {div_str}. This may indicate a regime shift or microstructure "
+                                f"dislocation worth investigating."
+                            )
+
+            except Exception as micro_exc:
+                logger.debug("Vol Context: microstructure enrichment skipped for %s — %s", ticker, micro_exc)
+                # Graceful degradation — proceed with IV-only narrative
+
             return {"vol_context": narrative}
 
         except Exception as exc:

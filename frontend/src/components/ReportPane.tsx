@@ -150,8 +150,16 @@ export function ReportPane({ content, status, tabLabel = 'Report', volContext, i
             <span>Vol Context</span>
             <span className="text-accent-blue/60 font-normal">click to collapse</span>
           </summary>
-          <div className="px-4 pb-3 pt-1 text-xs text-accent-blue leading-relaxed font-mono whitespace-pre-wrap">
-            {volContext}
+          <div className="px-4 pb-3 pt-1 text-xs leading-relaxed font-mono whitespace-pre-wrap">
+            {volContext.split('\n\n').map((block, i) => {
+              if (block.startsWith('VOLATILITY DIVERGENCE:')) {
+                return <p key={i} className="text-accent-amber font-semibold mt-2">{block}</p>;
+              }
+              if (block.startsWith('Microstructure F')) {
+                return <p key={i} className="text-accent-blue/80 mt-2">{block}</p>;
+              }
+              return <p key={i} className="text-accent-blue">{block}</p>;
+            })}
           </div>
         </details>
       )}
