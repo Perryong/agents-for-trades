@@ -171,7 +171,7 @@ development_status:
   # Epic 14: Microstructure-Enhanced Volatility Forecasting
   epic-14: in-progress
   14-1-compute-microstructure-features: review
-  14-2-ols-volatility-forecast-model: backlog
+  14-2-ols-volatility-forecast-model: review
   14-3-integrate-microstructure-forecast: backlog
   epic-14-retrospective: optional
 

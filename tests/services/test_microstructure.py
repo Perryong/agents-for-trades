@@ -9,7 +9,9 @@ import numpy as np
 
 from tradingagents.services.microstructure import (
     compute_microstructure_features,
+    forecast_volatility,
     MicrostructureFeatures,
+    VolatilityForecast,
 )
 
 
@@ -264,3 +266,109 @@ class TestDataclassOutput:
         result = compute_microstructure_features("aapl", ohlcv=simple_ohlcv)
         assert result is not None
         assert result.ticker == "AAPL"
+
+
+# ===========================================================================
+# Story 14.2: OLS Volatility Forecast Tests
+# ===========================================================================
+
+@pytest.fixture
+def large_ohlcv():
+    """100-day synthetic OHLCV with varied price action and volume.
+
+    Designed to produce non-collinear microstructure features for OLS.
+    Uses alternating trending/mean-reverting regimes with diverse volume.
+    """
+    np.random.seed(42)
+    n = 100
+    data = []
+    price = 100.0
+    for i in range(n):
+        # Alternate between trending and mean-reverting to create feature diversity
+        if i % 20 < 10:
+            # Trending: larger moves in one direction
+            move = np.random.uniform(0.5, 2.0) * (1 if i % 40 < 20 else -1)
+        else:
+            # Mean-reverting: oscillating
+            move = np.random.uniform(-2.0, 2.0)
+        price = max(10, price + move)
+        # Varied intraday range
+        spread = np.random.uniform(0.5, 4.0)
+        h = price + spread
+        l = price - spread * np.random.uniform(0.3, 0.8)
+        o = price + np.random.uniform(-1, 1)
+        # Highly varied volume to prevent collinearity
+        v = np.random.randint(100_000, 5_000_000)
+        data.append([max(o, 1), max(h, 1), max(l, 0.5), max(price, 1), max(v, 100)])
+    return np.array(data, dtype=float)
+
+
+class TestVolatilityForecast:
+
+    def test_returns_forecast_with_sufficient_data(self, large_ohlcv):
+        """With 100 days of data, OLS should produce a valid forecast."""
+        result = forecast_volatility("TEST", rolling_window=60, ohlcv=large_ohlcv)
+        assert result is not None
+        assert isinstance(result, VolatilityForecast)
+
+    def test_predicted_rv_non_negative(self, large_ohlcv):
+        """Predicted realized volatility must be >= 0."""
+        result = forecast_volatility("TEST", rolling_window=60, ohlcv=large_ohlcv)
+        assert result is not None
+        assert result.predicted_rv >= 0
+
+    def test_r_squared_in_range(self, large_ohlcv):
+        """R-squared must be between 0 and 1."""
+        result = forecast_volatility("TEST", rolling_window=60, ohlcv=large_ohlcv)
+        assert result is not None
+        assert 0 <= result.r_squared <= 1
+
+    def test_coefficients_have_expected_keys(self, large_ohlcv):
+        """Coefficients dict must have intercept + 4 feature keys."""
+        result = forecast_volatility("TEST", rolling_window=60, ohlcv=large_ohlcv)
+        assert result is not None
+        expected_keys = {"intercept", "range_volatility", "roll_measure", "price_impact", "price_dispersion"}
+        assert set(result.coefficients.keys()) == expected_keys
+
+    def test_dominant_factor_is_valid_name(self, large_ohlcv):
+        """Dominant factor must be one of the four feature names."""
+        result = forecast_volatility("TEST", rolling_window=60, ohlcv=large_ohlcv)
+        assert result is not None
+        valid_names = {"range_volatility", "roll_measure", "price_impact", "price_dispersion"}
+        assert result.dominant_factor in valid_names
+
+    def test_sample_days_positive(self, large_ohlcv):
+        """Sample days should reflect how many feature rows were used."""
+        result = forecast_volatility("TEST", rolling_window=60, ohlcv=large_ohlcv)
+        assert result is not None
+        assert result.sample_days >= 30  # Minimum guard in the function
+
+    def test_insufficient_data_returns_none(self):
+        """With fewer than ~50 rows (need 20 warmup + 30 valid), should return None."""
+        short_data = np.array([[100, 102, 99, 101, 1e6]] * 25, dtype=float)
+        result = forecast_volatility("TEST", rolling_window=60, ohlcv=short_data)
+        assert result is None
+
+    def test_configurable_rolling_window(self, large_ohlcv):
+        """Rolling window parameter should be respected."""
+        result_30 = forecast_volatility("TEST", rolling_window=30, ohlcv=large_ohlcv)
+        result_60 = forecast_volatility("TEST", rolling_window=60, ohlcv=large_ohlcv)
+        # Both should work with 100 days of data
+        assert result_30 is not None
+        assert result_60 is not None
+        # Different windows may produce different predictions
+        # (not guaranteed but likely with different sample sizes)
+
+    def test_ticker_uppercased(self, large_ohlcv):
+        """Output ticker should be uppercased."""
+        result = forecast_volatility("aapl", rolling_window=60, ohlcv=large_ohlcv)
+        assert result is not None
+        assert result.ticker == "AAPL"
+
+    def test_singular_matrix_returns_none(self):
+        """When all features are identical (collinear), OLS should fail gracefully."""
+        # Constant data → all features identical → singular matrix
+        data = np.array([[100, 102, 99, 101, 1e6]] * 100, dtype=float)
+        result = forecast_volatility("TEST", rolling_window=60, ohlcv=data)
+        # Should return None (singular matrix or zero variance)
+        assert result is None

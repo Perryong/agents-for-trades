@@ -74,8 +74,7 @@ def compute_microstructure_features(
 
     # 1. Range Volatility: (High - Low) / Open — single-day vol proxy
     range_vol = None
-    valid_opens = opens[opens > 0]
-    if len(valid_opens) > 0:
+    if np.any(opens > 0):
         rv_values = (highs - lows) / np.where(opens > 0, opens, np.nan)
         rv_clean = rv_values[np.isfinite(rv_values)]
         if len(rv_clean) > 0:
@@ -119,8 +118,8 @@ def compute_microstructure_features(
         date=date_str,
         range_volatility=round(range_vol, 6) if range_vol is not None else None,
         roll_measure=round(roll_measure, 6) if roll_measure is not None else None,
-        price_impact=round(price_impact, 10) if price_impact is not None else None,
-        price_dispersion=round(price_dispersion, 4) if price_dispersion is not None else None,
+        price_impact=round(price_impact, 6) if price_impact is not None else None,
+        price_dispersion=round(price_dispersion, 6) if price_dispersion is not None else None,
     )
 
 
@@ -157,6 +156,7 @@ class VolatilityForecast:
 def forecast_volatility(
     ticker: str,
     rolling_window: int = 60,
+    ohlcv: "np.ndarray | None" = None,
 ) -> Optional[VolatilityForecast]:
     """Forecast next-day realized volatility using OLS on microstructure features.
 
@@ -165,12 +165,15 @@ def forecast_volatility(
     Args:
         ticker: Stock ticker symbol.
         rolling_window: Number of trading days for estimation (minimum 60).
+        ohlcv: Optional pre-fetched array [open, high, low, close, volume].
+               If None, fetches from yfinance.
 
     Returns:
         VolatilityForecast or None if insufficient data.
     """
     # Fetch enough data for rolling window + 1 (for target variable)
-    ohlcv = _fetch_ohlcv(ticker, rolling_window + 20)
+    if ohlcv is None:
+        ohlcv = _fetch_ohlcv(ticker, rolling_window + 20)
     if ohlcv is None or len(ohlcv) < rolling_window + 1:
         logger.info(f"Insufficient data for volatility forecast: {ticker} has {len(ohlcv) if ohlcv is not None else 0} days, need {rolling_window + 1}")
         return None
