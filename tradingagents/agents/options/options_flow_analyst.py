@@ -367,9 +367,63 @@ def create_options_flow_analyst(llm):
                 })
 
         # ------------------------------------------------------------------
+        # Step 4b: Compute implied borrow fee from primary bucket's ATM options
+        # ------------------------------------------------------------------
+        borrow_fee_section = ""
+        borrow_fee_result = None
+        try:
+            from tradingagents.services.borrow_fee import compute_borrow_fee_from_chain
+            # Find the first bucket with valid chain data
+            for br in bucket_results:
+                if br.get("metrics") and br.get("expiry") and br.get("dte"):
+                    # Re-fetch chain for borrow fee (we need the raw DataFrame)
+                    chain_str = route_to_vendor("get_options_chain", ticker, br["expiry"])
+                    chain_df_bf = _parse_tabular_string(chain_str)
+                    if chain_df_bf is not None and not chain_df_bf.empty:
+                        # Get spot price from chain metadata or yfinance
+                        spot = None
+                        spot_line = chain_str.split("\n")[0] if chain_str else ""
+                        if spot_line.startswith("# SPOT:"):
+                            try:
+                                spot = float(spot_line.split(":")[1].strip())
+                            except (ValueError, IndexError):
+                                pass
+                        if not spot:
+                            import yfinance as yf
+                            try:
+                                spot = yf.Ticker(ticker).fast_info.get("lastPrice", 0)
+                            except Exception:
+                                spot = 0
+                        if spot and spot > 0:
+                            borrow_fee_result = compute_borrow_fee_from_chain(
+                                ticker, chain_df_bf, spot, br["dte"], br["expiry"]
+                            )
+                    break  # Only use the first valid bucket
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Borrow fee computation failed for {ticker}: {e}")
+
+        if borrow_fee_result:
+            fee = borrow_fee_result
+            borrow_fee_section = (
+                f"\n## Implied Borrow Fee Analysis\n"
+                f"- Implied borrow fee: {fee.implied_fee_annualized:.2f}% annualized\n"
+                f"- Fee tier: {fee.fee_tier.upper()}\n"
+                f"- IV spread (call - put): {fee.iv_spread:.4f}\n"
+                f"- Signal discount applied: {fee.signal_discount:.1f}x weight on IV spread/skew signals\n"
+            )
+            if fee.fee_tier == "high":
+                borrow_fee_section += (
+                    f"- **HARD-TO-BORROW WARNING**: This stock has elevated borrow costs. "
+                    f"IV spread/skew signals primarily reflect borrow fees, NOT informed trading. "
+                    f"Short-biased strategies face additional {fee.implied_fee_annualized:.1f}% annual friction.\n"
+                )
+
+        # ------------------------------------------------------------------
         # Step 5: Build data_content and invoke LLM
         # ------------------------------------------------------------------
         data_content = _build_flow_data_content(ticker, trade_date, bucket_results, primary_exp)
+        data_content += borrow_fee_section
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", SYSTEM_PROMPT),
