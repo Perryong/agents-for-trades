@@ -176,8 +176,8 @@ development_status:
   epic-14-retrospective: optional
 
   # Epic 16: Earnings Volatility Edge Detection
-  epic-16: backlog
-  16-1-compute-abnormaliv-and-max-ea: backlog
+  epic-16: in-progress
+  16-1-compute-abnormaliv-and-max-ea: review
   16-2-rank-surface-high-eav-events: backlog
   16-3-generate-premium-selling-specs: backlog
   epic-16-retrospective: optional
