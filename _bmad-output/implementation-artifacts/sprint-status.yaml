@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-15
-last_updated: 2026-04-16
+last_updated: 2026-04-16T02
 project: agents-for-trades
 project_key: NOKEY
 tracking_system: file-system
@@ -159,3 +159,47 @@ development_status:
   13-2-agent-accuracy-dashboard: in-progress
   13-3-weight-adjustment-recommendations: in-progress
   epic-13-retrospective: optional
+
+  # ─── Path C: Options Overhaul + Feedback Loop ───
+
+  # Epic 15: Borrow Fee Awareness & Signal Reinterpretation
+  epic-15: done
+  15-1-compute-implied-borrow-fee: done
+  15-2-integrate-borrow-fee-filter: done
+  epic-15-retrospective: optional
+
+  # Epic 14: Microstructure-Enhanced Volatility Forecasting
+  epic-14: in-progress
+  14-1-compute-microstructure-features: review
+  14-2-ols-volatility-forecast-model: backlog
+  14-3-integrate-microstructure-forecast: backlog
+  epic-14-retrospective: optional
+
+  # Epic 16: Earnings Volatility Edge Detection
+  epic-16: backlog
+  16-1-compute-abnormaliv-and-max-ea: backlog
+  16-2-rank-surface-high-eav-events: backlog
+  16-3-generate-premium-selling-specs: backlog
+  epic-16-retrospective: optional
+
+  # Epic 17: Pre-Market Options Data Reliability
+  epic-17: backlog
+  17-1-fix-import-time-cache-ttl: backlog
+  17-2-data-quality-validation: backlog
+  epic-17-retrospective: optional
+
+  # Epic 18: Thesis Lifecycle & Trade Journal
+  epic-18: backlog
+  18-1-thesis-data-model-lifecycle: backlog
+  18-2-auto-create-thesis: backlog
+  18-3-auto-close-thesis-postmortem: backlog
+  18-4-thesis-dashboard: backlog
+  epic-18-retrospective: optional
+
+  # Epic 19: Agent Accuracy & Self-Tuning
+  epic-19: backlog
+  19-1-compute-agent-accuracy: backlog
+  19-2-agent-performance-display: backlog
+  19-3-weight-adjustment-recommendations: backlog
+  19-4-one-click-weight-apply: backlog
+  epic-19-retrospective: optional
