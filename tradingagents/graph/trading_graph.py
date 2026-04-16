@@ -120,6 +120,7 @@ class TradingAgentsGraph:
             self.invest_judge_memory,
             self.risk_manager_memory,
             self.conditional_logic,
+            config=self.config,
         )
 
         self.propagator = Propagator()
@@ -133,6 +134,11 @@ class TradingAgentsGraph:
 
         # Set up the graph
         self.graph = self.graph_setup.setup_graph(selected_analysts)
+
+    def close(self) -> None:
+        """Release resources (checkpoint DB connections, etc.)."""
+        if hasattr(self, 'graph_setup'):
+            self.graph_setup.close()
 
     def _get_provider_kwargs(self) -> Dict[str, Any]:
         """Get provider-specific kwargs for LLM client creation."""
