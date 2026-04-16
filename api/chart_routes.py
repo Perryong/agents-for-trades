@@ -106,6 +106,14 @@ async def get_chart_overlay(ticker: str):
         raise HTTPException(status_code=404, detail="No analysis found")
 
     latest_log_path = log_files[-1]
+
+    # Staleness check: if log file is older than 24 hours, treat as no analysis
+    import os
+    from datetime import datetime, timedelta
+    file_mtime = datetime.fromtimestamp(os.path.getmtime(latest_log_path))
+    if datetime.now() - file_mtime > timedelta(hours=24):
+        raise HTTPException(status_code=404, detail="Analysis expired (>24h old)")
+
     with open(latest_log_path, encoding="utf-8") as f:
         log_data = json.load(f)
 
