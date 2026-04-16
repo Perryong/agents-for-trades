@@ -58,13 +58,15 @@ export function TradeSidebar({
   livePrice,
   onViewAnalysis,
 }: TradeSidebarProps) {
+  const [orderType, setOrderType] = useState<'market' | 'limit'>(overlay.entry_price ? 'limit' : 'market');
   const [entryPrice, setEntryPrice] = useState<number | null>(overlay.entry_price);
   const [targetPrice, setTargetPrice] = useState<number | null>(overlay.take_profit);
   const [stopLoss, setStopLoss] = useState<number | null>(overlay.stop_loss);
-  const [quantity, setQuantity] = useState<number>(100);
+  const isOptionsOrder = !!(overlay.options_legs && overlay.options_legs.length > 0);
+  const [quantity, setQuantity] = useState<number>(isOptionsOrder ? 1 : 100);
   const [tif, setTif] = useState<string>('GTC');
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
-  const [optionsExpanded, setOptionsExpanded] = useState(false);
+  const [optionsExpanded, setOptionsExpanded] = useState(isOptionsOrder);
 
   const status = tradeStatus?.status ?? 'idle';
   const isFilled = status === 'filled';
@@ -106,8 +108,8 @@ export function TradeSidebar({
     await onExecute({
       ticker: overlay.ticker,
       direction: overlay.signal,
-      trade_type: 'equity',
-      entry_price: entryPrice,
+      trade_type: isOptionsOrder ? 'option' : 'equity',
+      entry_price: orderType === 'market' ? null : entryPrice,
       target_price: targetPrice!,
       stop_loss: stopLoss!,
       quantity,
@@ -118,7 +120,9 @@ export function TradeSidebar({
     });
   };
 
-  const isExecuteDisabled = targetPrice == null || stopLoss == null || isSubmitting;
+  // For market orders, entry price is not required
+  const isExecuteDisabled = targetPrice == null || stopLoss == null || isSubmitting
+    || (orderType === 'limit' && entryPrice == null);
 
   const inputClasses = `bg-bg-elevated border border-border-default rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-blue focus:border-transparent w-full`;
   const disabledInputClasses = `${inputClasses} opacity-50 cursor-not-allowed`;
@@ -300,24 +304,57 @@ export function TradeSidebar({
 
         {/* OrderForm */}
         <div className="space-y-3">
-          {/* Entry Price */}
+          {/* Order Type (Market / Limit) */}
           <div className="flex flex-col gap-1">
-            <label
-              htmlFor="entry-price"
-              className="text-xs uppercase tracking-wide text-text-secondary"
-            >
-              Entry Price
+            <label className="text-xs uppercase tracking-wide text-text-secondary">
+              Order Type
             </label>
-            <input
-              id="entry-price"
-              type="number"
-              step="0.01"
-              value={entryPrice ?? ''}
-              onChange={e => setEntryPrice(e.target.value === '' ? null : parseFloat(e.target.value))}
-              disabled={isFieldsDisabled}
-              className={isFieldsDisabled ? disabledInputClasses : inputClasses}
-            />
+            <div className="flex gap-1">
+              <button
+                onClick={() => setOrderType('market')}
+                disabled={isFieldsDisabled}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-sm transition-colors ${
+                  orderType === 'market'
+                    ? 'bg-accent-blue text-white'
+                    : 'bg-bg-elevated text-text-secondary hover:bg-bg-hover'
+                } ${isFieldsDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                Market
+              </button>
+              <button
+                onClick={() => setOrderType('limit')}
+                disabled={isFieldsDisabled}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-sm transition-colors ${
+                  orderType === 'limit'
+                    ? 'bg-accent-blue text-white'
+                    : 'bg-bg-elevated text-text-secondary hover:bg-bg-hover'
+                } ${isFieldsDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                Limit
+              </button>
+            </div>
           </div>
+
+          {/* Limit Price (only shown for limit orders) */}
+          {orderType === 'limit' && (
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="entry-price"
+                className="text-xs uppercase tracking-wide text-text-secondary"
+              >
+                Limit Price
+              </label>
+              <input
+                id="entry-price"
+                type="number"
+                step="0.01"
+                value={entryPrice ?? ''}
+                onChange={e => setEntryPrice(e.target.value === '' ? null : parseFloat(e.target.value))}
+                disabled={isFieldsDisabled}
+                className={isFieldsDisabled ? disabledInputClasses : inputClasses}
+              />
+            </div>
+          )}
 
           {/* Target Price */}
           <div className="flex flex-col gap-1">
@@ -363,7 +400,7 @@ export function TradeSidebar({
               htmlFor="quantity"
               className="text-xs uppercase tracking-wide text-text-secondary"
             >
-              Quantity
+              {isOptionsOrder ? 'Contracts' : 'Shares'}
             </label>
             <input
               id="quantity"

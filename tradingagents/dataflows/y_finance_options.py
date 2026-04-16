@@ -50,8 +50,16 @@ def _bs_greeks(S: float, K: float, T: float, r: float, sigma: float,
         "vega": round(vega, 4),
     }
 
-OPTIONS_CHAIN_CACHE_TTL_SECONDS = 30 * 60      # 30 minutes — fresher data during market hours
-HISTORICAL_IV_CACHE_TTL_SECONDS = 6 * 60 * 60
+def _is_market_hours() -> bool:
+    """Check if US market is currently open (rough heuristic)."""
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone(timedelta(hours=-4)))  # ET
+    return 0 <= now.weekday() <= 4 and 9 <= now.hour < 16
+
+
+# Longer cache TTL outside market hours — data is stale anyway, avoid re-fetching
+OPTIONS_CHAIN_CACHE_TTL_SECONDS = 30 * 60 if _is_market_hours() else 12 * 60 * 60  # 30min / 12h
+HISTORICAL_IV_CACHE_TTL_SECONDS = 6 * 60 * 60 if _is_market_hours() else 24 * 60 * 60  # 6h / 24h
 
 
 def get_options_expirations(symbol: str) -> list[str]:

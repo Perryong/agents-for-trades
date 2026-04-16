@@ -71,7 +71,7 @@ async def start_analysis(run_id: str, request: AnalyzeRequest):
                 if isinstance(v, (str, int, float, bool, type(None)))
             }
             await q.put({"type": "complete", "state": serialized, "signal": signal, "config_snapshot": config_snapshot})
-            # Update run status to completed
+            # Update run status to completed + write Prediction record
             try:
                 async with AsyncSessionFactory() as run_session:
                     r = await run_session.execute(sa_select(AnalysisRun).where(AnalysisRun.run_id == run_id))
@@ -79,7 +79,39 @@ async def start_analysis(run_id: str, request: AnalyzeRequest):
                     if run_rec:
                         run_rec.status = "completed"
                         run_rec.completed_at = datetime.utcnow()
-                        await run_session.commit()
+
+                    # Write Prediction record from analysis results
+                    from .models import Prediction
+                    trade_rec = final_state.get("trade_recommendation") or {}
+                    trade_spec = trade_rec.get("trade_spec")
+                    reasoning = trade_rec.get("reasoning_chain", [])
+                    ftd = final_state.get("final_trade_decision", "")
+                    direction = None
+                    if isinstance(trade_spec, dict):
+                        direction = trade_spec.get("direction")
+                    if not direction and ftd:
+                        upper = ftd.upper()
+                        if "BUY" in upper:
+                            direction = "BUY"
+                        elif "SELL" in upper:
+                            direction = "SELL"
+                    confidence = trade_rec.get("confidence", 50.0)
+                    if not isinstance(confidence, (int, float)):
+                        confidence = 50.0
+                    valid_until = trade_rec.get("valid_until")
+                    if hasattr(valid_until, "isoformat"):
+                        valid_until = valid_until.isoformat()
+                    pred = Prediction(
+                        ticker=request.ticker.upper(),
+                        direction=direction,
+                        confidence=float(confidence),
+                        trade_spec_json=json.dumps(trade_spec) if trade_spec else None,
+                        reasoning_chain_json=json.dumps(reasoning) if reasoning else "[]",
+                        no_trade_reason=trade_rec.get("no_trade_reason"),
+                        valid_until=str(valid_until) if valid_until else None,
+                    )
+                    run_session.add(pred)
+                    await run_session.commit()
             except Exception:
                 pass
         except AnalysisCancelledError:
