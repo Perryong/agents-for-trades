@@ -64,14 +64,16 @@ export function useRecommendations(): UseRecommendationsResult {
   }, []);
 
   const approve = useCallback(async (id: number) => {
-    await fetch(`/api/recommendations/${id}/approve`, { method: 'POST' });
+    const res = await fetch(`/api/recommendations/${id}/approve`, { method: 'POST' });
+    if (!res.ok) { console.error('Failed to approve recommendation', id, res.status); return; }
     setRecommendations(prev =>
       prev.map(r => r.id === id ? { ...r, status: 'approved' as const } : r)
     );
   }, []);
 
   const skip = useCallback(async (id: number) => {
-    await fetch(`/api/recommendations/${id}/skip`, { method: 'POST' });
+    const res = await fetch(`/api/recommendations/${id}/skip`, { method: 'POST' });
+    if (!res.ok) { console.error('Failed to skip recommendation', id, res.status); return; }
     setRecommendations(prev =>
       prev.map(r => r.id === id ? { ...r, status: 'skipped' as const } : r)
     );

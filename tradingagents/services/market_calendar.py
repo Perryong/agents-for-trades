@@ -42,7 +42,7 @@ class MarketCalendar:
         ts = pd.Timestamp(dt)
         sessions = self._cal.sessions_in_range(
             ts + pd.Timedelta(days=1),
-            ts + pd.Timedelta(days=10),
+            ts + pd.Timedelta(days=30),
         )
         return sessions[0].date()
 
@@ -50,7 +50,7 @@ class MarketCalendar:
         """Return the most recent trading day before the given date."""
         ts = pd.Timestamp(dt)
         sessions = self._cal.sessions_in_range(
-            ts - pd.Timedelta(days=10),
+            ts - pd.Timedelta(days=30),
             ts - pd.Timedelta(days=1),
         )
         return sessions[-1].date()

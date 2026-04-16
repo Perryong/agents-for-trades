@@ -75,9 +75,14 @@ def create_technical_analyst(llm):
         vol_note = extract_vol_note(report)
 
         # Technical analyst always produces a report (no tool calls)
-        signal_dict = parse_agent_signal(
-            report, ticker=ticker, agent_name="technical"
-        )
+        try:
+            signal_dict = parse_agent_signal(
+                report, ticker=ticker, agent_name="technical"
+            )
+        except Exception:
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to parse structured signal for {ticker}, using raw report")
+            signal_dict = None
 
         return {
             "messages": [result],

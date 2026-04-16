@@ -126,15 +126,30 @@ class BatchRunResponse(BaseModel):
 async def start_batch_analysis(request: BatchRunRequest):
     """Start analysis for multiple tickers sequentially.
 
-    Returns immediately with a batch_id. Each ticker runs as a separate
-    analysis run, visible via SSE progress stream.
+    Returns immediately with a batch_id. Each ticker is analyzed sequentially
+    in a background task. Individual ticker failures don't crash the batch.
     """
+    import asyncio
     import uuid
     batch_id = f"batch-{uuid.uuid4().hex[:8]}"
 
-    # The actual batch orchestration happens in the background
-    # Each ticker gets its own run_id and SSE stream
-    # For now, return the batch info — frontend will trigger individual runs
+    async def _run_batch():
+        """Run each ticker sequentially — errors isolated per ticker."""
+        import logging
+        log = logging.getLogger(__name__)
+        for i, ticker in enumerate(request.tickers, 1):
+            log.info(f"Batch {batch_id}: analyzing {ticker} ({i}/{len(request.tickers)})")
+            try:
+                # Trigger individual analysis via the existing /api/analyze endpoint logic
+                from .routes import _start_single_analysis
+                await _start_single_analysis(ticker, batch_id=batch_id)
+            except Exception as e:
+                log.error(f"Batch {batch_id}: {ticker} failed — {e}")
+                continue  # Other tickers continue
+
+        log.info(f"Batch {batch_id}: complete ({len(request.tickers)} tickers)")
+
+    asyncio.create_task(_run_batch())
 
     return BatchRunResponse(
         batch_id=batch_id,

@@ -1,17 +1,14 @@
 """Pre-market analysis scheduler.
 
-Provides a simple scheduling service that triggers analysis runs at a
-configurable time on trading days. Uses APScheduler if available,
-falls back to a simple threading.Timer loop.
+Uses APScheduler's BackgroundScheduler with CronTrigger for reliable
+daily scheduling. Falls back to threading.Timer if APScheduler is unavailable.
 
 Designed to be started from the API lifespan or CLI.
 """
 from __future__ import annotations
 
-import asyncio
 import logging
-import threading
-from datetime import datetime, time, timedelta
+from datetime import time
 from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
@@ -29,59 +26,61 @@ class PreMarketScheduler:
         self.run_callback = run_callback
         self.schedule_time = schedule_time
         self.market_calendar = market_calendar
-        self._timer: Optional[threading.Timer] = None
+        self._scheduler = None
         self._running = False
 
     def start(self) -> None:
-        """Start the scheduler. Schedules the next run."""
+        """Start the scheduler."""
+        target = self._parse_time(self.schedule_time)
         self._running = True
-        self._schedule_next()
-        logger.info(f"PreMarketScheduler started, target time: {self.schedule_time}")
+
+        try:
+            from apscheduler.schedulers.background import BackgroundScheduler
+            from apscheduler.triggers.cron import CronTrigger
+
+            self._scheduler = BackgroundScheduler(
+                job_defaults={"coalesce": True, "misfire_grace_time": 3600}
+            )
+            self._scheduler.add_job(
+                self._execute,
+                CronTrigger(
+                    hour=target.hour,
+                    minute=target.minute,
+                    day_of_week="mon-fri",
+                    timezone="US/Eastern",
+                ),
+                id="pre_market_analysis",
+                replace_existing=True,
+            )
+            self._scheduler.start()
+            logger.info(f"PreMarketScheduler started (APScheduler), target: {self.schedule_time} ET, Mon-Fri")
+
+        except ImportError:
+            logger.warning("APScheduler not installed, falling back to threading.Timer")
+            self._start_timer_fallback(target)
 
     def stop(self) -> None:
         """Stop the scheduler."""
         self._running = False
-        if self._timer:
+        if self._scheduler:
+            self._scheduler.shutdown(wait=False)
+            self._scheduler = None
+        if hasattr(self, "_timer") and self._timer:
             self._timer.cancel()
             self._timer = None
         logger.info("PreMarketScheduler stopped")
 
-    def _schedule_next(self) -> None:
-        """Schedule the next analysis run."""
-        if not self._running:
-            return
-
-        now = datetime.now()
-        target_time = self._parse_time(self.schedule_time)
-
-        # Calculate next target datetime
-        target_dt = now.replace(
-            hour=target_time.hour,
-            minute=target_time.minute,
-            second=0,
-            microsecond=0,
-        )
-
-        # If target has passed today, schedule for tomorrow
-        if target_dt <= now:
-            target_dt += timedelta(days=1)
-
-        # Skip non-trading days
-        if self.market_calendar:
-            while not self._is_trading_day(target_dt.date()):
-                target_dt += timedelta(days=1)
-
-        delay = (target_dt - now).total_seconds()
-        logger.info(f"Next analysis scheduled for {target_dt} ({delay:.0f}s from now)")
-
-        self._timer = threading.Timer(delay, self._execute)
-        self._timer.daemon = True
-        self._timer.start()
-
     def _execute(self) -> None:
-        """Execute the scheduled run and reschedule."""
+        """Execute the scheduled run (called by APScheduler or Timer)."""
         if not self._running:
             return
+
+        # Check trading day if calendar available
+        if self.market_calendar and hasattr(self.market_calendar, "is_trading_day"):
+            from datetime import date
+            if not self.market_calendar.is_trading_day(date.today()):
+                logger.info("Skipping analysis — not a trading day")
+                return
 
         logger.info("PreMarketScheduler: triggering analysis run")
         try:
@@ -89,18 +88,41 @@ class PreMarketScheduler:
         except Exception as e:
             logger.error(f"Scheduled analysis failed: {e}")
 
-        # Schedule next run
-        self._schedule_next()
+    def _start_timer_fallback(self, target: time) -> None:
+        """Timer-based fallback when APScheduler is not available."""
+        import threading
+        from datetime import datetime, timedelta
 
-    def _is_trading_day(self, dt) -> bool:
-        """Check if a date is a trading day."""
-        if self.market_calendar and hasattr(self.market_calendar, 'is_trading_day'):
-            return self.market_calendar.is_trading_day(dt)
-        # Fallback: weekdays only
-        return dt.weekday() < 5
+        now = datetime.now()
+        target_dt = now.replace(hour=target.hour, minute=target.minute, second=0, microsecond=0)
+
+        if target_dt <= now:
+            target_dt += timedelta(days=1)
+
+        # Skip weekends
+        while target_dt.weekday() >= 5:
+            target_dt += timedelta(days=1)
+
+        delay = (target_dt - now).total_seconds()
+        logger.info(f"Next analysis (timer fallback) scheduled for {target_dt} ({delay:.0f}s)")
+
+        self._timer = threading.Timer(delay, self._timer_execute)
+        self._timer.daemon = True
+        self._timer.start()
+
+    def _timer_execute(self) -> None:
+        """Timer callback — execute and reschedule."""
+        self._execute()
+        if self._running:
+            target = self._parse_time(self.schedule_time)
+            self._start_timer_fallback(target)
 
     @staticmethod
     def _parse_time(time_str: str) -> time:
         """Parse 'HH:MM' string to time object."""
-        parts = time_str.split(":")
-        return time(int(parts[0]), int(parts[1]) if len(parts) > 1 else 0)
+        try:
+            parts = time_str.split(":")
+            return time(int(parts[0]), int(parts[1]) if len(parts) > 1 else 0)
+        except (ValueError, IndexError):
+            logger.warning(f"Invalid schedule_time '{time_str}', defaulting to 08:00")
+            return time(8, 0)

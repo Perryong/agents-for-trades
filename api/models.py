@@ -80,6 +80,7 @@ class Prediction(Base):
     no_trade_reason: Mapped[str | None] = mapped_column(String, nullable=True)
     valid_until: Mapped[str | None] = mapped_column(String, nullable=True)  # ISO 8601
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    approval_status: Mapped[str | None] = mapped_column(String, nullable=True, default="pending")  # pending|approved|skipped|expired
 
 
 class Trade(Base):

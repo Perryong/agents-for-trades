@@ -88,14 +88,14 @@ def _fetch_canslim_candidates(max_candidates: int = 30) -> list[dict]:
             sma200 = np.mean(close[-min(200, len(close)):])
             m_score = 80 if current > sma200 else 20
 
-            # Composite: C 19%, A 25%, N 19%, S 19%, I 13%, M 6%
+            # Composite: C 19%, A 25%, N 19%, S 19%, I 13%, M 5% = 100%
             composite = (
                 c_score * 0.19 +
                 a_score * 0.25 +
                 n_score * 0.19 +
                 s_score * 0.19 +
                 i_score * 0.13 +
-                m_score * 0.06
+                m_score * 0.05
             )
 
             # Grade
@@ -153,8 +153,19 @@ class CANSLIMStrategy:
                 error="No CANSLIM candidates found",
             )
 
-        # Check market direction warning
+        # Check market direction — M-component gates all picks per O'Neil methodology
         m_warning = any(c["m_warning"] for c in candidates[:5])
+
+        if m_warning:
+            avg_m = sum(c["m_score"] for c in candidates[:5]) / min(5, len(candidates))
+            return ScreenerResult(
+                picks=[],
+                screened_at=screened_at,
+                candidate_count=len(candidates),
+                model_used="CANSLIM-quantitative",
+                error=f"Market direction unfavorable (avg M-score: {avg_m:.0f}/100). "
+                      f"CANSLIM methodology requires favorable market direction for new buys. Raise cash.",
+            )
 
         picks = [
             TopPick(
@@ -162,8 +173,7 @@ class CANSLIMStrategy:
                 score=c["composite"] / 100,
                 rationale=f"CANSLIM Grade {c['grade']} ({c['composite']:.0f}/100). "
                           f"C:{c['c_score']:.0f} A:{c['a_score']:.0f} N:{c['n_score']:.0f} "
-                          f"S:{c['s_score']:.0f} I:{c['i_score']:.0f} M:{c['m_score']:.0f}"
-                          + (" ⚠ Market direction weak" if c["m_warning"] else ""),
+                          f"S:{c['s_score']:.0f} I:{c['i_score']:.0f} M:{c['m_score']:.0f}",
                 confidence=c["composite"] / 100 * 0.9,
                 key_metrics={
                     "composite": c["composite"],
@@ -176,16 +186,11 @@ class CANSLIMStrategy:
             for c in candidates[:n_picks]
         ]
 
-        error_msg = None
-        if m_warning:
-            error_msg = "Market direction (M) score is weak — raise cash warning active"
-
         return ScreenerResult(
             picks=picks,
             screened_at=screened_at,
             candidate_count=len(candidates),
             model_used="CANSLIM-quantitative",
-            error=error_msg,
         )
 
 

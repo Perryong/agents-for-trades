@@ -73,10 +73,7 @@ class QuickStatsResponse(BaseModel):
     expectancy: float
 
 
-# ---------------------------------------------------------------------------
-# In-memory recommendation state (approve/skip)
-# ---------------------------------------------------------------------------
-_recommendation_status: dict[int, str] = {}
+# Recommendation status is persisted in Prediction.approval_status column
 
 
 # ---------------------------------------------------------------------------
@@ -128,12 +125,13 @@ async def list_recommendations(session: SessionDep):
             except (json.JSONDecodeError, TypeError):
                 pass
 
-        status = _recommendation_status.get(p.id, "pending")
+        status = p.approval_status or "pending"
         if status == "pending" and p.valid_until:
             try:
                 if datetime.fromisoformat(p.valid_until) < datetime.utcnow():
                     status = "expired"
-                    _recommendation_status[p.id] = "expired"
+                    p.approval_status = "expired"
+                    await session.commit()
             except ValueError:
                 pass
 
@@ -156,21 +154,25 @@ async def list_recommendations(session: SessionDep):
 
 @recommendation_router.post("/recommendations/{rec_id}/approve")
 async def approve_recommendation(rec_id: int, session: SessionDep):
-    """Mark a recommendation as approved."""
+    """Mark a recommendation as approved (persisted to DB)."""
     result = await session.execute(select(Prediction).where(Prediction.id == rec_id))
-    if result.scalar_one_or_none() is None:
+    pred = result.scalar_one_or_none()
+    if pred is None:
         raise HTTPException(status_code=404, detail="Recommendation not found")
-    _recommendation_status[rec_id] = "approved"
+    pred.approval_status = "approved"
+    await session.commit()
     return {"id": rec_id, "status": "approved"}
 
 
 @recommendation_router.post("/recommendations/{rec_id}/skip")
 async def skip_recommendation(rec_id: int, session: SessionDep):
-    """Mark a recommendation as skipped."""
+    """Mark a recommendation as skipped (persisted to DB)."""
     result = await session.execute(select(Prediction).where(Prediction.id == rec_id))
-    if result.scalar_one_or_none() is None:
+    pred = result.scalar_one_or_none()
+    if pred is None:
         raise HTTPException(status_code=404, detail="Recommendation not found")
-    _recommendation_status[rec_id] = "skipped"
+    pred.approval_status = "skipped"
+    await session.commit()
     return {"id": rec_id, "status": "skipped"}
 
 

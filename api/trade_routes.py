@@ -3,6 +3,7 @@
 Delegates all broker operations to the ExecutionBackend (PaperBackend).
 Route handlers handle DB persistence and HTTP concerns only.
 """
+import asyncio
 import logging
 from datetime import datetime
 from typing import Optional
@@ -215,7 +216,7 @@ async def poll_trade_status(
     # This part needs the raw Alpaca order object — delegate to backend for bracket detection
     if trade.status == "filled" and trade.close_reason is None:
         try:
-            _check_bracket_legs(backend, trade, order_id, session)
+            await asyncio.to_thread(_check_bracket_legs, backend, trade, order_id, session)
         except Exception:
             pass  # bracket check is best-effort
 
@@ -236,8 +237,7 @@ async def poll_trade_status(
 
 
 def _check_bracket_legs(backend: PaperBackend, trade: Trade, order_id: str, session) -> None:
-    """Check bracket legs for close_reason. Synchronous helper called from async context."""
-    import asyncio
+    """Check bracket legs for close_reason. Synchronous helper called via asyncio.to_thread."""
 
     client = backend._get_client()
     from alpaca.trading.requests import GetOrderByIdRequest

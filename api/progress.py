@@ -150,7 +150,7 @@ class ProgressCallbackHandler(BaseCallbackHandler):
 
             asyncio.run_coroutine_threadsafe(_save(), self.loop)
         except Exception:
-            pass  # Non-fatal: don't crash the pipeline for persistence failures
+            logging.getLogger(__name__).exception("Failed to persist agent result")
 
     def on_llm_start(
         self, serialized: Dict[str, Any], prompts: Any, **kwargs: Any

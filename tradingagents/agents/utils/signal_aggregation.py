@@ -33,7 +33,10 @@ def aggregate_signals(
     direction_votes: dict[str, float] = {"bullish": 0.0, "bearish": 0.0, "neutral": 0.0}
     for name, signal in active.items():
         w = weights.get(name, 1.0) if weights else 1.0
-        direction_votes[signal["signal_direction"]] += w
+        direction = signal.get("signal_direction", "neutral")
+        if direction not in direction_votes:
+            direction = "neutral"
+        direction_votes[direction] += w
 
     # Majority direction (max weighted votes)
     majority = max(direction_votes, key=direction_votes.get)
@@ -43,7 +46,10 @@ def aggregate_signals(
     weighted_conf = 0.0
     for name, signal in active.items():
         w = weights.get(name, 1.0) if weights else 1.0
-        weighted_conf += signal["confidence"] * w
+        conf = signal.get("confidence", 50.0)
+        if not isinstance(conf, (int, float)):
+            conf = 50.0
+        weighted_conf += conf * w
         total_weight += w
 
     overall_confidence = weighted_conf / total_weight if total_weight > 0 else 0.0
@@ -51,7 +57,7 @@ def aggregate_signals(
     # Build reasoning chain with dissent flags
     chain = []
     for name, signal in active.items():
-        is_dissenting = signal["signal_direction"] != majority
+        is_dissenting = signal.get("signal_direction", "neutral") != majority
         chain.append(
             AgentSignalSummary(
                 agent_name=name,

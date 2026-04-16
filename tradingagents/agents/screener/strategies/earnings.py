@@ -103,8 +103,13 @@ def _fetch_earnings_candidates(max_candidates: int = 30) -> list[dict]:
             if composite < 45:
                 continue
 
-            # Determine gap timing (approximate)
+            # Determine gap timing (approximate: same-day gap = BMO, next-day = AMC)
             gap_date = hist.index[gap_idx].strftime("%Y-%m-%d") if gap_idx < len(hist) else "unknown"
+            # Heuristic: if gap occurred within 1 day of the period start, likely BMO
+            # If we can compare gap day vs prior day's close time we'd be more precise
+            # For now: if the gap day is a Monday, likely AMC Friday; otherwise BMO
+            gap_weekday = hist.index[gap_idx].weekday() if gap_idx < len(hist) else -1
+            timing = "BMO" if gap_weekday != 0 else "AMC"  # Monday gaps are usually AMC Friday reports
 
             candidates.append({
                 "ticker": ticker,
@@ -112,6 +117,7 @@ def _fetch_earnings_candidates(max_candidates: int = 30) -> list[dict]:
                 "grade": grade,
                 "gap_pct": round(gap_pct, 1),
                 "gap_date": gap_date,
+                "timing": timing,
                 "vol_ratio": round(vol_ratio, 1),
                 "above_ma200": close[-1] > sma200,
                 "above_ma50": close[-1] > sma50,
@@ -158,6 +164,7 @@ class EarningsMomentumStrategy:
                 key_metrics={
                     "gap_pct": c["gap_pct"],
                     "gap_date": c["gap_date"],
+                    "timing": c["timing"],
                     "volume_ratio": c["vol_ratio"],
                     "grade": c["grade"],
                 },

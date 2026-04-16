@@ -67,11 +67,19 @@ _VALIDATORS: dict[str, tuple[float, float] | str] = {
 }
 
 
+_ALLOWED_KEYS: set[str] = set(_EXPOSED_DEFAULTS.keys())
+
+
 def _validate(key: str, value: Any) -> None:
     """Validate a config value. Raises HTTPException on invalid."""
+    if key not in _ALLOWED_KEYS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown config key: '{key}'. Allowed keys: {sorted(_ALLOWED_KEYS)}",
+        )
     rule = _VALIDATORS.get(key)
     if rule is None:
-        return  # No validation for unknown keys
+        return  # Known key but no specific validation
 
     if rule == "watchlist":
         if not isinstance(value, list):
@@ -97,7 +105,12 @@ class ConfigValue(BaseModel):
 async def get_all_config(session: SessionDep):
     """Return all config: defaults merged with DB overrides."""
     result = await session.execute(select(Config))
-    db_entries = {c.key: json.loads(c.value) for c in result.scalars().all()}
+    db_entries = {}
+    for c in result.scalars().all():
+        try:
+            db_entries[c.key] = json.loads(c.value)
+        except (json.JSONDecodeError, TypeError):
+            logger.warning(f"Corrupt config value for key '{c.key}', skipping")
     merged = {**_EXPOSED_DEFAULTS, **db_entries}
     return merged
 

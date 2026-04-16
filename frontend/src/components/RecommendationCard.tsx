@@ -26,6 +26,14 @@ function timeRemaining(validUntil: string | null): { text: string; urgent: boole
   }
 }
 
+function isStalePreMarket(createdAt: string | undefined): boolean {
+  if (!createdAt) return false;
+  try {
+    const age = Date.now() - new Date(createdAt).getTime();
+    return age > 2 * 60 * 60 * 1000; // > 2 hours old
+  } catch { return false; }
+}
+
 const STATUS_CLASSES: Record<string, string> = {
   pending: '',
   approved: 'bg-accent-green/5 border-accent-green/20',
@@ -38,6 +46,7 @@ export function RecommendationCard({ recommendation: rec, focused, expanded, onT
   const { text: countdown, urgent } = timeRemaining(rec.valid_until);
   const statusClass = STATUS_CLASSES[rec.status] ?? '';
   const isPending = rec.status === 'pending';
+  const stale = isStalePreMarket((rec as any).created_at);
 
   return (
     <div
@@ -69,6 +78,11 @@ export function RecommendationCard({ recommendation: rec, focused, expanded, onT
       <div className="flex items-center gap-3 mb-2">
         {rec.agent_signals.length > 0 && (
           <ConsensusIndicator signals={rec.agent_signals} />
+        )}
+        {stale && isPending && (
+          <span className="text-[10px] font-medium text-accent-amber bg-accent-amber/10 px-1.5 py-0.5 rounded-sm">
+            Pre-market analysis — verify at open
+          </span>
         )}
         {countdown && (
           <span className={`text-[11px] font-mono ${urgent ? 'text-accent-amber' : 'text-text-secondary'}`}>

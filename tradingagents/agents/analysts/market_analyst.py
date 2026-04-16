@@ -92,9 +92,14 @@ Volume-Based Indicators:
 
         if len(result.tool_calls) == 0:
             report = result.content
-            signal_dict = parse_agent_signal(
-                report, ticker=ticker, agent_name="market"
-            )
+            try:
+                signal_dict = parse_agent_signal(
+                    report, ticker=ticker, agent_name="market"
+                )
+            except Exception:
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to parse structured signal for {ticker}, using raw report")
+                signal_dict = None
 
         # vol_note extracted outside the if block (original behavior preserved)
         vol_note = extract_vol_note(report)

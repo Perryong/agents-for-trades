@@ -71,6 +71,20 @@ async def ensure_prediction_id_column() -> None:
                 raise
 
 
+async def ensure_approval_status_column() -> None:
+    """Add approval_status column to predictions table."""
+    async with engine.begin() as conn:
+        try:
+            await conn.execute(
+                text("ALTER TABLE predictions ADD COLUMN approval_status TEXT DEFAULT 'pending'")
+            )
+        except Exception as exc:
+            if "duplicate column name" in str(exc).lower():
+                pass
+            else:
+                raise
+
+
 async def ensure_bracket_columns() -> None:
     """Add Phase-1 bracket order and close-reason columns."""
     new_columns = [

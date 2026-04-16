@@ -1,12 +1,15 @@
 import json
+import logging
 import yaml
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from tradingagents.agents.protocol import TradeRecommendation, TradeSpec
+from tradingagents.agents.protocol import AgentSignalSummary, TradeRecommendation, TradeSpec
 from tradingagents.agents.utils.signal_aggregation import aggregate_signals
 from tradingagents.agents.utils.signal_extraction import extract_agent_signal_json
 from tradingagents.exceptions import AgentProtocolError
+
+logger = logging.getLogger(__name__)
 
 
 def _should_skip_trade(
@@ -119,6 +122,145 @@ def _format_signal_summary(signals: dict[str, dict | None]) -> str:
     return "\n".join(lines)
 
 
+def _get_regime_and_exposure() -> tuple:
+    """Fetch regime classification and exposure decision, with graceful degradation.
+
+    Returns (regime_result, exposure_result) where either may be None if the
+    service call fails.
+    """
+    regime_result = None
+    exposure_result = None
+
+    try:
+        from tradingagents.services.regime_detector import detect_regime
+        regime_result = detect_regime()
+    except Exception:
+        logger.warning("Regime detection failed — proceeding with default behavior", exc_info=True)
+
+    try:
+        from tradingagents.services.exposure_manager import compute_exposure
+        exposure_result = compute_exposure()
+    except Exception:
+        logger.warning("Exposure computation failed — proceeding with default behavior", exc_info=True)
+
+    return regime_result, exposure_result
+
+
+def _apply_regime_adjustments(
+    confidence_threshold: float,
+    position_size_factor: float,
+    regime_result,
+) -> tuple[float, float, str]:
+    """Apply regime-based adjustments to confidence threshold and position sizing.
+
+    Returns (adjusted_threshold, adjusted_size_factor, description).
+    """
+    if regime_result is None:
+        return confidence_threshold, position_size_factor, "Regime: unavailable (defaults applied)"
+
+    regime = regime_result.regime
+    confidence = regime_result.confidence
+
+    if regime == "Contraction":
+        # Contraction: raise threshold by 10 pts, reduce sizing by 30%
+        adj_threshold = confidence_threshold + 10.0
+        adj_size = position_size_factor * 0.70
+        desc = (
+            f"Regime=Contraction (confidence {confidence:.0f}%): "
+            f"threshold +10 pts -> {adj_threshold:.0f}%, sizing -30%"
+        )
+    elif regime == "Broadening":
+        # Broadening: standard thresholds, no adjustment
+        adj_threshold = confidence_threshold
+        adj_size = position_size_factor
+        desc = (
+            f"Regime=Broadening (confidence {confidence:.0f}%): "
+            f"standard thresholds applied"
+        )
+    elif regime == "Concentration":
+        # Moderate caution: +5 pts threshold, -15% sizing
+        adj_threshold = confidence_threshold + 5.0
+        adj_size = position_size_factor * 0.85
+        desc = (
+            f"Regime=Concentration (confidence {confidence:.0f}%): "
+            f"threshold +5 pts -> {adj_threshold:.0f}%, sizing -15%"
+        )
+    elif regime == "Inflationary":
+        # Moderate caution: +5 pts threshold, -20% sizing
+        adj_threshold = confidence_threshold + 5.0
+        adj_size = position_size_factor * 0.80
+        desc = (
+            f"Regime=Inflationary (confidence {confidence:.0f}%): "
+            f"threshold +5 pts -> {adj_threshold:.0f}%, sizing -20%"
+        )
+    else:
+        # Transitional: slight caution: +3 pts threshold, -10% sizing
+        adj_threshold = confidence_threshold + 3.0
+        adj_size = position_size_factor * 0.90
+        desc = (
+            f"Regime=Transitional (confidence {confidence:.0f}%): "
+            f"threshold +3 pts -> {adj_threshold:.0f}%, sizing -10%"
+        )
+
+    return adj_threshold, adj_size, desc
+
+
+def _apply_exposure_gating(
+    overall_confidence: float,
+    exposure_result,
+) -> tuple[bool, float, str | None, str]:
+    """Apply exposure posture gating rules.
+
+    Returns (should_block, size_multiplier, block_reason, description).
+    - should_block: If True, produce a no-trade recommendation.
+    - size_multiplier: Additional position size multiplier (1.0 = no change).
+    - block_reason: Reason string if blocked, None otherwise.
+    - description: Human-readable description of the gating decision.
+    """
+    if exposure_result is None:
+        return False, 1.0, None, "Exposure: unavailable (defaults applied)"
+
+    posture = exposure_result.posture
+    ceiling = exposure_result.exposure_ceiling
+
+    if posture == "CASH_PRIORITY":
+        return (
+            True,
+            0.0,
+            "Market posture: CASH_PRIORITY — no new entries",
+            f"Exposure=CASH_PRIORITY (ceiling {ceiling:.0f}%): trade blocked",
+        )
+
+    if posture == "REDUCE_ONLY":
+        if overall_confidence <= 80:
+            return (
+                True,
+                0.0,
+                (
+                    f"Market posture: REDUCE_ONLY — confidence {overall_confidence:.1f}% "
+                    f"does not exceed 80% threshold for new entries"
+                ),
+                f"Exposure=REDUCE_ONLY (ceiling {ceiling:.0f}%): "
+                f"confidence {overall_confidence:.1f}% <= 80% — trade blocked",
+            )
+        # High-confidence trade allowed, but at 50% position size
+        return (
+            False,
+            0.50,
+            None,
+            f"Exposure=REDUCE_ONLY (ceiling {ceiling:.0f}%): "
+            f"confidence {overall_confidence:.1f}% > 80% — allowed at 50% size",
+        )
+
+    # NEW_ENTRY_ALLOWED: normal flow
+    return (
+        False,
+        1.0,
+        None,
+        f"Exposure=NEW_ENTRY_ALLOWED (ceiling {ceiling:.0f}%): normal flow",
+    )
+
+
 _TRADE_SPEC_INSTRUCTION = """
 
 CRITICAL: At the very end of your response, if your recommendation is BUY or SELL (not HOLD), you MUST append a JSON block with the exact trade specification:
@@ -171,6 +313,101 @@ def create_risk_manager(llm, memory):
         overall_confidence, reasoning_chain, majority_direction = aggregate_signals(
             structured_signals
         )
+
+        # ── D1: Regime detection & exposure management ──────────────────
+        regime_result, exposure_result = _get_regime_and_exposure()
+
+        # Build market context description for reasoning chain
+        regime_desc = _build_regime_context_description(regime_result)
+        exposure_desc = _build_exposure_context_description(exposure_result)
+        market_context_line = (
+            f"Market Context: {regime_desc}, {exposure_desc}"
+        )
+
+        # Inject market context as the first entry in reasoning chain
+        market_context_step = AgentSignalSummary(
+            agent_name="market_context",
+            signal_direction="neutral",
+            confidence=regime_result.confidence if regime_result else 0.0,
+            evidence=[market_context_line],
+            is_dissenting=False,
+        )
+        reasoning_chain = [market_context_step] + reasoning_chain
+
+        # Apply regime adjustments to confidence threshold
+        base_confidence_threshold = 65.0
+        base_size_factor = 1.0
+        adj_threshold, adj_size_factor, regime_adj_desc = _apply_regime_adjustments(
+            base_confidence_threshold, base_size_factor, regime_result
+        )
+
+        # Apply exposure gating
+        should_block, exposure_size_mult, block_reason, exposure_gate_desc = (
+            _apply_exposure_gating(overall_confidence, exposure_result)
+        )
+
+        # If exposure posture blocks the trade, return early with no-trade
+        if should_block:
+            valid_until = _compute_valid_until(None)
+            recommendation = TradeRecommendation(
+                trade_spec=None,
+                approval_status="rejected",
+                reasoning_chain=reasoning_chain,
+                no_trade_reason=block_reason,
+                confidence=overall_confidence,
+                valid_until=valid_until,
+                ticker=ticker,
+            )
+            recommendation_dict = recommendation.model_dump(mode="json")
+
+            no_trade_decision = (
+                f"## Risk Manager Decision\n\n"
+                f"**Recommendation: NO TRADE**\n\n"
+                f"**Reason:** {block_reason}\n\n"
+                f"**{regime_adj_desc}**\n"
+                f"**{exposure_gate_desc}**\n\n"
+                f"The current market posture does not support new entries. "
+                f"Majority signal was {majority_direction.upper()} at "
+                f"{overall_confidence:.1f}% confidence, but exposure constraints prevent action."
+            )
+
+            new_risk_debate_state = {
+                "judge_decision": no_trade_decision,
+                "history": risk_debate_state["history"],
+                "aggressive_history": risk_debate_state["aggressive_history"],
+                "conservative_history": risk_debate_state["conservative_history"],
+                "neutral_history": risk_debate_state["neutral_history"],
+                "latest_speaker": "Judge",
+                "current_aggressive_response": risk_debate_state["current_aggressive_response"],
+                "current_conservative_response": risk_debate_state["current_conservative_response"],
+                "current_neutral_response": risk_debate_state["current_neutral_response"],
+                "count": risk_debate_state["count"],
+            }
+
+            return {
+                "risk_debate_state": new_risk_debate_state,
+                "final_trade_decision": no_trade_decision,
+                "trade_recommendation": recommendation_dict,
+            }
+
+        # Combine size adjustments from regime + exposure
+        final_size_factor = adj_size_factor * exposure_size_mult
+
+        # Build market context section for LLM prompt
+        market_context_prompt = f"""
+---
+
+**MARKET CONTEXT (Regime & Exposure Assessment):**
+- {regime_adj_desc}
+- {exposure_gate_desc}
+- {market_context_line}
+- Effective confidence threshold: {adj_threshold:.0f}% (base: {base_confidence_threshold:.0f}%)
+- Position size adjustment factor: {final_size_factor:.0%}
+
+Use this market context to inform your position sizing and conviction level. In a defensive regime, prefer smaller positions and tighter stops.
+
+---
+"""
 
         # Format signal summary for LLM prompt
         signal_summary = _format_signal_summary(structured_signals)
@@ -248,12 +485,14 @@ Include your PASS/FLAG assessment for each rule in your final recommendation."""
         prompt = f"""As the Risk Management Judge and Debate Facilitator, your goal is to evaluate the debate between three risk analysts—Aggressive, Neutral, and Conservative—and determine the best course of action for the trader. Your decision must result in a clear recommendation: Buy, Sell, or Hold. Choose Hold only if strongly justified by specific arguments, not as a fallback when all sides seem valid. Strive for clarity and decisiveness.
 
 {signal_summary}
-
+{market_context_prompt}
 **Aggregated Signal Assessment:**
 - Majority Direction: {majority_direction.upper()}
 - Overall Confidence: {overall_confidence:.1f}%
-- Agents in agreement: {sum(1 for s in reasoning_chain if not s.is_dissenting)}/{len(reasoning_chain)}
-- Dissenting agents: {', '.join(s.agent_name for s in reasoning_chain if s.is_dissenting) or 'None'}
+- Effective Confidence Threshold: {adj_threshold:.0f}%
+- Position Size Factor: {final_size_factor:.0%}
+- Agents in agreement: {sum(1 for s in reasoning_chain if not s.is_dissenting and s.agent_name != "market_context")}/{len([s for s in reasoning_chain if s.agent_name != "market_context"])}
+- Dissenting agents: {', '.join(s.agent_name for s in reasoning_chain if s.is_dissenting and s.agent_name != 'market_context') or 'None'}
 
 Guidelines for Decision-Making:
 1. **Summarize Key Arguments**: Extract the strongest points from each analyst, focusing on relevance to the context.
@@ -262,6 +501,7 @@ Guidelines for Decision-Making:
 4. **Learn from Past Mistakes**: Use lessons from **{past_memory_str}** to address prior misjudgments and improve the decision you are making now to make sure you don't make a wrong BUY/SELL/HOLD call that loses money.
 5. **Technical Alignment Check**: Validate the final recommendation against the Technical Analyst report. If you diverge, provide a concrete reason and risk mitigation.
 6. **Structured Signal Check**: Consider the aggregated signal assessment above. If your recommendation diverges from the majority agent direction, explain why.
+7. **Market Context Check**: Factor in the regime and exposure context above. If operating in a defensive regime, justify any aggressive positioning.
 
 Deliverables — your output MUST include ALL of these sections:
 
@@ -275,7 +515,7 @@ Deliverables — your output MUST include ALL of these sections:
 - Stop loss level (with reasoning — e.g., below support)
 - Profit target(s) (T1 and T2 if applicable)
 - Risk/reward ratio
-- Position sizing suggestion (% of portfolio)
+- Position sizing suggestion (% of portfolio) — NOTE: apply the position size factor of {final_size_factor:.0%} from regime/exposure analysis
 
 ## Options Trade Plan (include ONLY if options data is available above)
 The options data includes contracts across multiple timeframes. You MUST evaluate and recommend for at least TWO timeframes:
@@ -369,3 +609,22 @@ Focus on actionable insights and continuous improvement. Build on past lessons, 
         }
 
     return risk_manager_node
+
+
+def _build_regime_context_description(regime_result) -> str:
+    """Build a human-readable regime description for the reasoning chain."""
+    if regime_result is None:
+        return "Regime=unavailable"
+    return (
+        f"Regime={regime_result.regime} (confidence {regime_result.confidence:.0f}%), "
+        f"Breadth={regime_result.breadth_label}"
+    )
+
+
+def _build_exposure_context_description(exposure_result) -> str:
+    """Build a human-readable exposure description for the reasoning chain."""
+    if exposure_result is None:
+        return "Exposure=unavailable"
+    return (
+        f"Exposure={exposure_result.posture} (ceiling {exposure_result.exposure_ceiling:.0f}%)"
+    )

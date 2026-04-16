@@ -2,6 +2,9 @@
 
 GET /api/regime — current regime classification + breadth score
 """
+import asyncio
+import time as _time
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
@@ -10,6 +13,7 @@ regime_router = APIRouter(prefix="/api")
 
 # Cache regime result for 15 minutes
 _regime_cache: dict = {"result": None, "expires": 0}
+_cache_lock = asyncio.Lock()
 
 
 class RegimeResponse(BaseModel):
@@ -39,30 +43,28 @@ _exposure_cache: dict = {"result": None, "expires": 0}
 @regime_router.get("/exposure", response_model=ExposureResponse)
 async def get_exposure():
     """Return current exposure recommendation."""
-    import asyncio
-    import time
+    async with _cache_lock:
+        now = _time.time()
+        if _exposure_cache["result"] and _exposure_cache["expires"] > now:
+            return _exposure_cache["result"]
 
-    now = time.time()
-    if _exposure_cache["result"] and _exposure_cache["expires"] > now:
-        return _exposure_cache["result"]
+        from tradingagents.services.exposure_manager import compute_exposure
+        result = await asyncio.to_thread(compute_exposure)
 
-    from tradingagents.services.exposure_manager import compute_exposure
-    result = await asyncio.to_thread(compute_exposure)
+        response = ExposureResponse(
+            exposure_ceiling=result.exposure_ceiling,
+            posture=result.posture,
+            growth_vs_value_bias=result.growth_vs_value_bias,
+            regime=result.regime,
+            breadth_label=result.breadth_label,
+            top_probability=result.top_probability,
+            ftd_state=result.ftd_state,
+            rationale=result.rationale,
+            computed_at=result.computed_at.isoformat(),
+        )
 
-    response = ExposureResponse(
-        exposure_ceiling=result.exposure_ceiling,
-        posture=result.posture,
-        growth_vs_value_bias=result.growth_vs_value_bias,
-        regime=result.regime,
-        breadth_label=result.breadth_label,
-        top_probability=result.top_probability,
-        ftd_state=result.ftd_state,
-        rationale=result.rationale,
-        computed_at=result.computed_at.isoformat(),
-    )
-
-    _exposure_cache["result"] = response
-    _exposure_cache["expires"] = now + 900
+        _exposure_cache["result"] = response
+        _exposure_cache["expires"] = now + 900
 
     return response
 
@@ -70,26 +72,24 @@ async def get_exposure():
 @regime_router.get("/regime", response_model=RegimeResponse)
 async def get_regime():
     """Return current market regime classification."""
-    import asyncio
-    import time
+    async with _cache_lock:
+        now = _time.time()
+        if _regime_cache["result"] and _regime_cache["expires"] > now:
+            return _regime_cache["result"]
 
-    now = time.time()
-    if _regime_cache["result"] and _regime_cache["expires"] > now:
-        return _regime_cache["result"]
+        from tradingagents.services.regime_detector import detect_regime
+        result = await asyncio.to_thread(detect_regime)
 
-    from tradingagents.services.regime_detector import detect_regime
-    result = await asyncio.to_thread(detect_regime)
+        response = RegimeResponse(
+            regime=result.regime,
+            confidence=result.confidence,
+            breadth_score=result.breadth_score,
+            breadth_label=result.breadth_label,
+            signals=result.signals,
+            computed_at=result.computed_at.isoformat(),
+        )
 
-    response = RegimeResponse(
-        regime=result.regime,
-        confidence=result.confidence,
-        breadth_score=result.breadth_score,
-        breadth_label=result.breadth_label,
-        signals=result.signals,
-        computed_at=result.computed_at.isoformat(),
-    )
-
-    _regime_cache["result"] = response
-    _regime_cache["expires"] = now + 900  # 15 min cache
+        _regime_cache["result"] = response
+        _regime_cache["expires"] = now + 900  # 15 min cache
 
     return response

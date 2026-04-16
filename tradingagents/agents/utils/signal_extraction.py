@@ -29,6 +29,36 @@ CRITICAL: At the very end of your report, you MUST append a JSON block with your
 The JSON block MUST be the last thing in your response. Do not add any text after it."""
 
 
+def _extract_outermost_json(text: str) -> str | None:
+    """Extract outermost JSON object using brace counting (handles nested structures)."""
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if escape:
+            escape = False
+            continue
+        if ch == "\\":
+            escape = True
+            continue
+        if ch == '"' and not escape:
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return None
+
+
 def extract_agent_signal_json(content: str) -> dict:
     """Extract AgentSignal JSON block from LLM response content.
 
@@ -41,17 +71,33 @@ def extract_agent_signal_json(content: str) -> dict:
     if not content:
         raise ValueError("No AgentSignal JSON block found in empty response")
 
-    # Try fenced ```json ... ``` block
-    match = re.search(r"```json\s*(\{.*?\})\s*```", content, re.DOTALL)
-    if match:
-        return json.loads(match.group(1))
+    # Try fenced ```json ... ``` block (use brace counting for nested JSON)
+    fence_match = re.search(r"```json\s*", content)
+    if fence_match:
+        after_fence = content[fence_match.end():]
+        json_str = _extract_outermost_json(after_fence)
+        if json_str:
+            return json.loads(json_str)
 
-    # Fallback: raw JSON object with signal_direction near end of content
-    match = re.search(
-        r'(\{[^{}]*"signal_direction"[^{}]*\})\s*$', content, re.DOTALL
-    )
-    if match:
-        return json.loads(match.group(1))
+    # Fallback: find last JSON object containing signal_direction
+    # Search from the end of content for the last { ... } block
+    last_obj = None
+    search_from = len(content)
+    while search_from > 0:
+        idx = content.rfind("{", 0, search_from)
+        if idx == -1:
+            break
+        candidate = _extract_outermost_json(content[idx:])
+        if candidate and "signal_direction" in candidate:
+            try:
+                last_obj = json.loads(candidate)
+                break
+            except json.JSONDecodeError:
+                pass
+        search_from = idx
+
+    if last_obj:
+        return last_obj
 
     raise ValueError("No AgentSignal JSON block found in response")
 

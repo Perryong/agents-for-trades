@@ -52,10 +52,11 @@ def _fetch_vcp_candidates(max_candidates: int = 50) -> list[dict]:
                         continue
 
                     close = df["Close"].dropna()
+                    volume = df["Volume"].dropna() if "Volume" in df.columns else None
                     if len(close) < 60:
                         continue
 
-                    result = _analyze_vcp(ticker, close)
+                    result = _analyze_vcp(ticker, close, volume=volume)
                     if result:
                         candidates.append(result)
                 except Exception:
@@ -71,7 +72,7 @@ def _fetch_vcp_candidates(max_candidates: int = 50) -> list[dict]:
     return candidates[:max_candidates]
 
 
-def _analyze_vcp(ticker: str, close: "pd.Series") -> Optional[dict]:
+def _analyze_vcp(ticker: str, close: "pd.Series", volume=None) -> Optional[dict]:
     """Analyze a single stock for VCP pattern.
 
     Returns dict with VCP metrics if the stock passes Stage 2 filter, else None.
@@ -120,15 +121,25 @@ def _analyze_vcp(ticker: str, close: "pd.Series") -> Optional[dict]:
     contraction_depth = ranges[-1]  # Last window's range as %
     proximity_to_pivot = (pivot - current) / pivot * 100 if pivot > 0 else 100
 
-    # Volume analysis: recent volume vs 50-day average (if available)
-    volume_ratio = 1.0  # Default if no volume data
+    # Volume analysis: recent volume vs early volume (drying up = good)
+    volume_ratio = 1.0
+    if volume is not None:
+        vol_vals = volume.values
+        if len(vol_vals) >= 80:
+            early_vol = np.mean(vol_vals[-80:-40])
+            recent_vol = np.mean(vol_vals[-20:])
+            volume_ratio = round(recent_vol / early_vol, 3) if early_vol > 0 else 1.0
 
-    # Score: tightness of contraction, proximity to pivot, trend strength
+    # Weeks in base: trading days in contraction window / 5
+    weeks_in_base = round(min(80, n) / 5, 1)
+
+    # Score: tightness of contraction, proximity to pivot, trend strength, volume drying up
     tightness_score = max(0, 1 - contraction_depth / 15)  # Tighter = higher
     proximity_score = max(0, 1 - proximity_to_pivot / 5)   # Closer to pivot = higher
     trend_score = min(1, (current - sma200) / sma200 * 5) if sma200 > 0 else 0  # Stronger trend = higher
+    volume_score = max(0, 1 - volume_ratio) if volume_ratio < 1.0 else 0  # Lower ratio = volume drying up = higher
 
-    composite = (tightness_score * 0.4 + proximity_score * 0.3 + trend_score * 0.3)
+    composite = (tightness_score * 0.35 + proximity_score * 0.25 + trend_score * 0.25 + volume_score * 0.15)
 
     if composite < 0.3:
         return None  # Too weak
@@ -142,6 +153,8 @@ def _analyze_vcp(ticker: str, close: "pd.Series") -> Optional[dict]:
         "sma50": round(sma50, 2),
         "sma200": round(sma200, 2),
         "contractions": contractions,
+        "volume_ratio": volume_ratio,
+        "weeks_in_base": weeks_in_base,
     }
 
 
@@ -179,6 +192,8 @@ class VCPStrategy:
                     "contraction_depth_pct": c["contraction_depth_pct"],
                     "proximity_to_pivot_pct": c["proximity_to_pivot_pct"],
                     "contractions": c["contractions"],
+                    "volume_ratio": c["volume_ratio"],
+                    "weeks_in_base": c["weeks_in_base"],
                 },
             )
             for c in candidates[:n_picks]
