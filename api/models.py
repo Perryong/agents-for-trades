@@ -10,6 +10,78 @@ from datetime import datetime
 from .db import Base
 
 
+class AnalysisRun(Base):
+    """Tracks each analysis pipeline execution."""
+    __tablename__ = "analysis_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String, unique=True, index=True)
+    ticker: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String, default="pending")  # pending|running|completed|failed|cancelling|cancelled
+    config_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class AgentResult(Base):
+    """Per-agent output persisted immediately upon completion."""
+    __tablename__ = "agent_results"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String, index=True)
+    agent_name: Mapped[str] = mapped_column(String)
+    signal_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class SignalPostmortem(Base):
+    """Post-trade outcome classification for signal quality tracking."""
+    __tablename__ = "signal_postmortems"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    prediction_id: Mapped[int] = mapped_column(Integer, index=True)
+    trade_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ticker: Mapped[str] = mapped_column(String)
+    classification: Mapped[str] = mapped_column(String)  # TRUE_POSITIVE|FALSE_POSITIVE|MISSED_OPPORTUNITY|REGIME_MISMATCH
+    predicted_confidence: Mapped[float] = mapped_column(Float)
+    actual_outcome: Mapped[str | None] = mapped_column(String, nullable=True)  # WIN|LOSS
+    pnl_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Config(Base):
+    """Runtime configuration key-value store with JSON values."""
+    __tablename__ = "config"
+
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    value: Mapped[str] = mapped_column(Text)  # JSON-serialized
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Prediction(Base):
+    """Immutable prediction record — what the system recommended before outcome was known.
+
+    Written when a TradeRecommendation is finalized. Never updated after creation.
+    Links to Trade records via prediction_id FK for calibration.
+    """
+    __tablename__ = "predictions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ticker: Mapped[str] = mapped_column(String, index=True)
+    direction: Mapped[str | None] = mapped_column(String, nullable=True)  # "BUY"|"SELL"|None (no-trade)
+    confidence: Mapped[float] = mapped_column(Float)
+    trade_spec_json: Mapped[str | None] = mapped_column(Text, nullable=True)  # Full TradeSpec as JSON
+    reasoning_chain_json: Mapped[str] = mapped_column(Text)  # AgentSignalSummary list as JSON
+    no_trade_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    valid_until: Mapped[str | None] = mapped_column(String, nullable=True)  # ISO 8601
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class Trade(Base):
     __tablename__ = "trades"
 
@@ -40,4 +112,5 @@ class Trade(Base):
     entry_price: Mapped[float | None] = mapped_column(Float, nullable=True)       # AI-recommended entry (may differ from fill)
     bracket_tp_order_id: Mapped[str | None] = mapped_column(String, nullable=True) # Alpaca UUID of take-profit leg
     bracket_sl_order_id: Mapped[str | None] = mapped_column(String, nullable=True) # Alpaca UUID of stop-loss leg
+    prediction_id: Mapped[int | None] = mapped_column(Integer, nullable=True)     # FK to predictions.id
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

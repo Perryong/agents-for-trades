@@ -35,6 +35,7 @@ class ProgressEvent(BaseModel):
 class ScreenRequest(BaseModel):
     max_picks: int = Field(default=5, ge=1, le=10)
     universe: str = "sp500"
+    strategy: str = "momentum"             # Registry name: "momentum", "vcp", "canslim", etc.
     llm_provider: str = "openai"
     quick_think_llm: str = "gpt-5-mini"
 
@@ -83,6 +84,8 @@ class TradeRequest(BaseModel):
     contract_type: Optional[str] = None    # "call" | "put"
     # Scoring fields (Phase 15 — SCORE-01)
     confidence_text: Optional[str] = None  # full prose for confidence/target/stop extraction
+    # Prediction linking (Epic 5)
+    prediction_id: Optional[int] = None
 
 
 class TradeResponse(BaseModel):
@@ -124,6 +127,7 @@ class BracketTradeRequest(BaseModel):
     analysis_date: Optional[str] = None
     confidence: Optional[float] = None
     confidence_text: Optional[str] = None  # Prose text for confidence extraction
+    prediction_id: Optional[int] = None   # Link to predictions table (Epic 5)
 
 
 class LivePriceResponse(BaseModel):

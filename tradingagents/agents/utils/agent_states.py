@@ -69,6 +69,11 @@ class AgentState(MessagesState):
     sentiment_report: Annotated[str, _last_value]
     news_report: Annotated[str, _last_value]
     fundamentals_report: Annotated[str, _last_value]
+    fundamentals_signal: Annotated[Optional[dict], _last_value]
+    news_signal: Annotated[Optional[dict], _last_value]
+    market_signal: Annotated[Optional[dict], _last_value]
+    technical_signal: Annotated[Optional[dict], _last_value]
+    social_signal: Annotated[Optional[dict], _last_value]
 
     # researcher team discussion step
     investment_debate_state: Annotated[InvestDebateState, _last_value]
@@ -79,6 +84,7 @@ class AgentState(MessagesState):
     # risk management team discussion step
     risk_debate_state: Annotated[RiskDebateState, _last_value]
     final_trade_decision: Annotated[str, _last_value]
+    trade_recommendation: Annotated[Optional[dict], _last_value]
 
     # options pipeline report fields
     volatility_report: Annotated[str, _last_value]

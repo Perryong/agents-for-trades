@@ -38,15 +38,16 @@ function reducer(state: ScreenerState, action: ScreenerAction): ScreenerState {
 export function useScreener() {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  const runScreen = useCallback(async (provider = 'google', model = 'gemini-2.5-flash') => {
+  const runScreen = useCallback(async (provider = 'google', model = 'gemini-2.5-flash', strategy = 'momentum', maxPicks = 5) => {
     dispatch({ type: 'FETCH_START' });
     try {
       const res = await fetch('/api/screen', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          max_picks: 5,
+          max_picks: maxPicks,
           universe: 'sp500',
+          strategy,
           llm_provider: provider,
           quick_think_llm: model,
         }),

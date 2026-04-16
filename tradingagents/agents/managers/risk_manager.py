@@ -1,7 +1,46 @@
-import time
 import json
 import yaml
+from datetime import datetime, timedelta
 from pathlib import Path
+
+from tradingagents.agents.protocol import TradeRecommendation, TradeSpec
+from tradingagents.agents.utils.signal_aggregation import aggregate_signals
+from tradingagents.agents.utils.signal_extraction import extract_agent_signal_json
+from tradingagents.exceptions import AgentProtocolError
+
+
+def _should_skip_trade(
+    signals: dict[str, dict | None],
+    confidence_threshold: float = 65.0,
+) -> tuple[bool, str | None]:
+    """Check if trade should be skipped based on aggregated signal confidence.
+
+    Returns (should_skip, reason). If should_skip is False, reason is None.
+    """
+    active = {k: v for k, v in signals.items() if v is not None}
+    if not active:
+        return True, "No agent signals produced — cannot assess opportunity"
+
+    total_conf = sum(s["confidence"] for s in active.values())
+    avg_conf = total_conf / len(active)
+
+    if avg_conf < confidence_threshold:
+        return True, (
+            f"Aggregated confidence ({avg_conf:.1f}%) below threshold ({confidence_threshold:.0f}%)"
+        )
+
+    return False, None
+
+
+def _build_no_trade_summary(evaluations: list[dict]) -> str:
+    """Build a human-readable summary of no-trade evaluations across tickers."""
+    if not evaluations:
+        return "0 tickers evaluated — no analysis was run"
+
+    lines = [f"Evaluated {len(evaluations)} tickers — 0 met criteria:\n"]
+    for ev in evaluations:
+        lines.append(f"- {ev['ticker']}: {ev['reason']}")
+    return "\n".join(lines)
 
 
 def _get_strategy_context(options_strategy: str) -> dict:
@@ -12,7 +51,6 @@ def _get_strategy_context(options_strategy: str) -> dict:
         strategy_key = normalize_strategy_key(options_strategy)
         meta = REGISTRY.strategies.get(strategy_key)
         if meta:
-            # Determine max loss profile from strategy structure
             if meta.margin_intensive:
                 max_loss_profile = "UNLIMITED or MARGIN-DEPENDENT"
             elif meta.legs_count >= 3:
@@ -49,10 +87,66 @@ def _get_paper_trading_stop_loss_pct() -> float:
     return 0.50
 
 
+def _compute_valid_until(trade_spec: TradeSpec | None) -> datetime:
+    """Compute valid_until based on trade type and strategy."""
+    now = datetime.utcnow()
+    if trade_spec is None:
+        return now + timedelta(hours=24)
+    if trade_spec.trade_type == "option" and trade_spec.expiry:
+        try:
+            expiry_date = datetime.strptime(trade_spec.expiry, "%Y-%m-%d").date()
+            dte = (expiry_date - now.date()).days
+            if dte <= 7:
+                return now + timedelta(minutes=30)
+            else:
+                return now + timedelta(hours=4)
+        except ValueError:
+            return now + timedelta(hours=4)
+    return now + timedelta(hours=24)
+
+
+def _format_signal_summary(signals: dict[str, dict | None]) -> str:
+    """Format structured signals as a readable summary for the LLM prompt."""
+    lines = ["\n## Structured Agent Signals\n"]
+    for name, signal in signals.items():
+        if signal is None:
+            lines.append(f"- **{name}**: No signal produced")
+            continue
+        direction = signal["signal_direction"].upper()
+        conf = signal["confidence"]
+        evidence = "; ".join(signal.get("evidence", [])[:3])
+        lines.append(f"- **{name}**: {direction} ({conf:.0f}% confidence) — {evidence}")
+    return "\n".join(lines)
+
+
+_TRADE_SPEC_INSTRUCTION = """
+
+CRITICAL: At the very end of your response, if your recommendation is BUY or SELL (not HOLD), you MUST append a JSON block with the exact trade specification:
+
+```json
+{
+  "ticker": "<TICKER>",
+  "direction": "BUY" or "SELL",
+  "trade_type": "equity" or "option",
+  "entry_price": <float>,
+  "stop_loss": <float>,
+  "profit_target": <float>,
+  "position_size": <int>,
+  "strike": <float or null>,
+  "expiry": "YYYY-MM-DD" or null,
+  "contract_type": "call" or "put" or null
+}
+```
+
+If your recommendation is HOLD, do NOT include a JSON block — the system will treat this as a no-trade decision.
+The JSON block MUST be the last thing in your response."""
+
+
 def create_risk_manager(llm, memory):
     def risk_manager_node(state) -> dict:
 
         company_name = state["company_of_interest"]
+        ticker = company_name
 
         history = state["risk_debate_state"]["history"]
         risk_debate_state = state["risk_debate_state"]
@@ -63,6 +157,23 @@ def create_risk_manager(llm, memory):
         sentiment_report = state["sentiment_report"]
         trader_plan = state["investment_plan"]
         options_legs = state.get("options_legs", "")
+
+        # Gather structured signals from Epic 1
+        structured_signals = {
+            "fundamentals": state.get("fundamentals_signal"),
+            "news": state.get("news_signal"),
+            "market": state.get("market_signal"),
+            "technical": state.get("technical_signal"),
+            "social": state.get("social_signal"),
+        }
+
+        # Aggregate signals for reasoning chain and confidence
+        overall_confidence, reasoning_chain, majority_direction = aggregate_signals(
+            structured_signals
+        )
+
+        # Format signal summary for LLM prompt
+        signal_summary = _format_signal_summary(structured_signals)
 
         curr_situation = f"{market_research_report}\n\n{technical_report}\n\n{sentiment_report}\n\n{news_report}\n\n{fundamentals_report}"
         past_memories = memory.get_memories(curr_situation, n_matches=2)
@@ -136,12 +247,21 @@ Include your PASS/FLAG assessment for each rule in your final recommendation."""
 
         prompt = f"""As the Risk Management Judge and Debate Facilitator, your goal is to evaluate the debate between three risk analysts—Aggressive, Neutral, and Conservative—and determine the best course of action for the trader. Your decision must result in a clear recommendation: Buy, Sell, or Hold. Choose Hold only if strongly justified by specific arguments, not as a fallback when all sides seem valid. Strive for clarity and decisiveness.
 
+{signal_summary}
+
+**Aggregated Signal Assessment:**
+- Majority Direction: {majority_direction.upper()}
+- Overall Confidence: {overall_confidence:.1f}%
+- Agents in agreement: {sum(1 for s in reasoning_chain if not s.is_dissenting)}/{len(reasoning_chain)}
+- Dissenting agents: {', '.join(s.agent_name for s in reasoning_chain if s.is_dissenting) or 'None'}
+
 Guidelines for Decision-Making:
 1. **Summarize Key Arguments**: Extract the strongest points from each analyst, focusing on relevance to the context.
 2. **Provide Rationale**: Support your recommendation with direct quotes and counterarguments from the debate.
 3. **Refine the Trader's Plan**: Start with the trader's original plan, **{trader_plan}**, and adjust it based on the analysts' insights.
 4. **Learn from Past Mistakes**: Use lessons from **{past_memory_str}** to address prior misjudgments and improve the decision you are making now to make sure you don't make a wrong BUY/SELL/HOLD call that loses money.
 5. **Technical Alignment Check**: Validate the final recommendation against the Technical Analyst report. If you diverge, provide a concrete reason and risk mitigation.
+6. **Structured Signal Check**: Consider the aggregated signal assessment above. If your recommendation diverges from the majority agent direction, explain why.
 
 Deliverables — your output MUST include ALL of these sections:
 
@@ -196,10 +316,39 @@ Key risk for overall options position: what scenario kills this trade?
 
 ---
 
-Focus on actionable insights and continuous improvement. Build on past lessons, critically evaluate all perspectives, and ensure each decision advances better outcomes.{options_rules_section}"""
+Focus on actionable insights and continuous improvement. Build on past lessons, critically evaluate all perspectives, and ensure each decision advances better outcomes.{options_rules_section}{_TRADE_SPEC_INSTRUCTION}"""
 
         response = llm.invoke(prompt)
 
+        # Build TradeRecommendation from response + aggregated signals
+        trade_spec = None
+        no_trade_reason = None
+
+        try:
+            raw_spec = extract_agent_signal_json(response.content)
+            trade_spec = TradeSpec(**raw_spec)
+        except (ValueError, Exception):
+            # No JSON block → HOLD/no-trade decision
+            no_trade_reason = (
+                f"Risk judge recommended HOLD or no actionable trade. "
+                f"Majority signal: {majority_direction}, confidence: {overall_confidence:.1f}%"
+            )
+
+        valid_until = _compute_valid_until(trade_spec)
+
+        recommendation = TradeRecommendation(
+            trade_spec=trade_spec,
+            approval_status="pending_review",
+            reasoning_chain=reasoning_chain,
+            no_trade_reason=no_trade_reason,
+            confidence=overall_confidence,
+            valid_until=valid_until,
+            ticker=ticker,
+        )
+
+        recommendation_dict = recommendation.model_dump(mode="json")
+
+        # Backward compatibility: preserve existing state keys
         new_risk_debate_state = {
             "judge_decision": response.content,
             "history": risk_debate_state["history"],
@@ -216,6 +365,7 @@ Focus on actionable insights and continuous improvement. Build on past lessons, 
         return {
             "risk_debate_state": new_risk_debate_state,
             "final_trade_decision": response.content,
+            "trade_recommendation": recommendation_dict,
         }
 
     return risk_manager_node

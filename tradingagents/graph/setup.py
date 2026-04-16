@@ -284,5 +284,16 @@ class GraphSetup:
 
         workflow.add_edge("Risk Judge", END)
 
-        # Compile and return
-        return workflow.compile()
+        # Compile with optional checkpointer (Epic 7.3)
+        checkpointer = None
+        if self.config.get("enable_checkpointing"):
+            try:
+                from langgraph.checkpoint.sqlite import SqliteSaver
+                import sqlite3
+                checkpoint_db = self.config.get("checkpoint_db", "./checkpoints.db")
+                conn = sqlite3.connect(checkpoint_db, check_same_thread=False)
+                checkpointer = SqliteSaver(conn)
+            except ImportError:
+                pass  # SqliteSaver not available — skip checkpointing
+
+        return workflow.compile(checkpointer=checkpointer)

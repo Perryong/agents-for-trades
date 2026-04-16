@@ -5,6 +5,8 @@ interface ProgressStepperProps {
   completedNodes: string[];
   currentNode: string | null;
   status: AnalysisStatus;
+  elapsedMs?: number;
+  estimatedTotalMs?: number;
 }
 
 type NodeStatus = 'done' | 'running' | 'pending';
@@ -25,40 +27,54 @@ function StatusDot({ nodeStatus }: { nodeStatus: NodeStatus }) {
 
   if (nodeStatus === 'done') {
     return (
-      <div className={`${baseClass} bg-green-500 text-white`}>&#10003;</div>
+      <div className={`${baseClass} bg-accent-green text-white`}>&#10003;</div>
     );
   }
   if (nodeStatus === 'running') {
     return (
-      <div className={`${baseClass} bg-blue-500 text-white animate-pulse`}>
+      <div className={`${baseClass} bg-accent-blue text-white animate-pulse`}>
         &hellip;
       </div>
     );
   }
   return (
-    <div className={`${baseClass} bg-gray-200 dark:bg-gray-600 text-gray-400 dark:text-gray-500`}>
-      <span className="w-2 h-2 rounded-full border border-gray-400 dark:border-gray-500 block" />
+    <div className={`${baseClass} bg-bg-secondary text-text-tertiary`}>
+      <span className="w-2 h-2 rounded-full border border-border-subtle block" />
     </div>
   );
+}
+
+function formatEtr(remainingMs: number): string {
+  if (remainingMs <= 0) return 'finishing...';
+  const mins = Math.ceil(remainingMs / 60_000);
+  return `~${mins} min remaining`;
 }
 
 export function ProgressStepper({
   completedNodes,
   currentNode,
   status,
+  elapsedMs,
+  estimatedTotalMs,
 }: ProgressStepperProps) {
   if (status === 'idle') {
     return (
-      <p className="text-sm text-gray-400 dark:text-gray-500">
+      <p className="text-sm text-text-tertiary">
         Configure and click Analyze to start
       </p>
     );
   }
 
   const nodes = getNodeList();
+  const etrText = (status === 'running' && elapsedMs != null && estimatedTotalMs != null && estimatedTotalMs > 0)
+    ? formatEtr(estimatedTotalMs - elapsedMs)
+    : null;
 
   return (
     <div className="space-y-1">
+      {etrText && (
+        <p className="text-[11px] font-mono text-text-secondary mb-1">{etrText}</p>
+      )}
       {nodes.map(node => {
         const nodeStatus = getNodeStatus(node, completedNodes, currentNode);
         return (
@@ -67,10 +83,10 @@ export function ProgressStepper({
             <span
               className={`text-sm ${
                 nodeStatus === 'done'
-                  ? 'text-gray-700 dark:text-gray-300'
+                  ? 'text-text-primary'
                   : nodeStatus === 'running'
-                    ? 'text-blue-700 dark:text-blue-400 font-medium'
-                    : 'text-gray-400 dark:text-gray-500'
+                    ? 'text-accent-blue font-medium'
+                    : 'text-text-tertiary'
               }`}
             >
               {node}

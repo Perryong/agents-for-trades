@@ -45,7 +45,7 @@ export function ChartTickerPicker({ value, onChange }: ChartTickerPickerProps) {
       <TickerAutocomplete
         value={value}
         onChange={handleSelect}
-        className="w-48 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="w-48 px-3 py-1.5 text-sm border border-border-default rounded-sm bg-bg-primary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-blue"
       />
       {recentTickers.length > 0 && (
         <div className="flex flex-wrap gap-1">
@@ -53,7 +53,7 @@ export function ChartTickerPicker({ value, onChange }: ChartTickerPickerProps) {
             <button
               key={ticker}
               onClick={() => handleSelect(ticker)}
-              className="px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              className="px-2 py-0.5 text-xs rounded-full bg-bg-primary text-text-secondary hover:bg-bg-hover hover:text-accent-blue transition-colors"
             >
               {ticker}
             </button>

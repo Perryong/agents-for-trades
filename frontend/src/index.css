@@ -1,2 +1,60 @@
 @import "tailwindcss";
-@variant dark (&:where(.dark, .dark *));
+
+/* ─── Design Tokens ─── */
+
+@theme {
+  /* Background */
+  --color-bg-base: #131313;
+  --color-bg-primary: #1c1c1c;
+  --color-bg-secondary: #232323;
+  --color-bg-elevated: #2a2a2a;
+  --color-bg-hover: #333333;
+
+  /* Borders */
+  --color-border-subtle: #2e2e2e;
+  --color-border-default: #3a3a3a;
+
+  /* Text */
+  --color-text-primary: #e0e0e0;
+  --color-text-secondary: #888888;
+  --color-text-tertiary: #555555;
+
+  /* Accent (functional only) */
+  --color-accent-green: #3ecf8e;
+  --color-accent-red: #f56565;
+  --color-accent-amber: #eab308;
+  --color-accent-blue: #3b82f6;
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+  /* Spacing (4px base) */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+
+  /* Border Radius */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+}
+
+/* ─── Base Styles ─── */
+
+html {
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+}
+
+body {
+  margin: 0;
+}
+
+/* Default border-radius: 2px */
+button, input, select, textarea {
+  border-radius: var(--radius-md);
+}

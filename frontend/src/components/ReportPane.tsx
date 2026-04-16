@@ -23,7 +23,7 @@ function CopyButton({ content }: { content: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+      className="px-3 py-1.5 text-xs font-medium rounded-sm border border-border-default text-text-secondary hover:bg-bg-hover transition-colors"
     >
       {copied ? 'Copied!' : 'Copy'}
     </button>
@@ -104,7 +104,7 @@ function PdfButton({ contentRef, tabLabel }: { contentRef: React.RefObject<HTMLD
     <button
       onClick={handleExport}
       disabled={exporting}
-      className="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+      className="px-3 py-1.5 text-xs font-medium rounded-sm border border-border-default text-text-secondary hover:bg-bg-hover disabled:opacity-50 transition-colors"
     >
       {exporting ? 'Exporting...' : 'Export PDF'}
     </button>
@@ -116,7 +116,7 @@ export function ReportPane({ content, status, tabLabel = 'Report', volContext, i
 
   if (status === 'error') {
     return (
-      <div className="text-red-500 dark:text-red-400 text-sm">
+      <div className="text-accent-red text-sm">
         An error occurred during analysis.
       </div>
     );
@@ -124,7 +124,7 @@ export function ReportPane({ content, status, tabLabel = 'Report', volContext, i
 
   if (status === 'idle') {
     return (
-      <div className="text-gray-400 dark:text-gray-500 text-sm">
+      <div className="text-text-tertiary text-sm">
         Run an analysis to see reports here.
       </div>
     );
@@ -132,7 +132,7 @@ export function ReportPane({ content, status, tabLabel = 'Report', volContext, i
 
   if (!content) {
     return (
-      <div className="text-gray-400 dark:text-gray-500 text-sm animate-pulse">
+      <div className="text-text-tertiary text-sm animate-pulse">
         Waiting for results...
       </div>
     );
@@ -144,13 +144,13 @@ export function ReportPane({ content, status, tabLabel = 'Report', volContext, i
       {isEquityTab && volContext && (
         <details
           open
-          className="mb-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 vol-context-banner"
+          className="mb-4 rounded-sm border border-accent-blue/30 bg-accent-blue/10 vol-context-banner"
         >
-          <summary className="cursor-pointer px-4 py-2 text-xs font-semibold text-blue-700 dark:text-blue-300 select-none list-none flex items-center justify-between">
+          <summary className="cursor-pointer px-4 py-2 text-xs font-semibold text-accent-blue select-none list-none flex items-center justify-between">
             <span>Vol Context</span>
-            <span className="text-blue-400 dark:text-blue-500 font-normal">click to collapse</span>
+            <span className="text-accent-blue/60 font-normal">click to collapse</span>
           </summary>
-          <div className="px-4 pb-3 pt-1 text-xs text-blue-800 dark:text-blue-200 leading-relaxed font-mono whitespace-pre-wrap">
+          <div className="px-4 pb-3 pt-1 text-xs text-accent-blue leading-relaxed font-mono whitespace-pre-wrap">
             {volContext}
           </div>
         </details>
@@ -163,38 +163,38 @@ export function ReportPane({ content, status, tabLabel = 'Report', volContext, i
       </div>
 
       {/* Report content */}
-      <div ref={contentRef} className="report-markdown text-gray-800 dark:text-gray-200 text-sm leading-relaxed">
+      <div ref={contentRef} className="report-markdown text-text-primary text-sm leading-relaxed">
         <ReactMarkdown
           components={{
-            h1: ({ children }) => <h1 className="text-xl font-bold text-gray-900 dark:text-gray-50 mt-6 mb-3 border-b border-gray-200 dark:border-gray-700 pb-2">{children}</h1>,
-            h2: ({ children }) => <h2 className="text-lg font-bold text-gray-900 dark:text-gray-50 mt-5 mb-2 border-b border-gray-200 dark:border-gray-700 pb-1">{children}</h2>,
-            h3: ({ children }) => <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mt-4 mb-2">{children}</h3>,
-            h4: ({ children }) => <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mt-3 mb-1">{children}</h4>,
-            p: ({ children }) => <p className="text-gray-700 dark:text-gray-300 mb-3">{children}</p>,
-            strong: ({ children }) => <strong className="font-semibold text-gray-900 dark:text-gray-100">{children}</strong>,
-            em: ({ children }) => <em className="text-gray-600 dark:text-gray-400">{children}</em>,
-            ul: ({ children }) => <ul className="list-disc list-inside mb-3 space-y-1 text-gray-700 dark:text-gray-300">{children}</ul>,
-            ol: ({ children }) => <ol className="list-decimal list-inside mb-3 space-y-1 text-gray-700 dark:text-gray-300">{children}</ol>,
-            li: ({ children }) => <li className="text-gray-700 dark:text-gray-300">{children}</li>,
-            blockquote: ({ children }) => <blockquote className="border-l-4 border-blue-400 dark:border-blue-600 pl-4 my-3 text-gray-600 dark:text-gray-400 italic">{children}</blockquote>,
+            h1: ({ children }) => <h1 className="text-xl font-bold text-text-primary mt-6 mb-3 border-b border-border-subtle pb-2">{children}</h1>,
+            h2: ({ children }) => <h2 className="text-lg font-bold text-text-primary mt-5 mb-2 border-b border-border-subtle pb-1">{children}</h2>,
+            h3: ({ children }) => <h3 className="text-base font-semibold text-text-primary mt-4 mb-2">{children}</h3>,
+            h4: ({ children }) => <h4 className="text-sm font-semibold text-text-primary mt-3 mb-1">{children}</h4>,
+            p: ({ children }) => <p className="text-text-secondary mb-3">{children}</p>,
+            strong: ({ children }) => <strong className="font-semibold text-text-primary">{children}</strong>,
+            em: ({ children }) => <em className="text-text-tertiary">{children}</em>,
+            ul: ({ children }) => <ul className="list-disc list-inside mb-3 space-y-1 text-text-secondary">{children}</ul>,
+            ol: ({ children }) => <ol className="list-decimal list-inside mb-3 space-y-1 text-text-secondary">{children}</ol>,
+            li: ({ children }) => <li className="text-text-secondary">{children}</li>,
+            blockquote: ({ children }) => <blockquote className="border-l-4 border-accent-blue pl-4 my-3 text-text-tertiary italic">{children}</blockquote>,
             code: ({ className, children }) => {
               const isBlock = className?.includes('language-');
               if (isBlock) {
-                return <code className="block bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 p-4 rounded-lg overflow-auto text-xs border border-gray-200 dark:border-gray-700 my-3">{children}</code>;
+                return <code className="block bg-bg-primary text-text-primary p-4 rounded-sm overflow-auto text-xs border border-border-subtle my-3">{children}</code>;
               }
-              return <code className="bg-gray-100 dark:bg-gray-800 text-pink-600 dark:text-pink-400 px-1.5 py-0.5 rounded text-xs">{children}</code>;
+              return <code className="bg-bg-primary text-accent-red px-1.5 py-0.5 rounded-sm text-xs">{children}</code>;
             },
             pre: ({ children }) => <pre className="my-3">{children}</pre>,
             table: ({ children }) => (
               <div className="overflow-x-auto my-3">
-                <table className="min-w-full border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">{children}</table>
+                <table className="min-w-full border border-border-subtle rounded-sm overflow-hidden">{children}</table>
               </div>
             ),
-            thead: ({ children }) => <thead className="bg-gray-100 dark:bg-gray-700">{children}</thead>,
-            th: ({ children }) => <th className="px-3 py-2 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">{children}</th>,
-            td: ({ children }) => <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300 border-b border-gray-100 dark:border-gray-700">{children}</td>,
-            hr: () => <hr className="my-4 border-gray-200 dark:border-gray-700" />,
-            a: ({ href, children }) => <a href={href} className="text-blue-600 dark:text-blue-400 underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+            thead: ({ children }) => <thead className="bg-bg-primary">{children}</thead>,
+            th: ({ children }) => <th className="px-3 py-2 text-left text-xs font-semibold text-text-primary border-b border-border-default">{children}</th>,
+            td: ({ children }) => <td className="px-3 py-2 text-xs text-text-secondary border-b border-border-subtle">{children}</td>,
+            hr: () => <hr className="my-4 border-border-subtle" />,
+            a: ({ href, children }) => <a href={href} className="text-accent-blue underline" target="_blank" rel="noopener noreferrer">{children}</a>,
           }}
         >
           {content}

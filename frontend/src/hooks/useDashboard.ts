@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { DashboardSummary, DashboardTradesData, EquityCurveData } from '../types';
+import type { DashboardSummary, DashboardTradesData, EquityCurveData, RollingWinRateData } from '../types';
 
 function buildQuery(ticker?: string, tradeType?: string): string {
   const params = new URLSearchParams();
@@ -97,4 +97,34 @@ export function useEquityCurve(ticker?: string, tradeType?: string): UseEquityCu
   }, [ticker, tradeType]);
 
   return { curve, loading };
+}
+
+interface UseRollingWinRateResult {
+  rolling: RollingWinRateData | null;
+  loading: boolean;
+}
+
+export function useRollingWinRate(weeks: number = 4): UseRollingWinRateResult {
+  const [rolling, setRolling] = useState<RollingWinRateData | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/scores/rolling?weeks=${weeks}`)
+      .then(res => {
+        if (!res.ok) throw new Error(`Rolling win rate fetch error ${res.status}`);
+        return res.json();
+      })
+      .then((data: RollingWinRateData) => {
+        setRolling(data);
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        console.error('useRollingWinRate error:', err instanceof Error ? err.message : String(err));
+        setRolling(null);
+        setLoading(false);
+      });
+  }, [weeks]);
+
+  return { rolling, loading };
 }

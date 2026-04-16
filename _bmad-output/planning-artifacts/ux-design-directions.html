@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>agents-for-trades — Design Directions</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-base: #131313;
+  --bg-primary: #1c1c1c;
+  --bg-secondary: #232323;
+  --bg-elevated: #2a2a2a;
+  --bg-hover: #333333;
+  --border-subtle: #2e2e2e;
+  --border-default: #3a3a3a;
+  --text-primary: #e0e0e0;
+  --text-secondary: #888888;
+  --text-tertiary: #555555;
+  --accent-green: #3ecf8e;
+  --accent-red: #f56565;
+  --accent-amber: #eab308;
+  --accent-blue: #3b82f6;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-base); color: var(--text-primary); font-size: 13px; line-height: 1.4; }
+.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+/* Direction Selector */
+.dir-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: var(--bg-primary); border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); }
+.dir-nav h1 { font-size: 14px; font-weight: 600; margin-right: var(--space-4); white-space: nowrap; }
+.dir-btn { padding: var(--space-1) var(--space-3); background: var(--bg-secondary); border: 1px solid var(--border-default); color: var(--text-secondary); border-radius: var(--radius-md); cursor: pointer; font-size: 12px; font-family: inherit; transition: all 0.15s; }
+.dir-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.dir-btn.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+.dir-desc { margin-left: auto; color: var(--text-secondary); font-size: 11px; }
+
+/* Mockup container */
+.mockup { display: none; margin-top: 40px; height: calc(100vh - 40px); }
+.mockup.active { display: flex; }
+
+/* === DIRECTION A: Dense Terminal === */
+.da-app { display: flex; flex-direction: column; width: 100%; height: 100%; }
+.da-header { height: 40px; background: var(--bg-primary); border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; padding: 0 var(--space-4); gap: var(--space-4); }
+.da-header-title { font-size: 14px; font-weight: 600; }
+.da-tabs { display: flex; gap: 0; margin-left: var(--space-6); }
+.da-tab { padding: var(--space-2) var(--space-4); color: var(--text-secondary); cursor: pointer; border-bottom: 2px solid transparent; font-size: 12px; font-weight: 500; }
+.da-tab.active { color: var(--text-primary); border-bottom-color: var(--accent-blue); }
+.da-status { margin-left: auto; font-size: 11px; color: var(--text-secondary); display: flex; gap: var(--space-4); }
+.da-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-green); display: inline-block; margin-right: var(--space-1); }
+.da-body { display: flex; flex: 1; overflow: hidden; }
+.da-main { flex: 1; overflow-y: auto; padding: var(--space-4); }
+.da-side { width: 320px; border-left: 1px solid var(--border-subtle); background: var(--bg-secondary); overflow-y: auto; padding: var(--space-4); }
+.da-footer { height: 28px; background: var(--bg-primary); border-top: 1px solid var(--border-subtle); display: flex; align-items: center; padding: 0 var(--space-4); font-size: 11px; color: var(--text-tertiary); gap: var(--space-6); }
+
+/* Recommendation cards — Direction A */
+.da-rec { background: var(--bg-primary); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); margin-bottom: var(--space-3); overflow: hidden; }
+.da-rec:hover { border-color: var(--border-default); }
+.da-rec-header { display: flex; align-items: center; padding: var(--space-3) var(--space-4); gap: var(--space-3); }
+.da-ticker { font-size: 16px; font-weight: 500; font-family: 'JetBrains Mono', monospace; }
+.da-direction { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: var(--radius-sm); }
+.da-direction.buy { color: var(--accent-green); background: rgba(62, 207, 142, 0.1); }
+.da-direction.sell { color: var(--accent-red); background: rgba(245, 101, 101, 0.1); }
+.da-type { font-size: 11px; color: var(--text-secondary); }
+.da-confidence { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; }
+.da-conf-high { color: var(--accent-green); }
+.da-conf-med { color: var(--accent-amber); }
+.da-valid { font-size: 11px; color: var(--text-secondary); margin-left: var(--space-3); }
+.da-consensus { display: flex; gap: 3px; margin-left: var(--space-3); }
+.da-dot { width: 8px; height: 8px; border-radius: 50%; }
+.da-dot.bull { background: var(--accent-green); }
+.da-dot.bear { background: var(--accent-red); }
+.da-dot.neutral { background: var(--text-tertiary); }
+.da-rec-specs { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--space-1); padding: 0 var(--space-4) var(--space-3); }
+.da-spec { display: flex; flex-direction: column; }
+.da-spec-label { font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+.da-spec-value { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+.da-rec-actions { display: flex; gap: var(--space-2); padding: var(--space-2) var(--space-4); border-top: 1px solid var(--border-subtle); background: var(--bg-secondary); }
+.da-action { padding: var(--space-1) var(--space-3); font-size: 11px; border: 1px solid var(--border-default); background: transparent; color: var(--text-secondary); border-radius: var(--radius-md); cursor: pointer; font-family: inherit; }
+.da-action:hover { background: var(--bg-hover); color: var(--text-primary); }
+.da-action.approve { border-color: var(--accent-green); color: var(--accent-green); }
+.da-action.approve:hover { background: rgba(62, 207, 142, 0.1); }
+.da-expand { margin-left: auto; color: var(--text-tertiary); font-size: 11px; cursor: pointer; border: none; background: none; font-family: inherit; }
+.da-expand:hover { color: var(--text-secondary); }
+
+/* Reasoning chain */
+.da-reasoning { display: none; padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border-subtle); background: var(--bg-elevated); }
+.da-reasoning.open { display: block; }
+.da-agent-row { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-2) 0; border-bottom: 1px solid var(--border-subtle); }
+.da-agent-row:last-child { border-bottom: none; }
+.da-agent-name { font-size: 11px; font-weight: 500; color: var(--text-secondary); min-width: 100px; }
+.da-agent-signal { font-size: 11px; font-family: 'JetBrains Mono', monospace; min-width: 60px; }
+.da-agent-evidence { font-size: 11px; color: var(--text-secondary); flex: 1; }
+
+/* Side panel — positions */
+.da-side-title { font-size: 12px; font-weight: 600; margin-bottom: var(--space-3); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+.da-position { padding: var(--space-2) 0; border-bottom: 1px solid var(--border-subtle); }
+.da-position:last-child { border-bottom: none; }
+.da-pos-header { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-1); }
+.da-pos-ticker { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; }
+.da-pos-pnl { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-left: auto; }
+.da-pos-detail { font-size: 11px; color: var(--text-secondary); display: flex; gap: var(--space-3); }
+
+/* === DIRECTION B: Card-minimal === */
+.db-rec { background: var(--bg-primary); border-left: 3px solid var(--accent-green); margin-bottom: var(--space-2); padding: var(--space-3) var(--space-4); }
+.db-rec.low-conf { border-left-color: var(--accent-amber); }
+.db-rec-top { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-2); }
+.db-ticker { font-size: 16px; font-weight: 500; font-family: 'JetBrains Mono', monospace; }
+.db-strategy { font-size: 11px; color: var(--text-secondary); }
+.db-conf { font-family: 'JetBrains Mono', monospace; font-size: 13px; margin-left: auto; }
+.db-specs { display: flex; gap: var(--space-6); font-size: 12px; color: var(--text-secondary); }
+.db-specs .mono { color: var(--text-primary); }
+.db-actions { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
+
+/* === DIRECTION C: Table-driven === */
+.dc-table { width: 100%; border-collapse: collapse; }
+.dc-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-tertiary); text-align: left; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-default); font-weight: 500; }
+.dc-table th.right { text-align: right; }
+.dc-table td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-subtle); font-size: 13px; vertical-align: middle; }
+.dc-table td.right { text-align: right; }
+.dc-table tr:hover { background: var(--bg-hover); }
+.dc-table .mono { font-family: 'JetBrains Mono', monospace; }
+.dc-expandable { cursor: pointer; }
+
+/* No-trade summary */
+.da-notrade { background: var(--bg-primary); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: var(--space-6); text-align: center; }
+.da-notrade-count { font-family: 'JetBrains Mono', monospace; font-size: 24px; font-weight: 500; color: var(--text-secondary); }
+.da-notrade-label { font-size: 13px; color: var(--text-secondary); margin-top: var(--space-2); }
+.da-notrade-detail { font-size: 11px; color: var(--text-tertiary); margin-top: var(--space-3); cursor: pointer; }
+
+/* Weekly summary */
+.da-weekly { padding: var(--space-4); }
+.da-weekly-hero { font-family: 'JetBrains Mono', monospace; font-size: 32px; font-weight: 500; margin-bottom: var(--space-1); }
+.da-weekly-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: var(--space-4); }
+.da-weekly-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); margin-bottom: var(--space-6); }
+.da-weekly-stat-value { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 500; }
+.da-weekly-stat-label { font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<nav class="dir-nav">
+  <h1>Design Directions</h1>
+  <button class="dir-btn active" onclick="showDir('a')">A: Dense Terminal</button>
+  <button class="dir-btn" onclick="showDir('b')">B: Border Accent</button>
+  <button class="dir-btn" onclick="showDir('c')">C: Table-First</button>
+  <button class="dir-btn" onclick="showDir('d')">D: No-Trade State</button>
+  <button class="dir-btn" onclick="showDir('e')">E: Weekly Review</button>
+  <button class="dir-btn" onclick="showDir('f')">F: Reasoning Expanded</button>
+  <span class="dir-desc">Click each direction to compare approaches</span>
+</nav>
+
+<!-- DIRECTION A: Dense Terminal — Full recommendation view -->
+<div id="dir-a" class="mockup active">
+  <div class="da-app">
+    <div class="da-header">
+      <span class="da-header-title">TradingAgents</span>
+      <div class="da-tabs">
+        <div class="da-tab active">Recommendations</div>
+        <div class="da-tab">Chart</div>
+        <div class="da-tab">Track Record</div>
+      </div>
+      <div class="da-status">
+        <span><span class="da-status-dot"></span>System Online</span>
+        <span>Last run: 07:45 AM</span>
+        <span>Next: 07:00 AM tomorrow</span>
+      </div>
+    </div>
+    <div class="da-body">
+      <div class="da-main">
+        <!-- Rec 1 -->
+        <div class="da-rec">
+          <div class="da-rec-header">
+            <span class="da-ticker">NVDA</span>
+            <span class="da-direction buy">BUY</span>
+            <span class="da-type">Bull Call Spread</span>
+            <div class="da-consensus" title="4 bullish, 1 neutral">
+              <span class="da-dot bull"></span><span class="da-dot bull"></span><span class="da-dot bull"></span><span class="da-dot bull"></span><span class="da-dot neutral"></span>
+            </div>
+            <span class="da-confidence da-conf-high">87%</span>
+            <span class="da-valid">47 min left</span>
+          </div>
+          <div class="da-rec-specs">
+            <div class="da-spec"><span class="da-spec-label">Entry</span><span class="da-spec-value mono">$142.50</span></div>
+            <div class="da-spec"><span class="da-spec-label">Stop</span><span class="da-spec-value mono" style="color: var(--accent-red)">$138.00</span></div>
+            <div class="da-spec"><span class="da-spec-label">Target</span><span class="da-spec-value mono" style="color: var(--accent-green)">$152.00</span></div>
+            <div class="da-spec"><span class="da-spec-label">Size</span><span class="da-spec-value mono">2 contracts</span></div>
+            <div class="da-spec"><span class="da-spec-label">R:R</span><span class="da-spec-value mono">2.1:1</span></div>
+          </div>
+          <div class="da-rec-actions">
+            <button class="da-action approve">✓ Approve</button>
+            <button class="da-action">Skip</button>
+            <button class="da-expand" onclick="toggleReasoning(this)">Show reasoning ▾</button>
+          </div>
+          <div class="da-reasoning">
+            <div class="da-agent-row">
+              <span class="da-agent-name">Fundamentals</span>
+              <span class="da-agent-signal" style="color: var(--accent-green)">Bullish 91%</span>
+              <span class="da-agent-evidence">Strong earnings beat, revenue up 22% YoY, guidance raised</span>
+            </div>
+            <div class="da-agent-row">
+              <span class="da-agent-name">Market/Technical</span>
+              <span class="da-agent-signal" style="color: var(--accent-green)">Bullish 85%</span>
+              <span class="da-agent-evidence">Breakout above $140 resistance, volume confirmation, RSI 62</span>
+            </div>
+            <div class="da-agent-row">
+              <span class="da-agent-name">News</span>
+              <span class="da-agent-signal" style="color: var(--accent-green)">Bullish 82%</span>
+              <span class="da-agent-evidence">Positive semiconductor policy news, data center demand surge</span>
+            </div>
+            <div class="da-agent-row">
+              <span class="da-agent-name">Social</span>
+              <span class="da-agent-signal" style="color: var(--accent-green)">Bullish 78%</span>
+              <span class="da-agent-evidence">High retail sentiment, institutional accumulation signals</span>
+            </div>
+            <div class="da-agent-row">
+              <span class="da-agent-name">Options Flow</span>
+              <span class="da-agent-signal" style="color: var(--text-secondary)">Neutral 55%</span>
+              <span class="da-agent-evidence">Mixed flow — large call buys offset by protective put activity</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rec 2 -->
+        <div class="da-rec">
+          <div class="da-rec-header">
+            <span class="da-ticker">AAPL</span>
+            <span class="da-direction buy">BUY</span>
+            <span class="da-type">Equity</span>
+            <div class="da-consensus" title="3 bullish, 2 neutral">
+              <span class="da-dot bull"></span><span class="da-dot bull"></span><span class="da-dot bull"></span><span class="da-dot neutral"></span><span class="da-dot neutral"></span>
+            </div>
+            <span class="da-confidence da-conf-med" style="color: var(--accent-amber)">68%</span>
+            <span class="da-valid">47 min left</span>
+          </div>
+          <div class="da-rec-specs">
+            <div class="da-spec"><span class="da-spec-label">Entry</span><span class="da-spec-value mono">$198.30</span></div>
+            <div class="da-spec"><span class="da-spec-label">Stop</span><span class="da-spec-value mono" style="color: var(--accent-red)">$194.00</span></div>
+            <div class="da-spec"><span class="da-spec-label">Target</span><span class="da-spec-value mono" style="color: var(--accent-green)">$208.00</span></div>
+            <div class="da-spec"><span class="da-spec-label">Size</span><span class="da-spec-value mono">50 shares</span></div>
+            <div class="da-spec"><span class="da-spec-label">R:R</span><span class="da-spec-value mono">2.3:1</span></div>
+          </div>
+          <div class="da-rec-actions">
+            <button class="da-action approve">✓ Approve</button>
+            <button class="da-action">Skip</button>
+            <button class="da-expand" onclick="toggleReasoning(this)">Show reasoning ▾</button>
+          </div>
+          <div class="da-reasoning"></div>
+        </div>
+
+        <!-- Rec 3 — lower confidence -->
+        <div class="da-rec">
+          <div class="da-rec-header">
+            <span class="da-ticker">TSLA</span>
+            <span class="da-direction sell">SELL</span>
+            <span class="da-type">Bear Put Spread</span>
+            <div class="da-consensus" title="2 bearish, 2 neutral, 1 bullish">
+              <span class="da-dot bear"></span><span class="da-dot bear"></span><span class="da-dot neutral"></span><span class="da-dot neutral"></span><span class="da-dot bull"></span>
+            </div>
+            <span class="da-confidence da-conf-med" style="color: var(--accent-amber)">62%</span>
+            <span class="da-valid">47 min left</span>
+          </div>
+          <div class="da-rec-specs">
+            <div class="da-spec"><span class="da-spec-label">Entry</span><span class="da-spec-value mono">$3.20</span></div>
+            <div class="da-spec"><span class="da-spec-label">Stop</span><span class="da-spec-value mono" style="color: var(--accent-red)">$4.80</span></div>
+            <div class="da-spec"><span class="da-spec-label">Target</span><span class="da-spec-value mono" style="color: var(--accent-green)">$1.20</span></div>
+            <div class="da-spec"><span class="da-spec-label">Size</span><span class="da-spec-value mono">1 contract</span></div>
+            <div class="da-spec"><span class="da-spec-label">R:R</span><span class="da-spec-value mono">1.3:1</span></div>
+          </div>
+          <div class="da-rec-actions">
+            <button class="da-action approve">✓ Approve</button>
+            <button class="da-action">Skip</button>
+            <button class="da-expand" onclick="toggleReasoning(this)">Show reasoning ▾</button>
+          </div>
+          <div class="da-reasoning"></div>
+        </div>
+      </div>
+
+      <div class="da-side">
+        <div class="da-side-title">Active Positions</div>
+        <div class="da-position">
+          <div class="da-pos-header">
+            <span class="da-pos-ticker">MSFT</span>
+            <span class="da-direction buy" style="font-size: 10px;">LONG</span>
+            <span class="da-pos-pnl" style="color: var(--accent-green)">+4.2%</span>
+          </div>
+          <div class="da-pos-detail">
+            <span>Entry <span class="mono">$425.00</span></span>
+            <span>Current <span class="mono">$442.85</span></span>
+            <span>SL <span class="mono" style="color: var(--accent-red)">$418.00</span></span>
+          </div>
+        </div>
+        <div class="da-position">
+          <div class="da-pos-header">
+            <span class="da-pos-ticker">AMD</span>
+            <span class="da-direction buy" style="font-size: 10px;">LONG</span>
+            <span class="da-pos-pnl" style="color: var(--accent-red)">-1.8%</span>
+          </div>
+          <div class="da-pos-detail">
+            <span>Entry <span class="mono">$162.40</span></span>
+            <span>Current <span class="mono">$159.48</span></span>
+            <span>SL <span class="mono" style="color: var(--accent-red)">$155.00</span></span>
+          </div>
+        </div>
+
+        <div class="da-side-title" style="margin-top: var(--space-6);">Quick Stats</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+          <div><span class="da-spec-label">Win Rate</span><div class="mono" style="font-size: 16px; color: var(--accent-green);">72%</div></div>
+          <div><span class="da-spec-label">Open Positions</span><div class="mono" style="font-size: 16px;">2</div></div>
+          <div><span class="da-spec-label">Week P&L</span><div class="mono" style="font-size: 16px; color: var(--accent-green);">+$842</div></div>
+          <div><span class="da-spec-label">Expectancy</span><div class="mono" style="font-size: 16px;">+2.1%</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="da-footer">
+      <span>Today: 3 recommendations • 0 approved • 0 skipped</span>
+      <span>Pipeline: completed at 07:45 AM (12 min)</span>
+      <span>Tokens: 14,230 ($0.42)</span>
+    </div>
+  </div>
+</div>
+
+<!-- DIRECTION B: Border Accent — Left border indicates confidence -->
+<div id="dir-b" class="mockup">
+  <div class="da-app">
+    <div class="da-header">
+      <span class="da-header-title">TradingAgents</span>
+      <div class="da-tabs"><div class="da-tab active">Recommendations</div><div class="da-tab">Chart</div><div class="da-tab">Track Record</div></div>
+      <div class="da-status"><span><span class="da-status-dot"></span>Online</span><span>Last run: 07:45 AM</span></div>
+    </div>
+    <div class="da-body">
+      <div class="da-main">
+        <div style="font-size: 11px; color: var(--text-tertiary); margin-bottom: var(--space-3); text-transform: uppercase; letter-spacing: 0.5px;">3 recommendations — sorted by confidence</div>
+
+        <div class="db-rec">
+          <div class="db-rec-top">
+            <span class="db-ticker">NVDA</span>
+            <span class="da-direction buy">BUY</span>
+            <span class="db-strategy">Bull Call Spread • 2 contracts</span>
+            <span class="db-conf" style="color: var(--accent-green);">87%</span>
+          </div>
+          <div class="db-specs">
+            <span>Entry <span class="mono">$142.50</span></span>
+            <span>Stop <span class="mono" style="color: var(--accent-red)">$138.00</span></span>
+            <span>Target <span class="mono" style="color: var(--accent-green)">$152.00</span></span>
+            <span>R:R <span class="mono">2.1:1</span></span>
+            <span style="margin-left: auto; font-size: 11px; color: var(--text-tertiary);">Valid 47 min</span>
+          </div>
+          <div class="db-actions">
+            <button class="da-action approve">✓ Approve</button>
+            <button class="da-action">Skip</button>
+            <button class="da-expand" onclick="toggleReasoning(this)">Reasoning ▾</button>
+          </div>
+        </div>
+
+        <div class="db-rec low-conf">
+          <div class="db-rec-top">
+            <span class="db-ticker">AAPL</span>
+            <span class="da-direction buy">BUY</span>
+            <span class="db-strategy">Equity • 50 shares</span>
+            <span class="db-conf" style="color: var(--accent-amber);">68%</span>
+          </div>
+          <div class="db-specs">
+            <span>Entry <span class="mono">$198.30</span></span>
+            <span>Stop <span class="mono" style="color: var(--accent-red)">$194.00</span></span>
+            <span>Target <span class="mono" style="color: var(--accent-green)">$208.00</span></span>
+            <span>R:R <span class="mono">2.3:1</span></span>
+            <span style="margin-left: auto; font-size: 11px; color: var(--text-tertiary);">Valid 47 min</span>
+          </div>
+          <div class="db-actions">
+            <button class="da-action approve">✓ Approve</button>
+            <button class="da-action">Skip</button>
+            <button class="da-expand" onclick="toggleReasoning(this)">Reasoning ▾</button>
+          </div>
+        </div>
+
+        <div class="db-rec low-conf" style="border-left-color: var(--accent-red);">
+          <div class="db-rec-top">
+            <span class="db-ticker">TSLA</span>
+            <span class="da-direction sell">SELL</span>
+            <span class="db-strategy">Bear Put Spread • 1 contract</span>
+            <span class="db-conf" style="color: var(--accent-amber);">62%</span>
+          </div>
+          <div class="db-specs">
+            <span>Entry <span class="mono">$3.20</span></span>
+            <span>Stop <span class="mono" style="color: var(--accent-red)">$4.80</span></span>
+            <span>Target <span class="mono" style="color: var(--accent-green)">$1.20</span></span>
+            <span>R:R <span class="mono">1.3:1</span></span>
+            <span style="margin-left: auto; font-size: 11px; color: var(--text-tertiary);">Valid 47 min</span>
+          </div>
+          <div class="db-actions">
+            <button class="da-action approve">✓ Approve</button>
+            <button class="da-action">Skip</button>
+            <button class="da-expand" onclick="toggleReasoning(this)">Reasoning ▾</button>
+          </div>
+        </div>
+      </div>
+      <div class="da-side">
+        <div class="da-side-title">Active Positions</div>
+        <div class="da-position"><div class="da-pos-header"><span class="da-pos-ticker">MSFT</span><span class="da-pos-pnl" style="color: var(--accent-green)">+4.2%</span></div><div class="da-pos-detail"><span>Entry <span class="mono">$425.00</span></span><span>Now <span class="mono">$442.85</span></span></div></div>
+        <div class="da-position"><div class="da-pos-header"><span class="da-pos-ticker">AMD</span><span class="da-pos-pnl" style="color: var(--accent-red)">-1.8%</span></div><div class="da-pos-detail"><span>Entry <span class="mono">$162.40</span></span><span>Now <span class="mono">$159.48</span></span></div></div>
+      </div>
+    </div>
+    <div class="da-footer"><span>3 recommendations • 0 acted on</span><span>Pipeline: 07:45 AM (12 min, 14K tokens)</span></div>
+  </div>
+</div>
+
+<!-- DIRECTION C: Table-First — Spreadsheet density -->
+<div id="dir-c" class="mockup">
+  <div class="da-app">
+    <div class="da-header">
+      <span class="da-header-title">TradingAgents</span>
+      <div class="da-tabs"><div class="da-tab active">Recommendations</div><div class="da-tab">Chart</div><div class="da-tab">Track Record</div></div>
+      <div class="da-status"><span><span class="da-status-dot"></span>Online</span><span>07:45 AM</span></div>
+    </div>
+    <div class="da-body">
+      <div class="da-main">
+        <table class="dc-table">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Dir</th>
+              <th>Strategy</th>
+              <th>Consensus</th>
+              <th class="right">Conf</th>
+              <th class="right">Entry</th>
+              <th class="right">Stop</th>
+              <th class="right">Target</th>
+              <th class="right">R:R</th>
+              <th class="right">Valid</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="dc-expandable">
+              <td class="mono" style="font-weight: 500;">NVDA</td>
+              <td><span class="da-direction buy">BUY</span></td>
+              <td style="color: var(--text-secondary);">Bull Call Spread</td>
+              <td><span class="da-dot bull" style="display:inline-block"></span><span class="da-dot bull" style="display:inline-block"></span><span class="da-dot bull" style="display:inline-block"></span><span class="da-dot bull" style="display:inline-block"></span><span class="da-dot neutral" style="display:inline-block"></span></td>
+              <td class="right mono" style="color: var(--accent-green);">87%</td>
+              <td class="right mono">$142.50</td>
+              <td class="right mono" style="color: var(--accent-red);">$138.00</td>
+              <td class="right mono" style="color: var(--accent-green);">$152.00</td>
+              <td class="right mono">2.1:1</td>
+              <td class="right" style="color: var(--text-secondary); font-size: 11px;">47m</td>
+              <td><button class="da-action approve" style="font-size:10px; padding: 2px 8px;">✓</button></td>
+            </tr>
+            <tr class="dc-expandable">
+              <td class="mono" style="font-weight: 500;">AAPL</td>
+              <td><span class="da-direction buy">BUY</span></td>
+              <td style="color: var(--text-secondary);">Equity</td>
+              <td><span class="da-dot bull" style="display:inline-block"></span><span class="da-dot bull" style="display:inline-block"></span><span class="da-dot bull" style="display:inline-block"></span><span class="da-dot neutral" style="display:inline-block"></span><span class="da-dot neutral" style="display:inline-block"></span></td>
+              <td class="right mono" style="color: var(--accent-amber);">68%</td>
+              <td class="right mono">$198.30</td>
+              <td class="right mono" style="color: var(--accent-red);">$194.00</td>
+              <td class="right mono" style="color: var(--accent-green);">$208.00</td>
+              <td class="right mono">2.3:1</td>
+              <td class="right" style="color: var(--text-secondary); font-size: 11px;">47m</td>
+              <td><button class="da-action approve" style="font-size:10px; padding: 2px 8px;">✓</button></td>
+            </tr>
+            <tr class="dc-expandable">
+              <td class="mono" style="font-weight: 500;">TSLA</td>
+              <td><span class="da-direction sell">SELL</span></td>
+              <td style="color: var(--text-secondary);">Bear Put Spread</td>
+              <td><span class="da-dot bear" style="display:inline-block"></span><span class="da-dot bear" style="display:inline-block"></span><span class="da-dot neutral" style="display:inline-block"></span><span class="da-dot neutral" style="display:inline-block"></span><span class="da-dot bull" style="display:inline-block"></span></td>
+              <td class="right mono" style="color: var(--accent-amber);">62%</td>
+              <td class="right mono">$3.20</td>
+              <td class="right mono" style="color: var(--accent-red);">$4.80</td>
+              <td class="right mono" style="color: var(--accent-green);">$1.20</td>
+              <td class="right mono">1.3:1</td>
+              <td class="right" style="color: var(--text-secondary); font-size: 11px;">47m</td>
+              <td><button class="da-action approve" style="font-size:10px; padding: 2px 8px;">✓</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="da-side">
+        <div class="da-side-title">Active Positions</div>
+        <div class="da-position"><div class="da-pos-header"><span class="da-pos-ticker">MSFT</span><span class="da-pos-pnl" style="color: var(--accent-green)">+4.2%</span></div></div>
+        <div class="da-position"><div class="da-pos-header"><span class="da-pos-ticker">AMD</span><span class="da-pos-pnl" style="color: var(--accent-red)">-1.8%</span></div></div>
+      </div>
+    </div>
+    <div class="da-footer"><span>3 recommendations</span><span>07:45 AM • 14K tokens</span></div>
+  </div>
+</div>
+
+<!-- DIRECTION D: No-Trade State -->
+<div id="dir-d" class="mockup">
+  <div class="da-app">
+    <div class="da-header">
+      <span class="da-header-title">TradingAgents</span>
+      <div class="da-tabs"><div class="da-tab active">Recommendations</div><div class="da-tab">Chart</div><div class="da-tab">Track Record</div></div>
+      <div class="da-status"><span><span class="da-status-dot"></span>Online</span><span>Last run: 07:45 AM</span></div>
+    </div>
+    <div class="da-body">
+      <div class="da-main" style="display: flex; align-items: center; justify-content: center;">
+        <div class="da-notrade">
+          <div class="da-notrade-count">0</div>
+          <div class="da-notrade-label">recommendations today</div>
+          <div style="font-size: 12px; color: var(--text-secondary); margin-top: var(--space-4); max-width: 400px; text-align: left;">
+            Evaluated 12 tickers from your watchlist. No setups met the confidence threshold (70%). Market volatility elevated following tariff announcement — capital preservation mode active.
+          </div>
+          <div class="da-notrade-detail" style="margin-top: var(--space-4); text-align: left;">
+            <div style="font-size: 11px; color: var(--text-tertiary); margin-bottom: var(--space-2);">EVALUATION SUMMARY</div>
+            <div style="display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-1) var(--space-3); font-size: 12px;">
+              <span class="mono">NVDA</span><span style="color: var(--text-secondary)">High vol, conflicting signals</span><span class="mono" style="color: var(--accent-amber)">52%</span>
+              <span class="mono">AAPL</span><span style="color: var(--text-secondary)">No clear technical setup</span><span class="mono" style="color: var(--accent-amber)">41%</span>
+              <span class="mono">MSFT</span><span style="color: var(--text-secondary)">Already at position limit</span><span class="mono" style="color: var(--text-tertiary)">—</span>
+              <span class="mono">TSLA</span><span style="color: var(--text-secondary)">Earnings in 2 days, suspended</span><span class="mono" style="color: var(--text-tertiary)">—</span>
+              <span style="color: var(--text-tertiary)">+8 more</span><span style="color: var(--text-tertiary)">Below 40% confidence</span><span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="da-side">
+        <div class="da-side-title">Active Positions</div>
+        <div class="da-position"><div class="da-pos-header"><span class="da-pos-ticker">MSFT</span><span class="da-pos-pnl" style="color: var(--accent-green)">+4.2%</span></div><div class="da-pos-detail"><span>Entry <span class="mono">$425.00</span></span><span>SL <span class="mono" style="color: var(--accent-red)">$418.00</span></span></div></div>
+      </div>
+    </div>
+    <div class="da-footer"><span>No trades today — discipline is a feature</span><span>Pipeline: 07:45 AM</span></div>
+  </div>
+</div>
+
+<!-- DIRECTION E: Weekly Review -->
+<div id="dir-e" class="mockup">
+  <div class="da-app">
+    <div class="da-header">
+      <span class="da-header-title">TradingAgents</span>
+      <div class="da-tabs"><div class="da-tab">Recommendations</div><div class="da-tab">Chart</div><div class="da-tab active">Track Record</div></div>
+      <div class="da-status"><span>Week of Apr 7–11, 2026</span></div>
+    </div>
+    <div class="da-body">
+      <div class="da-main">
+        <div class="da-weekly">
+          <div class="da-weekly-hero" style="color: var(--accent-green);">73%</div>
+          <div class="da-weekly-label">Win Rate This Week</div>
+          <div class="da-weekly-stats">
+            <div><span class="da-weekly-stat-value" style="color: var(--accent-green);">+$1,240</span><span class="da-weekly-stat-label">Week P&L</span></div>
+            <div><span class="da-weekly-stat-value">11</span><span class="da-weekly-stat-label">Trades Taken</span></div>
+            <div><span class="da-weekly-stat-value">3</span><span class="da-weekly-stat-label">Days Sat Out</span></div>
+          </div>
+          <div class="da-weekly-stats">
+            <div><span class="da-weekly-stat-value" style="color: var(--accent-green);">+3.8%</span><span class="da-weekly-stat-label">Avg Winner</span></div>
+            <div><span class="da-weekly-stat-value" style="color: var(--accent-red);">-1.9%</span><span class="da-weekly-stat-label">Avg Loser</span></div>
+            <div><span class="da-weekly-stat-value">2.0:1</span><span class="da-weekly-stat-label">Profit Factor</span></div>
+          </div>
+
+          <div style="margin-top: var(--space-4);">
+            <div class="da-side-title">Biggest Surprise</div>
+            <div style="background: var(--bg-primary); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: var(--space-3) var(--space-4); margin-top: var(--space-2);">
+              <div style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2);">
+                <span class="mono" style="font-weight: 500;">CRWD</span>
+                <span style="color: var(--accent-red); font-size: 12px; font-family: 'JetBrains Mono', monospace;">-4.2% LOSS</span>
+                <span style="color: var(--text-secondary); font-size: 11px; margin-left: auto;">Confidence was 81%</span>
+              </div>
+              <div style="font-size: 12px; color: var(--text-secondary);">
+                System was confident based on strong fundamentals and technical breakout. Unexpected cybersecurity sector rotation following competitor acquisition news caused broad sector sell-off. Stop-loss triggered at $342.00. Risk judge correctly identified this as an unpredictable external event.
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: var(--space-6);">
+            <div class="da-side-title">Agent Performance</div>
+            <table class="dc-table" style="margin-top: var(--space-2);">
+              <thead><tr><th>Agent</th><th class="right">Accuracy</th><th class="right">Avg Confidence</th><th class="right">Contribution</th></tr></thead>
+              <tbody>
+                <tr><td>Fundamentals</td><td class="right mono" style="color: var(--accent-green)">78%</td><td class="right mono">76%</td><td class="right" style="color: var(--text-secondary)">Strongest signal this week</td></tr>
+                <tr><td>Market/Technical</td><td class="right mono" style="color: var(--accent-green)">72%</td><td class="right mono">71%</td><td class="right" style="color: var(--text-secondary)">Reliable</td></tr>
+                <tr><td>News</td><td class="right mono" style="color: var(--accent-amber)">64%</td><td class="right mono">68%</td><td class="right" style="color: var(--text-secondary)">Missed CRWD sector rotation</td></tr>
+                <tr><td>Social</td><td class="right mono" style="color: var(--accent-amber)">61%</td><td class="right mono">62%</td><td class="right" style="color: var(--text-secondary)">Noisy week</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="da-side">
+        <div class="da-side-title">4-Week Rolling</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-6);">
+          <div><span class="da-spec-label">Win Rate</span><div class="mono" style="font-size: 16px; color: var(--accent-green);">71%</div></div>
+          <div><span class="da-spec-label">Total Trades</span><div class="mono" style="font-size: 16px;">38</div></div>
+          <div><span class="da-spec-label">Total P&L</span><div class="mono" style="font-size: 16px; color: var(--accent-green);">+$3,420</div></div>
+          <div><span class="da-spec-label">Expectancy</span><div class="mono" style="font-size: 16px;">+2.3%</div></div>
+        </div>
+        <div class="da-side-title">Week Trend</div>
+        <div style="font-size: 12px; color: var(--text-secondary); margin-top: var(--space-2);">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span>Week 1</span><span class="mono" style="color: var(--accent-green)">68%</span></div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span>Week 2</span><span class="mono" style="color: var(--accent-green)">70%</span></div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span>Week 3</span><span class="mono" style="color: var(--accent-green)">72%</span></div>
+          <div style="display: flex; justify-content: space-between;"><span>Week 4 (current)</span><span class="mono" style="color: var(--accent-green)">73%</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="da-footer"><span>Track Record • Week 4 of paper trading</span></div>
+  </div>
+</div>
+
+<!-- DIRECTION F: Reasoning Chain Expanded -->
+<div id="dir-f" class="mockup">
+  <div class="da-app">
+    <div class="da-header">
+      <span class="da-header-title">TradingAgents</span>
+      <div class="da-tabs"><div class="da-tab active">Recommendations</div><div class="da-tab">Chart</div><div class="da-tab">Track Record</div></div>
+      <div class="da-status"><span><span class="da-status-dot"></span>Online</span></div>
+    </div>
+    <div class="da-body">
+      <div class="da-main">
+        <div class="da-rec">
+          <div class="da-rec-header">
+            <span class="da-ticker">NVDA</span>
+            <span class="da-direction buy">BUY</span>
+            <span class="da-type">Bull Call Spread</span>
+            <div class="da-consensus"><span class="da-dot bull"></span><span class="da-dot bull"></span><span class="da-dot bull"></span><span class="da-dot bull"></span><span class="da-dot neutral"></span></div>
+            <span class="da-confidence da-conf-high">87%</span>
+            <span class="da-valid">47 min left</span>
+          </div>
+          <div class="da-rec-specs">
+            <div class="da-spec"><span class="da-spec-label">Entry</span><span class="da-spec-value mono">$142.50</span></div>
+            <div class="da-spec"><span class="da-spec-label">Stop</span><span class="da-spec-value mono" style="color: var(--accent-red)">$138.00</span></div>
+            <div class="da-spec"><span class="da-spec-label">Target</span><span class="da-spec-value mono" style="color: var(--accent-green)">$152.00</span></div>
+            <div class="da-spec"><span class="da-spec-label">Size</span><span class="da-spec-value mono">2 contracts</span></div>
+            <div class="da-spec"><span class="da-spec-label">R:R</span><span class="da-spec-value mono">2.1:1</span></div>
+          </div>
+          <div class="da-rec-actions">
+            <button class="da-action approve">✓ Approve</button>
+            <button class="da-action">Skip</button>
+            <span class="da-expand">▴ Reasoning expanded</span>
+          </div>
+          <div class="da-reasoning open">
+            <div style="font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: var(--space-3);">Agent Reasoning Chain</div>
+            <div class="da-agent-row">
+              <span class="da-agent-name">Fundamentals</span>
+              <span class="da-agent-signal" style="color: var(--accent-green)">Bullish 91%</span>
+              <span class="da-agent-evidence">Strong earnings beat Q1 2026 — EPS $7.82 vs $7.10 est. Revenue $38.2B (+22% YoY). Data center segment up 31%. Guidance raised for Q2. Debt/equity ratio healthy at 0.41.</span>
+            </div>
+            <div class="da-agent-row">
+              <span class="da-agent-name">Market/Technical</span>
+              <span class="da-agent-signal" style="color: var(--accent-green)">Bullish 85%</span>
+              <span class="da-agent-evidence">Clean breakout above $140 resistance on 1.8x avg volume. RSI 62 — bullish but not overbought. MACD crossover confirmed. 20 EMA supporting. Previous resistance now support.</span>
+            </div>
+            <div class="da-agent-row">
+              <span class="da-agent-name">News</span>
+              <span class="da-agent-signal" style="color: var(--accent-green)">Bullish 82%</span>
+              <span class="da-agent-evidence">US semiconductor policy support announced yesterday. Three major cloud providers increasing GPU orders. No negative catalysts in pipeline. Earnings behind us — next catalyst is August.</span>
+            </div>
+            <div class="da-agent-row">
+              <span class="da-agent-name">Social</span>
+              <span class="da-agent-signal" style="color: var(--accent-green)">Bullish 78%</span>
+              <span class="da-agent-evidence">Retail sentiment score 8.2/10 (elevated but not euphoric). Institutional dark pool activity showing accumulation. Options flow: large May $150 call sweeps.</span>
+            </div>
+            <div class="da-agent-row">
+              <span class="da-agent-name" style="color: var(--accent-amber);">Options Flow ⚠</span>
+              <span class="da-agent-signal" style="color: var(--text-secondary)">Neutral 55%</span>
+              <span class="da-agent-evidence">Dissent: Large protective put buying at $130 strike suggests some institutional hedging. Call/put ratio 1.2 — slightly bullish but not convincing. Recommends caution on position size.</span>
+            </div>
+            <div style="margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border-subtle);">
+              <div style="font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: var(--space-2);">Risk Judge Resolution</div>
+              <div style="font-size: 12px; color: var(--text-secondary);">
+                4/5 agents bullish with high confidence. Options flow dissent noted but weighted lower (20% weight) due to mixed signal quality. Bull call spread selected to limit downside exposure per dissenting agent's caution. Position size reduced from 3 to 2 contracts. Stop placed below breakout level for clean invalidation.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="da-side">
+        <div class="da-side-title">Active Positions</div>
+        <div class="da-position"><div class="da-pos-header"><span class="da-pos-ticker">MSFT</span><span class="da-pos-pnl" style="color: var(--accent-green)">+4.2%</span></div></div>
+        <div class="da-position"><div class="da-pos-header"><span class="da-pos-ticker">AMD</span><span class="da-pos-pnl" style="color: var(--accent-red)">-1.8%</span></div></div>
+      </div>
+    </div>
+    <div class="da-footer"><span>NVDA reasoning expanded — 4/5 bullish, 1 dissent (Options Flow)</span></div>
+  </div>
+</div>
+
+<script>
+function showDir(id) {
+  document.querySelectorAll('.mockup').forEach(m => m.classList.remove('active'));
+  document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('dir-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function toggleReasoning(btn) {
+  const reasoning = btn.closest('.da-rec, .db-rec').querySelector('.da-reasoning');
+  if (reasoning) {
+    reasoning.classList.toggle('open');
+    btn.textContent = reasoning.classList.contains('open') ? 'Hide reasoning ▴' : 'Show reasoning ▾';
+  }
+}
+</script>
+</body>
+</html>

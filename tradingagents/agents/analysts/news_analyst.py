@@ -1,9 +1,11 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-import time
-import json
+
 from tradingagents.agents.utils.agent_utils import get_news, get_global_news
-from tradingagents.dataflows.config import get_config
 from tradingagents.agents.utils.vol_note_utils import extract_vol_note
+from tradingagents.agents.utils.signal_extraction import (
+    STRUCTURED_OUTPUT_INSTRUCTION,
+    parse_agent_signal,
+)
 
 
 def create_news_analyst(llm):
@@ -26,7 +28,8 @@ def create_news_analyst(llm):
 
         system_message = (
             "You are a news researcher tasked with analyzing recent news and trends over the past week. Please write a comprehensive report of the current state of the world that is relevant for trading and macroeconomics. Use the available tools: get_news(query, start_date, end_date) for company-specific or targeted news searches, and get_global_news(curr_date, look_back_days, limit) for broader macroeconomic news. Do not simply state the trends are mixed, provide detailed and finegrained analysis and insights that may help traders make decisions."
-            + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
+            + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
+            + STRUCTURED_OUTPUT_INSTRUCTION
         )
 
         prompt = ChatPromptTemplate.from_messages(
@@ -60,15 +63,20 @@ def create_news_analyst(llm):
 
         report = ""
         vol_note = None
+        signal_dict = None
 
         if len(result.tool_calls) == 0:
             report = result.content
             vol_note = extract_vol_note(report)
+            signal_dict = parse_agent_signal(
+                report, ticker=ticker, agent_name="news"
+            )
 
         return {
             "messages": [result],
             "news_report": report,
             "vol_note_news": vol_note,
+            "news_signal": signal_dict,
         }
 
     return news_analyst_node

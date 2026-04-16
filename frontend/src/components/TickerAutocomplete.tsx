@@ -99,7 +99,7 @@ export function TickerAutocomplete({ value, onChange, className }: TickerAutocom
       {open && (
         <ul
           ref={listRef}
-          className="absolute z-50 left-0 right-0 mt-1 max-h-64 overflow-auto rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-lg"
+          className="absolute z-50 left-0 right-0 mt-1 max-h-64 overflow-auto rounded-sm border border-border-default bg-bg-elevated shadow-lg"
         >
           {filtered.map((t, i) => (
             <li
@@ -108,8 +108,8 @@ export function TickerAutocomplete({ value, onChange, className }: TickerAutocom
               onMouseEnter={() => setHighlightIdx(i)}
               className={`flex items-center gap-3 px-3 py-2 cursor-pointer text-sm ${
                 i === highlightIdx
-                  ? 'bg-blue-50 dark:bg-blue-900/40'
-                  : 'hover:bg-gray-50 dark:hover:bg-gray-600'
+                  ? 'bg-accent-blue/10'
+                  : 'hover:bg-bg-hover'
               }`}
             >
               <img
@@ -120,10 +120,10 @@ export function TickerAutocomplete({ value, onChange, className }: TickerAutocom
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-gray-900 dark:text-gray-100">{t.ticker}</span>
-                  <span className="text-xs text-gray-400 dark:text-gray-500 truncate">{t.sector}</span>
+                  <span className="font-semibold text-text-primary">{t.ticker}</span>
+                  <span className="text-xs text-text-tertiary truncate">{t.sector}</span>
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{t.name}</div>
+                <div className="text-xs text-text-secondary truncate">{t.name}</div>
               </div>
             </li>
           ))}

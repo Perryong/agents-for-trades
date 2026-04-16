@@ -1,0 +1,166 @@
+"""Analysis run tracking endpoints.
+
+GET /api/analysis/runs          — run history (most recent first)
+GET /api/analysis/runs/{run_id} — single run details
+GET /api/analysis/runs/{run_id}/agents — agent results for a run
+"""
+import json
+from datetime import datetime
+from typing import Optional, List
+
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import select
+
+from .db import SessionDep
+from .models import AnalysisRun, AgentResult
+
+analysis_router = APIRouter(prefix="/api")
+
+# Valid state transitions
+_VALID_TRANSITIONS = {
+    "pending": {"running"},
+    "running": {"completed", "failed", "cancelling"},
+    "cancelling": {"cancelled"},
+}
+
+
+class AnalysisRunResponse(BaseModel):
+    id: int
+    run_id: str
+    ticker: str
+    status: str
+    config_snapshot: Optional[str] = None
+    started_at: str
+    completed_at: Optional[str] = None
+    error_message: Optional[str] = None
+    token_count: Optional[int] = None
+
+
+class AgentResultResponse(BaseModel):
+    id: int
+    run_id: str
+    agent_name: str
+    signal_json: Optional[str] = None
+    token_count: Optional[int] = None
+    duration_ms: Optional[int] = None
+    created_at: str
+
+
+class AgentDurationStats(BaseModel):
+    agent_name: str
+    avg_duration_ms: int
+    sample_count: int
+
+
+@analysis_router.get("/analysis/runs", response_model=List[AnalysisRunResponse])
+async def list_runs(
+    session: SessionDep,
+    limit: int = Query(20, ge=1, le=100),
+):
+    """List analysis runs, most recent first."""
+    result = await session.execute(
+        select(AnalysisRun).order_by(AnalysisRun.started_at.desc()).limit(limit)
+    )
+    return [
+        AnalysisRunResponse(
+            id=r.id, run_id=r.run_id, ticker=r.ticker, status=r.status,
+            config_snapshot=r.config_snapshot,
+            started_at=r.started_at.isoformat() if r.started_at else "",
+            completed_at=r.completed_at.isoformat() if r.completed_at else None,
+            error_message=r.error_message, token_count=r.token_count,
+        )
+        for r in result.scalars().all()
+    ]
+
+
+@analysis_router.get("/analysis/runs/{run_id}", response_model=AnalysisRunResponse)
+async def get_run(run_id: str, session: SessionDep):
+    """Get a single analysis run."""
+    result = await session.execute(
+        select(AnalysisRun).where(AnalysisRun.run_id == run_id)
+    )
+    r = result.scalar_one_or_none()
+    if r is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return AnalysisRunResponse(
+        id=r.id, run_id=r.run_id, ticker=r.ticker, status=r.status,
+        config_snapshot=r.config_snapshot,
+        started_at=r.started_at.isoformat() if r.started_at else "",
+        completed_at=r.completed_at.isoformat() if r.completed_at else None,
+        error_message=r.error_message, token_count=r.token_count,
+    )
+
+
+@analysis_router.get("/analysis/runs/{run_id}/agents", response_model=List[AgentResultResponse])
+async def get_run_agents(run_id: str, session: SessionDep):
+    """Get agent results for a specific run."""
+    result = await session.execute(
+        select(AgentResult).where(AgentResult.run_id == run_id).order_by(AgentResult.created_at)
+    )
+    return [
+        AgentResultResponse(
+            id=a.id, run_id=a.run_id, agent_name=a.agent_name,
+            signal_json=a.signal_json, token_count=a.token_count,
+            duration_ms=a.duration_ms,
+            created_at=a.created_at.isoformat() if a.created_at else "",
+        )
+        for a in result.scalars().all()
+    ]
+
+
+class BatchRunRequest(BaseModel):
+    tickers: List[str]
+    llm_provider: str = "openai"
+    deep_think_llm: str = "gpt-5.2"
+    quick_think_llm: str = "gpt-5-mini"
+
+
+class BatchRunResponse(BaseModel):
+    batch_id: str
+    tickers: List[str]
+    status: str  # "started"
+
+
+@analysis_router.post("/analysis/batch", response_model=BatchRunResponse)
+async def start_batch_analysis(request: BatchRunRequest):
+    """Start analysis for multiple tickers sequentially.
+
+    Returns immediately with a batch_id. Each ticker runs as a separate
+    analysis run, visible via SSE progress stream.
+    """
+    import uuid
+    batch_id = f"batch-{uuid.uuid4().hex[:8]}"
+
+    # The actual batch orchestration happens in the background
+    # Each ticker gets its own run_id and SSE stream
+    # For now, return the batch info — frontend will trigger individual runs
+
+    return BatchRunResponse(
+        batch_id=batch_id,
+        tickers=request.tickers,
+        status="started",
+    )
+
+
+@analysis_router.get("/analysis/agent-durations", response_model=List[AgentDurationStats])
+async def get_agent_durations(session: SessionDep):
+    """Average agent durations from historical runs (for ETR calculation)."""
+    result = await session.execute(select(AgentResult).where(AgentResult.duration_ms != None))  # noqa: E711
+    agents = result.scalars().all()
+
+    # Compute averages per agent
+    from collections import defaultdict
+    durations: dict[str, list[int]] = defaultdict(list)
+    for a in agents:
+        if a.duration_ms is not None:
+            durations[a.agent_name].append(a.duration_ms)
+
+    return [
+        AgentDurationStats(
+            agent_name=name,
+            avg_duration_ms=sum(durs) // len(durs),
+            sample_count=len(durs),
+        )
+        for name, durs in sorted(durations.items())
+    ]

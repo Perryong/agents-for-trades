@@ -14,12 +14,11 @@ interface TradeMarker {
 interface ChartContainerProps {
   data: CandlestickData[];
   volumeData: HistogramData[];
-  dark: boolean;
   overlay?: ChartOverlay | null;
   tradeMarker?: TradeMarker | null;
 }
 
-export function ChartContainer({ data, volumeData, dark, overlay, tradeMarker }: ChartContainerProps) {
+export function ChartContainer({ data, volumeData, overlay, tradeMarker }: ChartContainerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
@@ -39,18 +38,18 @@ export function ChartContainer({ data, volumeData, dark, overlay, tradeMarker }:
       width,
       height,
       layout: {
-        background: { color: 'transparent' },
-        textColor: dark ? '#9ca3af' : '#4b5563',
+        background: { color: '#131313' },
+        textColor: '#888888',
       },
       grid: {
-        vertLines: { color: dark ? '#374151' : '#e5e7eb' },
-        horzLines: { color: dark ? '#374151' : '#e5e7eb' },
+        vertLines: { color: '#2e2e2e' },
+        horzLines: { color: '#2e2e2e' },
       },
       rightPriceScale: {
-        borderColor: dark ? '#374151' : '#e5e7eb',
+        borderColor: '#2e2e2e',
       },
       timeScale: {
-        borderColor: dark ? '#374151' : '#e5e7eb',
+        borderColor: '#2e2e2e',
       },
     });
 
@@ -175,7 +174,7 @@ export function ChartContainer({ data, volumeData, dark, overlay, tradeMarker }:
       window.removeEventListener('resize', handleResize);
       try { chart.remove(); } catch { /* already disposed (React Strict Mode) */ }
     };
-  }, [data, volumeData, dark, overlay, tradeMarker]);
+  }, [data, volumeData, overlay, tradeMarker]);
 
   return <div ref={containerRef} className="w-full h-full" />;
 }

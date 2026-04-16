@@ -239,6 +239,12 @@ export interface ScreenerPick {
   market_cap: string | null;
 }
 
+export interface ScreenerStrategyInfo {
+  name: string;
+  display_name: string;
+  description: string;
+}
+
 export type ScreenerStatus = 'idle' | 'loading' | 'done' | 'error';
 
 export interface ScreenerState {
@@ -317,4 +323,74 @@ export interface EquityCurvePoint {
 export interface EquityCurveData {
   points: EquityCurvePoint[];
   total_trades: number;
+}
+
+// --- Recommendation types (Epic 4) ---
+
+export type RecommendationStatus = 'pending' | 'approved' | 'skipped' | 'expired';
+
+export interface AgentSignalSummary {
+  agent_name: string;
+  signal: string;            // "BUY" | "SELL" | "HOLD" | "NO TRADE"
+  confidence: number;        // 0-100
+  rationale: string;
+}
+
+export interface RecommendationTradeSpec {
+  entry_price: number | null;
+  stop_loss: number | null;
+  target_price: number | null;
+  position_size: number | null;
+  risk_reward: number | null;
+}
+
+export interface Position {
+  id: number;
+  ticker: string;
+  direction: string;
+  trade_type: string;
+  entry_price: number | null;
+  fill_price: number | null;
+  stop_loss: number | null;
+  target_price: number | null;
+  pnl_pct: number | null;
+  strategy_name: string | null;
+  status: string;
+}
+
+export interface QuickStats {
+  win_rate: number;
+  open_positions: number;
+  week_pnl: number;
+  expectancy: number;
+}
+
+// --- Rolling win rate types (Epic 5) ---
+
+export interface RollingWeekPoint {
+  week_start: string;
+  win_rate: number;
+  trade_count: number;
+  wins: number;
+  losses: number;
+}
+
+export interface RollingWinRateData {
+  weeks: RollingWeekPoint[];
+  total_weeks: number;
+  disclaimer: string | null;
+}
+
+export interface Recommendation {
+  id: number;
+  ticker: string;
+  direction: string | null;           // "BUY" | "SELL" | null (no-trade)
+  confidence: number;
+  strategy: string | null;
+  trade_spec: RecommendationTradeSpec | null;
+  agent_signals: AgentSignalSummary[];
+  no_trade_reason: string | null;
+  valid_until: string | null;         // ISO 8601
+  created_at: string;
+  status: RecommendationStatus;
 }

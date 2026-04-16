@@ -275,35 +275,24 @@ def create_screener_agent(llm):
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def run_screener(config: dict, llm) -> ScreenerResult:
-    """Public entry point: run the full screener pipeline (RANK-02).
+def run_screener(config: dict, llm, strategy_name: str = "") -> ScreenerResult:
+    """Public entry point: run a screener strategy (RANK-02).
 
-    Fetches candidates from the data layer, ranks them via the LLM screener,
-    and returns a ScreenerResult. Enforces AgentState isolation (RANK-03).
+    Delegates to the strategy registry. Defaults to "momentum" for backward
+    compatibility. Enforces AgentState isolation (RANK-03).
 
     Args:
-        config: Configuration dict. Supported keys:
-            - screener_max_candidates (int, default 50): max candidates to fetch
-            - screener_n_picks (int, default 5): top picks to return
+        config: Configuration dict.
         llm: LangChain-compatible LLM instance.
+        strategy_name: Registry name of the strategy to use (default: "momentum").
 
     Returns:
         ScreenerResult with ranked top picks.
-
-    Raises:
-        TypeError: If the agent returns a non-ScreenerResult (should never happen
-            in normal operation, but guards against misuse).
     """
-    candidates, _coverage = get_screener_signals(
-        max_candidates=config.get("screener_max_candidates", 50)
-    )
+    from .registry import get_strategy
 
-    # Unwrap BaseLLMClient wrappers to get the LangChain-compatible LLM
-    if hasattr(llm, "get_llm"):
-        llm = llm.get_llm()
-
-    agent = create_screener_agent(llm)
-    result = agent(candidates, config)
+    strategy = get_strategy(strategy_name)
+    result = strategy.screen(config, llm)
 
     if not isinstance(result, ScreenerResult):
         raise TypeError(

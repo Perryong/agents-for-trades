@@ -96,13 +96,13 @@ export function ConfigSidebar({ onAnalyze, isRunning, prefillTicker }: ConfigSid
   }
 
   const inputClass =
-    'w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none';
+    'w-full px-3 py-2 border border-border-default rounded-sm text-sm bg-bg-elevated text-text-primary focus:ring-2 focus:ring-accent-blue focus:border-accent-blue outline-none';
 
   return (
     <div className="space-y-6">
       {/* Ticker Symbol */}
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label className="block text-sm font-medium text-text-secondary">
           Ticker Symbol
         </label>
         <TickerAutocomplete
@@ -114,7 +114,7 @@ export function ConfigSidebar({ onAnalyze, isRunning, prefillTicker }: ConfigSid
 
       {/* Analysis Date */}
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label className="block text-sm font-medium text-text-secondary">
           Analysis Date
         </label>
         <input
@@ -127,23 +127,23 @@ export function ConfigSidebar({ onAnalyze, isRunning, prefillTicker }: ConfigSid
 
       {/* Analysts */}
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium text-gray-700 dark:text-gray-300">Analysts</legend>
+        <legend className="text-sm font-medium text-text-secondary">Analysts</legend>
         {ANALYST_OPTIONS.map(({ id, label }) => (
           <label key={id} className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={analysts.includes(id)}
               onChange={() => toggleAnalyst(id)}
-              className="rounded border-gray-300 dark:border-gray-600 text-blue-600"
+              className="rounded-sm border-border-default text-accent-blue"
             />
-            <span className="text-sm text-gray-700 dark:text-gray-300">{label}</span>
+            <span className="text-sm text-text-secondary">{label}</span>
           </label>
         ))}
       </fieldset>
 
       {/* LLM Provider */}
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label className="block text-sm font-medium text-text-secondary">
           LLM Provider
         </label>
         <select
@@ -159,7 +159,7 @@ export function ConfigSidebar({ onAnalyze, isRunning, prefillTicker }: ConfigSid
 
       {/* Deep Think Model */}
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label className="block text-sm font-medium text-text-secondary">
           Deep Think Model
         </label>
         <select
@@ -175,7 +175,7 @@ export function ConfigSidebar({ onAnalyze, isRunning, prefillTicker }: ConfigSid
 
       {/* Quick Think Model */}
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label className="block text-sm font-medium text-text-secondary">
           Quick Think Model
         </label>
         <select
@@ -193,7 +193,7 @@ export function ConfigSidebar({ onAnalyze, isRunning, prefillTicker }: ConfigSid
       <button
         onClick={handleAnalyze}
         disabled={isRunning || !ticker.trim()}
-        className="w-full py-2 px-4 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+        className="w-full py-2 px-4 bg-accent-blue text-white rounded-sm text-sm font-medium hover:bg-accent-blue/80 disabled:bg-bg-secondary disabled:text-text-tertiary disabled:cursor-not-allowed transition-colors"
       >
         {isRunning ? 'Analyzing...' : 'Analyze'}
       </button>

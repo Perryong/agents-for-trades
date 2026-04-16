@@ -4,12 +4,17 @@ Provides:
   GET /api/scores/summary      — full metric suite: win_rate, expectancy,
                                   avg_winner, avg_loser, profit_factor
   GET /api/scores/calibration  — 5 confidence buckets with actual win rate
+  GET /api/scores/rolling      — rolling 4-week win rate time series
 
 Per D-06: win_rate is NEVER returned alone — full suite always present.
 Per D-08: disclaimer included when total_closed < 5.
 Per D-11: calibration returns empty buckets + message when < 10 scored trades.
 """
-from fastapi import APIRouter
+from datetime import datetime, timedelta
+from typing import Optional, List
+
+from fastapi import APIRouter, Query
+from pydantic import BaseModel
 from sqlalchemy import select
 
 from .db import SessionDep
@@ -38,15 +43,41 @@ def _mean(values: list[float]) -> float:
 # Endpoints
 # ---------------------------------------------------------------------------
 
+def _parse_period(period: str | None) -> datetime | None:
+    """Parse period string like '7d', '4w', '30d' into a cutoff datetime."""
+    if not period:
+        return None
+    period = period.strip().lower()
+    try:
+        if period.endswith('d'):
+            days = int(period[:-1])
+            return datetime.utcnow() - timedelta(days=days)
+        elif period.endswith('w'):
+            weeks = int(period[:-1])
+            return datetime.utcnow() - timedelta(weeks=weeks)
+    except ValueError:
+        pass
+    return None
+
+
 @score_router.get("/scores/summary", response_model=ScoreSummaryResponse)
-async def get_score_summary(session: SessionDep) -> ScoreSummaryResponse:
+async def get_score_summary(
+    session: SessionDep,
+    period: Optional[str] = Query(None, description="Filter: '7d', '4w', '30d'"),
+) -> ScoreSummaryResponse:
     """Return aggregate recommendation scoring metrics.
 
     All metrics are always returned together (D-06 — win_rate alone is misleading).
     A disclaimer is included when total_closed < 5 (D-08).
+    Optional period filter limits to trades closed within the period.
     """
     result = await session.execute(select(Trade))
     all_trades = result.scalars().all()
+
+    # Apply period filter if provided
+    cutoff = _parse_period(period)
+    if cutoff:
+        all_trades = [t for t in all_trades if t.close_time and t.close_time > cutoff]
 
     total_trades = len(all_trades)
     closed = [t for t in all_trades if t.outcome is not None]
@@ -155,4 +186,67 @@ async def get_score_calibration(session: SessionDep) -> CalibrationResponse:
         buckets=buckets,
         total_scored=total_scored,
         message=None,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Rolling win rate (Epic 5, Story 5.2)
+# ---------------------------------------------------------------------------
+
+class RollingWeekPoint(BaseModel):
+    week_start: str       # ISO date of week start (Monday)
+    win_rate: float       # 0-100
+    trade_count: int
+    wins: int
+    losses: int
+
+
+class RollingWinRateResponse(BaseModel):
+    weeks: List[RollingWeekPoint]
+    total_weeks: int
+    disclaimer: Optional[str] = None
+
+
+@score_router.get("/scores/rolling", response_model=RollingWinRateResponse)
+async def get_rolling_win_rate(
+    session: SessionDep,
+    weeks: int = Query(4, ge=1, le=52, description="Number of weeks to include"),
+) -> RollingWinRateResponse:
+    """Return rolling weekly win rate for the last N weeks."""
+    result = await session.execute(select(Trade))
+    all_trades = result.scalars().all()
+
+    closed = [t for t in all_trades if t.outcome is not None and t.close_time is not None]
+
+    # Build week buckets
+    now = datetime.utcnow()
+    week_points: List[RollingWeekPoint] = []
+
+    for w in range(weeks - 1, -1, -1):
+        week_end = now - timedelta(weeks=w)
+        week_start = week_end - timedelta(days=7)
+
+        in_week = [t for t in closed if week_start <= t.close_time < week_end]
+        wins = sum(1 for t in in_week if t.outcome == "WIN")
+        losses = sum(1 for t in in_week if t.outcome == "LOSS")
+        total = wins + losses
+        win_rate = wins / total * 100 if total > 0 else 0.0
+
+        week_points.append(RollingWeekPoint(
+            week_start=week_start.strftime("%Y-%m-%d"),
+            win_rate=round(win_rate, 2),
+            trade_count=total,
+            wins=wins,
+            losses=losses,
+        ))
+
+    total_closed = sum(p.trade_count for p in week_points)
+    disclaimer = None
+    if total_closed < 5:
+        disclaimer = f"Based on {total_closed} trade(s) — insufficient sample for reliable rolling metrics."
+
+    return RollingWinRateResponse(
+        weeks=week_points,
+        total_weeks=len(week_points),
+        disclaimer=disclaimer,
     )

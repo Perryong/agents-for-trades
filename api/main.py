@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import router
-from .db import engine, Base, ensure_scoring_columns, ensure_bracket_columns
+from .db import engine, Base, ensure_scoring_columns, ensure_bracket_columns, ensure_prediction_id_column
 
 
 @asynccontextmanager
@@ -17,6 +17,7 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     await ensure_scoring_columns()
     await ensure_bracket_columns()
+    await ensure_prediction_id_column()
     yield
     await engine.dispose()
 
@@ -45,6 +46,14 @@ from .dashboard_routes import dashboard_router
 app.include_router(dashboard_router)
 from .price_routes import price_router
 app.include_router(price_router)
+from .recommendation_routes import recommendation_router
+app.include_router(recommendation_router)
+from .config_routes import config_router
+app.include_router(config_router)
+from .analysis_routes import analysis_router
+app.include_router(analysis_router)
+from .regime_routes import regime_router
+app.include_router(regime_router)
 
 # Production: serve Vite dist if it exists
 DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")

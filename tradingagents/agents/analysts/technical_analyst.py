@@ -1,8 +1,11 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.messages import HumanMessage
 
 from tradingagents.dataflows.technical_analysis import get_technical_analysis as fetch_technical_data
 from tradingagents.agents.utils.vol_note_utils import extract_vol_note
+from tradingagents.agents.utils.signal_extraction import (
+    STRUCTURED_OUTPUT_INSTRUCTION,
+    parse_agent_signal,
+)
 
 
 def create_technical_analyst(llm):
@@ -20,7 +23,6 @@ def create_technical_analyst(llm):
         ) if vol_context else ""
 
         # Pre-fetch technical data so the LLM doesn't need tool calling
-        # (Gemini and some models struggle with LangChain tool invocation)
         try:
             tech_data = fetch_technical_data(ticker, current_date, 120)
         except Exception:
@@ -36,6 +38,7 @@ def create_technical_analyst(llm):
             "End your report with an exact line: Technical stance: BUY or Technical stance: HOLD "
             "or Technical stance: SELL."
             " Append a small markdown table summarizing 1H/4H/1D bias and confidence."
+            + STRUCTURED_OUTPUT_INSTRUCTION
         )
 
         prompt = ChatPromptTemplate.from_messages(
@@ -71,10 +74,16 @@ def create_technical_analyst(llm):
 
         vol_note = extract_vol_note(report)
 
+        # Technical analyst always produces a report (no tool calls)
+        signal_dict = parse_agent_signal(
+            report, ticker=ticker, agent_name="technical"
+        )
+
         return {
             "messages": [result],
             "technical_report": report,
             "vol_note_technical": vol_note,
+            "technical_signal": signal_dict,
         }
 
     return technical_analyst_node

@@ -75,9 +75,13 @@ class Propagator:
             callbacks: Optional list of callback handlers for tool execution tracking.
                        Note: LLM callbacks are handled separately via LLM constructor.
         """
-        config = {"recursion_limit": self.max_recur_limit}
+        config: Dict[str, Any] = {"recursion_limit": self.max_recur_limit}
         if callbacks:
             config["callbacks"] = callbacks
+        # Thread ID for checkpointing (Epic 7.3) — enables resume-after-crash
+        if self.config.get("enable_checkpointing"):
+            import uuid
+            config["configurable"] = {"thread_id": self.config.get("thread_id", str(uuid.uuid4()))}
         return {
             "stream_mode": "values",
             "config": config,

@@ -1,4 +1,5 @@
 import asyncio
+import time
 import threading
 from typing import Any, Dict, Optional
 
@@ -91,6 +92,8 @@ class ProgressCallbackHandler(BaseCallbackHandler):
         self._lock = threading.Lock()
         # Maps LangChain run_id (UUID) -> node name, populated in on_chain_start
         self._node_names: Dict[str, str] = {}
+        # Maps LangChain run_id (UUID) -> start time for duration tracking
+        self._node_start_times: Dict[str, float] = {}
 
     def _check_cancel(self) -> None:
         if self.cancel_event.is_set():
@@ -111,6 +114,7 @@ class ProgressCallbackHandler(BaseCallbackHandler):
         run_uuid = kwargs.get("run_id")
         if run_uuid is not None:
             self._node_names[str(run_uuid)] = name
+            self._node_start_times[str(run_uuid)] = time.monotonic()
         # Only emit SSE events for known graph nodes
         if name in self._GRAPH_NODES:
             self._put({"type": "node_start", "node": name})
@@ -119,9 +123,34 @@ class ProgressCallbackHandler(BaseCallbackHandler):
         """Emit a node_end event when a graph node finishes execution."""
         self._check_cancel()
         run_uuid = kwargs.get("run_id")
-        name = self._node_names.pop(str(run_uuid), "unknown") if run_uuid is not None else "unknown"
+        uuid_str = str(run_uuid) if run_uuid is not None else ""
+        name = self._node_names.pop(uuid_str, "unknown")
+        start_time = self._node_start_times.pop(uuid_str, None)
+        duration_ms = int((time.monotonic() - start_time) * 1000) if start_time else None
+
         if name in self._GRAPH_NODES:
             self._put({"type": "node_end", "node": name})
+            # Persist agent result (Epic 7.2)
+            self._persist_agent_result(name, duration_ms)
+
+    def _persist_agent_result(self, agent_name: str, duration_ms: int | None) -> None:
+        """Persist an agent result to the database (best-effort, non-blocking)."""
+        try:
+            from .db import AsyncSessionFactory
+            from .models import AgentResult
+
+            async def _save():
+                async with AsyncSessionFactory() as session:
+                    session.add(AgentResult(
+                        run_id=self.run_id,
+                        agent_name=agent_name,
+                        duration_ms=duration_ms,
+                    ))
+                    await session.commit()
+
+            asyncio.run_coroutine_threadsafe(_save(), self.loop)
+        except Exception:
+            pass  # Non-fatal: don't crash the pipeline for persistence failures
 
     def on_llm_start(
         self, serialized: Dict[str, Any], prompts: Any, **kwargs: Any

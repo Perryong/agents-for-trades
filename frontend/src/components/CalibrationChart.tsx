@@ -111,16 +111,16 @@ export function CalibrationChart({ calibration }: CalibrationChartProps) {
       {/* Collapsible toggle */}
       <button
         onClick={() => setExpanded(prev => !prev)}
-        className="text-xs text-blue-400 hover:text-blue-300 cursor-pointer transition-colors"
+        className="text-xs text-accent-blue hover:text-accent-blue/80 cursor-pointer transition-colors"
       >
         {expanded ? 'Hide Calibration' : 'Show Calibration'}
       </button>
 
       {expanded && (
-        <div className="mt-2 bg-gray-800/50 rounded p-2">
+        <div className="mt-2 bg-bg-elevated/50 rounded-sm p-2">
           {calibration.message ? (
             // Insufficient data message per D-11
-            <p className="text-xs text-gray-400 py-2 text-center">
+            <p className="text-xs text-text-secondary py-2 text-center">
               {calibration.message}
             </p>
           ) : (
@@ -131,7 +131,7 @@ export function CalibrationChart({ calibration }: CalibrationChartProps) {
               {/* Bucket labels below chart */}
               <div className="flex justify-between mt-1 px-1">
                 {BUCKET_LABELS.map(label => (
-                  <span key={label} className="text-xs text-gray-500">
+                  <span key={label} className="text-xs text-text-tertiary">
                     {label}
                   </span>
                 ))}

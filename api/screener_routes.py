@@ -1,5 +1,7 @@
 import asyncio
 from fastapi import APIRouter
+from pydantic import BaseModel
+from typing import List
 from .schemas import ScreenRequest, ScreenResponse
 
 screener_router = APIRouter(prefix="/api")
@@ -37,13 +39,25 @@ async def get_tickers():
     return _ticker_cache
 
 
+class StrategyInfo(BaseModel):
+    name: str
+    display_name: str
+    description: str
+
+
+@screener_router.get("/screen/strategies", response_model=List[StrategyInfo])
+async def get_strategies():
+    """Return available screener strategies."""
+    from tradingagents.agents.screener import list_strategies
+    return [
+        StrategyInfo(name=s.name, display_name=s.display_name, description=s.description)
+        for s in list_strategies()
+    ]
+
+
 @screener_router.post("/screen", response_model=ScreenResponse)
 async def screen(request: ScreenRequest = ScreenRequest()):
-    """Run the screener pipeline and return ranked picks as JSON.
-
-    Calls run_screener() in a thread pool via asyncio.to_thread() so the
-    event loop remains free for concurrent SSE streams (API-02).
-    """
+    """Run a screener strategy and return ranked picks as JSON."""
     from tradingagents.agents.screener.screener_agent import run_screener
     from tradingagents.llm_clients.factory import create_llm_client
 
@@ -54,12 +68,18 @@ async def screen(request: ScreenRequest = ScreenRequest()):
     )
 
     try:
-        result = await asyncio.to_thread(run_screener, config, llm)
+        result = await asyncio.to_thread(run_screener, config, llm, request.strategy)
         status = "partial" if result.error else "success"
         return ScreenResponse(
             status=status,
             data=result.model_dump(mode="json"),
             screened_at=result.screened_at.isoformat(),
+        )
+    except KeyError as exc:
+        return ScreenResponse(
+            status="error",
+            data={"error": str(exc)},
+            screened_at="",
         )
     except Exception as exc:
         return ScreenResponse(

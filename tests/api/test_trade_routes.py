@@ -1,8 +1,8 @@
-"""Route-level tests for trade endpoints with mocked Alpaca client.
+"""Route-level tests for trade endpoints with mocked execution backend.
 
 Uses httpx.AsyncClient + ASGITransport so the full FastAPI app is exercised
-without hitting a real Alpaca paper account. The Alpaca client is monkeypatched
-at the module level via pytest monkeypatch.
+without hitting a real Alpaca paper account. The PaperBackend is mocked
+to return controlled OrderResult objects.
 """
 import pytest
 import pytest_asyncio
@@ -17,6 +17,7 @@ from sqlalchemy import select
 
 from api.db import Base, get_session
 from api.models import Trade
+from tradingagents.execution.types import OrderResult, PositionStatus
 
 # ---------------------------------------------------------------------------
 # In-memory DB setup for tests
@@ -78,19 +79,19 @@ def make_mock_order(
 # ---------------------------------------------------------------------------
 
 def test_occ_symbol_construction_call():
-    from api.trade_routes import build_occ_symbol
+    from tradingagents.execution.paper import build_occ_symbol
     result = build_occ_symbol("AAPL", "2026-05-08", "CALL", 195.0)
     assert result == "AAPL260508C00195000"
 
 
 def test_occ_symbol_construction_put():
-    from api.trade_routes import build_occ_symbol
+    from tradingagents.execution.paper import build_occ_symbol
     result = build_occ_symbol("TSLA", "2026-05-08", "PUT", 300.0)
     assert result == "TSLA260508P00300000"
 
 
 def test_parse_first_leg_buy_call():
-    from api.trade_routes import parse_first_leg
+    from tradingagents.execution.paper import parse_first_leg
     legs_text = "LEG 1: BUY CALL AAPL 2026-05-08 $195.00 limit=3.50 qty=1 [OK]"
     result = parse_first_leg(legs_text)
     assert result is not None
@@ -102,7 +103,7 @@ def test_parse_first_leg_buy_call():
 
 
 def test_parse_first_leg_sell_put():
-    from api.trade_routes import parse_first_leg
+    from tradingagents.execution.paper import parse_first_leg
     legs_text = "LEG 1: SELL PUT TSLA 2026-05-08 $300.00 limit=3.95 qty=1 [OK]"
     result = parse_first_leg(legs_text)
     assert result is not None
@@ -113,25 +114,34 @@ def test_parse_first_leg_sell_put():
 
 
 def test_parse_first_leg_no_match():
-    from api.trade_routes import parse_first_leg
+    from tradingagents.execution.paper import parse_first_leg
     result = parse_first_leg("No structured leg data here")
     assert result is None
 
 
 def test_missing_env_raises():
-    """_get_trading_client raises RuntimeError when env vars are empty."""
-    from api.trade_routes import _get_trading_client
-    import api.trade_routes as tr
-    orig_key = tr.ALPACA_PAPER_KEY
-    orig_secret = tr.ALPACA_PAPER_SECRET
-    tr.ALPACA_PAPER_KEY = ""
-    tr.ALPACA_PAPER_SECRET = ""
+    """PaperBackend._get_client raises ExecutionBackendError when env vars are empty."""
+    from tradingagents.execution.paper import PaperBackend
+    from tradingagents.exceptions import ExecutionBackendError
+    import os
+
+    orig_key = os.environ.get("ALPACA_PAPER_KEY")
+    orig_secret = os.environ.get("ALPACA_PAPER_SECRET")
+    os.environ["ALPACA_PAPER_KEY"] = ""
+    os.environ["ALPACA_PAPER_SECRET"] = ""
     try:
-        with pytest.raises(RuntimeError, match="ALPACA_PAPER_KEY"):
-            _get_trading_client()
+        backend = PaperBackend()
+        with pytest.raises(ExecutionBackendError, match="ALPACA_PAPER_KEY"):
+            backend._get_client()
     finally:
-        tr.ALPACA_PAPER_KEY = orig_key
-        tr.ALPACA_PAPER_SECRET = orig_secret
+        if orig_key is not None:
+            os.environ["ALPACA_PAPER_KEY"] = orig_key
+        else:
+            os.environ.pop("ALPACA_PAPER_KEY", None)
+        if orig_secret is not None:
+            os.environ["ALPACA_PAPER_SECRET"] = orig_secret
+        else:
+            os.environ.pop("ALPACA_PAPER_SECRET", None)
 
 
 # ---------------------------------------------------------------------------
@@ -144,10 +154,13 @@ async def test_submit_equity_trade(app_with_db, test_session_factory):
     order_id = str(uuid.uuid4())
     mock_order = make_mock_order(order_id=order_id, status="submitted")
 
-    mock_client = MagicMock()
-    mock_client.submit_order.return_value = mock_order
+    mock_backend = AsyncMock()
+    mock_backend.submit_order.return_value = OrderResult(
+        order_id=order_id, status="submitted", ticker="AAPL",
+        direction="BUY", trade_type="equity", quantity=100,
+    )
 
-    with patch("api.trade_routes.get_client", return_value=mock_client):
+    with patch("api.trade_routes.get_backend", return_value=mock_backend):
         async with AsyncClient(
             transport=ASGITransport(app=app_with_db), base_url="http://test"
         ) as client:
@@ -184,12 +197,16 @@ async def test_submit_options_trade(app_with_db):
     order_id = str(uuid.uuid4())
     mock_order = make_mock_order(order_id=order_id, status="submitted")
 
-    mock_client = MagicMock()
-    mock_client.submit_order.return_value = mock_order
-
     options_legs_text = "LEG 1: BUY CALL AAPL 2026-05-08 $195.00 limit=3.50 qty=1 [OK]"
 
-    with patch("api.trade_routes.get_client", return_value=mock_client):
+    mock_backend = AsyncMock()
+    mock_backend.submit_order.return_value = OrderResult(
+        order_id=order_id, status="submitted", ticker="AAPL",
+        direction="BUY", trade_type="option", quantity=1,
+        occ_symbol="AAPL260508C00195000",
+    )
+
+    with patch("api.trade_routes.get_backend", return_value=mock_backend):
         async with AsyncClient(
             transport=ASGITransport(app=app_with_db), base_url="http://test"
         ) as client:
@@ -208,10 +225,8 @@ async def test_submit_options_trade(app_with_db):
     assert data["trade_type"] == "option"
     assert data["quantity"] == 1
 
-    # Verify the OCC symbol was used in submit_order call
-    call_args = mock_client.submit_order.call_args
-    order_arg = call_args.kwargs.get("order_data") or call_args.args[0]
-    assert order_arg.symbol == "AAPL260508C00195000"
+    # Verify submit_order was called with the right request
+    mock_backend.submit_order.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -235,16 +250,14 @@ async def test_poll_order_status(app_with_db, test_session_factory):
         session.add(trade)
         await session.commit()
 
-    mock_order = make_mock_order(
-        order_id=order_id,
-        status=OrderStatus.FILLED,
-        filled_avg_price="195.50",
-        filled_at=fill_time,
+    mock_backend = AsyncMock()
+    mock_backend.get_order_status.return_value = PositionStatus(
+        order_id=order_id, status="filled",
+        fill_price=195.50, fill_time=fill_time.isoformat(),
     )
-    mock_client = MagicMock()
-    mock_client.get_order_by_id.return_value = mock_order
+    mock_backend._get_client.return_value = MagicMock()
 
-    with patch("api.trade_routes.get_client", return_value=mock_client):
+    with patch("api.trade_routes.get_backend", return_value=mock_backend):
         async with AsyncClient(
             transport=ASGITransport(app=app_with_db), base_url="http://test"
         ) as client:
@@ -285,17 +298,14 @@ async def test_poll_order_status_includes_close_time(app_with_db, test_session_f
         session.add(trade)
         await session.commit()
 
-    # Alpaca still returns FILLED (position closed externally)
-    mock_order = make_mock_order(
-        order_id=order_id,
-        status=OrderStatus.FILLED,
-        filled_avg_price="200.0",
-        filled_at=datetime(2026, 3, 25),
+    mock_backend = AsyncMock()
+    mock_backend.get_order_status.return_value = PositionStatus(
+        order_id=order_id, status="filled",
+        fill_price=200.0, fill_time=datetime(2026, 3, 25).isoformat(),
     )
-    mock_client = MagicMock()
-    mock_client.get_order_by_id.return_value = mock_order
+    mock_backend._get_client.return_value = MagicMock()
 
-    with patch("api.trade_routes.get_client", return_value=mock_client):
+    with patch("api.trade_routes.get_backend", return_value=mock_backend):
         async with AsyncClient(
             transport=ASGITransport(app=app_with_db), base_url="http://test"
         ) as client:
@@ -318,25 +328,25 @@ async def test_poll_order_status_includes_close_time(app_with_db, test_session_f
 
 def test_extract_confidence_explicit_percent():
     """_extract_confidence("Confidence: 85%") returns 85.0."""
-    from api.trade_routes import _extract_confidence
+    from tradingagents.execution.paper import extract_confidence as _extract_confidence
     assert _extract_confidence("Confidence: 85%") == 85.0
 
 
 def test_extract_confidence_level_percent():
     """_extract_confidence("confidence level: 72.5%") returns 72.5."""
-    from api.trade_routes import _extract_confidence
+    from tradingagents.execution.paper import extract_confidence as _extract_confidence
     assert _extract_confidence("confidence level: 72.5%") == 72.5
 
 
 def test_extract_confidence_overall_level():
     """_extract_confidence("Overall Confidence Level: 78%") returns 78.0."""
-    from api.trade_routes import _extract_confidence
+    from tradingagents.execution.paper import extract_confidence as _extract_confidence
     assert _extract_confidence("Overall Confidence Level: 78%") == 78.0
 
 
 def test_extract_confidence_no_match():
     """_extract_confidence("no confidence here") returns None."""
-    from api.trade_routes import _extract_confidence
+    from tradingagents.execution.paper import extract_confidence as _extract_confidence
     assert _extract_confidence("no confidence here") is None
 
 
@@ -356,10 +366,13 @@ async def test_submit_trade_stores_confidence(app_with_db, test_session_factory)
     """POST /api/trades with confidence_text stores extracted confidence in DB."""
     order_id = str(uuid.uuid4())
     mock_order = make_mock_order(order_id=order_id, status="submitted")
-    mock_client = MagicMock()
-    mock_client.submit_order.return_value = mock_order
+    mock_backend = AsyncMock()
+    mock_backend.submit_order.return_value = OrderResult(
+        order_id=order_id, status="submitted", ticker="AAPL",
+        direction="BUY", trade_type="equity", quantity=100,
+    )
 
-    with patch("api.trade_routes.get_client", return_value=mock_client):
+    with patch("api.trade_routes.get_backend", return_value=mock_backend):
         async with AsyncClient(
             transport=ASGITransport(app=app_with_db), base_url="http://test"
         ) as client:

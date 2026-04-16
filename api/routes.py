@@ -22,7 +22,41 @@ async def start_analysis(run_id: str, request: AnalyzeRequest):
     async def run_graph():
         try:
             from tradingagents.graph.trading_graph import TradingAgentsGraph
+            from .db import AsyncSessionFactory
+            from .models import AnalysisRun, Config as ConfigModel
+            from sqlalchemy import select as sa_select
+            from datetime import datetime
+
             config = request.config_dict()
+
+            # Config snapshot: merge DB overrides into run config (Epic 6.5)
+            config_snapshot = {}
+            try:
+                from .config_routes import _EXPOSED_DEFAULTS
+                async with AsyncSessionFactory() as cfg_session:
+                    result = await cfg_session.execute(sa_select(ConfigModel))
+                    db_overrides = {c.key: json.loads(c.value) for c in result.scalars().all()}
+                config_snapshot = {**_EXPOSED_DEFAULTS, **db_overrides}
+                for k, v in db_overrides.items():
+                    if k in config:
+                        config[k] = v
+            except Exception:
+                pass
+
+            # Create AnalysisRun record (Epic 7.1)
+            try:
+                async with AsyncSessionFactory() as run_session:
+                    analysis_run = AnalysisRun(
+                        run_id=run_id,
+                        ticker=request.ticker,
+                        status="running",
+                        config_snapshot=json.dumps(config_snapshot) if config_snapshot else None,
+                    )
+                    run_session.add(analysis_run)
+                    await run_session.commit()
+            except Exception:
+                pass  # Non-fatal
+
             ta = TradingAgentsGraph(
                 selected_analysts=request.analysts,
                 config=config,
@@ -36,11 +70,43 @@ async def start_analysis(run_id: str, request: AnalyzeRequest):
                 k: v for k, v in final_state.items()
                 if isinstance(v, (str, int, float, bool, type(None)))
             }
-            await q.put({"type": "complete", "state": serialized, "signal": signal})
+            await q.put({"type": "complete", "state": serialized, "signal": signal, "config_snapshot": config_snapshot})
+            # Update run status to completed
+            try:
+                async with AsyncSessionFactory() as run_session:
+                    r = await run_session.execute(sa_select(AnalysisRun).where(AnalysisRun.run_id == run_id))
+                    run_rec = r.scalar_one_or_none()
+                    if run_rec:
+                        run_rec.status = "completed"
+                        run_rec.completed_at = datetime.utcnow()
+                        await run_session.commit()
+            except Exception:
+                pass
         except AnalysisCancelledError:
             await q.put({"type": "cancelled"})
+            try:
+                async with AsyncSessionFactory() as run_session:
+                    r = await run_session.execute(sa_select(AnalysisRun).where(AnalysisRun.run_id == run_id))
+                    run_rec = r.scalar_one_or_none()
+                    if run_rec:
+                        run_rec.status = "cancelled"
+                        run_rec.completed_at = datetime.utcnow()
+                        await run_session.commit()
+            except Exception:
+                pass
         except Exception as e:
             await q.put({"type": "error", "message": str(e)})
+            try:
+                async with AsyncSessionFactory() as run_session:
+                    r = await run_session.execute(sa_select(AnalysisRun).where(AnalysisRun.run_id == run_id))
+                    run_rec = r.scalar_one_or_none()
+                    if run_rec:
+                        run_rec.status = "failed"
+                        run_rec.error_message = str(e)
+                        run_rec.completed_at = datetime.utcnow()
+                        await run_session.commit()
+            except Exception:
+                pass
         finally:
             await q.put(None)  # sentinel to signal stream end
 

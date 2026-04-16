@@ -57,6 +57,20 @@ async def ensure_scoring_columns() -> None:
                     raise
 
 
+async def ensure_prediction_id_column() -> None:
+    """Add prediction_id FK column to trades table."""
+    async with engine.begin() as conn:
+        try:
+            await conn.execute(
+                text("ALTER TABLE trades ADD COLUMN prediction_id INTEGER")
+            )
+        except Exception as exc:
+            if "duplicate column name" in str(exc).lower():
+                pass
+            else:
+                raise
+
+
 async def ensure_bracket_columns() -> None:
     """Add Phase-1 bracket order and close-reason columns."""
     new_columns = [
