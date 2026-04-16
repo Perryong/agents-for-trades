@@ -294,15 +294,10 @@ async def close_position(ticker: str, session: SessionDep):
     if trade is None:
         raise HTTPException(status_code=404, detail="No open position found")
 
-    # Cancel pending OCO legs
-    client = backend._get_client()
+    # Cancel pending OCO legs via backend abstraction
     for leg_id in [trade.bracket_tp_order_id, trade.bracket_sl_order_id]:
         if leg_id:
-            try:
-                import asyncio
-                await asyncio.to_thread(client.cancel_order_by_id, order_id=leg_id)
-            except Exception:
-                pass
+            await backend.cancel_order(leg_id)
 
     try:
         close_result = await backend.close_position(ticker)

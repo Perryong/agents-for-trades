@@ -161,21 +161,22 @@ async def start_batch_analysis(request: BatchRunRequest):
 @analysis_router.get("/analysis/agent-durations", response_model=List[AgentDurationStats])
 async def get_agent_durations(session: SessionDep):
     """Average agent durations from historical runs (for ETR calculation)."""
-    result = await session.execute(select(AgentResult).where(AgentResult.duration_ms != None))  # noqa: E711
-    agents = result.scalars().all()
+    from sqlalchemy import func
 
-    # Compute averages per agent
-    from collections import defaultdict
-    durations: dict[str, list[int]] = defaultdict(list)
-    for a in agents:
-        if a.duration_ms is not None:
-            durations[a.agent_name].append(a.duration_ms)
-
+    result = await session.execute(
+        select(
+            AgentResult.agent_name,
+            func.avg(AgentResult.duration_ms).label("avg_ms"),
+            func.count().label("cnt"),
+        )
+        .where(AgentResult.duration_ms != None)  # noqa: E711
+        .group_by(AgentResult.agent_name)
+    )
     return [
         AgentDurationStats(
-            agent_name=name,
-            avg_duration_ms=sum(durs) // len(durs),
-            sample_count=len(durs),
+            agent_name=row.agent_name,
+            avg_duration_ms=int(row.avg_ms),
+            sample_count=row.cnt,
         )
-        for name, durs in sorted(durations.items())
+        for row in result.all()
     ]

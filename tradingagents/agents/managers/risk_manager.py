@@ -91,8 +91,12 @@ def _get_paper_trading_stop_loss_pct() -> float:
 
 
 def _compute_valid_until(trade_spec: TradeSpec | None) -> datetime:
-    """Compute valid_until based on trade type and strategy."""
-    now = datetime.utcnow()
+    """Compute valid_until based on trade type and strategy.
+
+    Returns a timezone-aware UTC datetime so ISO serialization includes 'Z' suffix.
+    """
+    from datetime import timezone
+    now = datetime.now(timezone.utc)
     if trade_spec is None:
         return now + timedelta(hours=24)
     if trade_spec.trade_type == "option" and trade_spec.expiry:

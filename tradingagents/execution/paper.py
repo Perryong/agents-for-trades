@@ -8,6 +8,7 @@ import os
 import re
 import asyncio
 import logging
+import threading
 from typing import Optional
 from datetime import datetime
 
@@ -117,17 +118,20 @@ class PaperBackend:
 
     def __init__(self):
         self._client: Optional[TradingClient] = None
+        self._client_lock = threading.Lock()
 
     def _get_client(self) -> TradingClient:
-        """Return the TradingClient singleton (lazy init)."""
+        """Return the TradingClient singleton (thread-safe lazy init)."""
         if self._client is None:
-            key = os.environ.get("ALPACA_PAPER_KEY")
-            secret = os.environ.get("ALPACA_PAPER_SECRET")
-            if not key or not secret:
-                raise ExecutionBackendError(
-                    "ALPACA_PAPER_KEY and ALPACA_PAPER_SECRET must be set"
-                )
-            self._client = TradingClient(key, secret, paper=True)
+            with self._client_lock:
+                if self._client is None:  # Double-check after acquiring lock
+                    key = os.environ.get("ALPACA_PAPER_KEY")
+                    secret = os.environ.get("ALPACA_PAPER_SECRET")
+                    if not key or not secret:
+                        raise ExecutionBackendError(
+                            "ALPACA_PAPER_KEY and ALPACA_PAPER_SECRET must be set"
+                        )
+                    self._client = TradingClient(key, secret, paper=True)
         return self._client
 
     async def submit_order(self, request: OrderRequest) -> OrderResult:
@@ -277,6 +281,14 @@ class PaperBackend:
                 status.rejection_reason = "Order rejected by Alpaca"
 
         return status
+
+    async def cancel_order(self, order_id: str) -> None:
+        """Cancel a pending order by ID."""
+        client = self._get_client()
+        try:
+            await asyncio.to_thread(client.cancel_order_by_id, order_id=order_id)
+        except Exception as e:
+            logger.warning(f"Failed to cancel order {order_id}: {e}")
 
     async def close_position(self, ticker: str) -> dict:
         """Close an open position by ticker."""

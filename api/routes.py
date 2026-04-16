@@ -108,6 +108,9 @@ async def start_analysis(run_id: str, request: AnalyzeRequest):
             except Exception:
                 pass
         finally:
+            # Clean up checkpoint connection to avoid leaks
+            if 'ta' in locals() and hasattr(ta, 'close'):
+                ta.close()
             await q.put(None)  # sentinel to signal stream end
 
     asyncio.create_task(run_graph())

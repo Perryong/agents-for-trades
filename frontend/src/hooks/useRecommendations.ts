@@ -54,7 +54,9 @@ export function useRecommendations(): UseRecommendationsResult {
       setRecommendations(prev => prev.map(r => {
         if (r.status !== 'pending' || !r.valid_until) return r;
         try {
-          if (new Date(r.valid_until).getTime() < now) return { ...r, status: 'expired' as const };
+          // Ensure UTC parsing: append Z if no timezone indicator present
+          const vu = r.valid_until.endsWith('Z') || r.valid_until.includes('+') ? r.valid_until : r.valid_until + 'Z';
+          if (new Date(vu).getTime() < now) return { ...r, status: 'expired' as const };
         } catch { /* ignore parse errors */ }
         return r;
       }));

@@ -293,7 +293,19 @@ class GraphSetup:
                 checkpoint_db = self.config.get("checkpoint_db", "./checkpoints.db")
                 conn = sqlite3.connect(checkpoint_db, check_same_thread=False)
                 checkpointer = SqliteSaver(conn)
+                # Store connection reference so it can be closed on cleanup
+                self._checkpoint_conn = conn
             except ImportError:
                 pass  # SqliteSaver not available — skip checkpointing
 
         return workflow.compile(checkpointer=checkpointer)
+
+    def close(self) -> None:
+        """Release resources (checkpoint DB connection)."""
+        conn = getattr(self, "_checkpoint_conn", None)
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            self._checkpoint_conn = None

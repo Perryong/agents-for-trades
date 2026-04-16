@@ -24,6 +24,10 @@ class ExecutionBackend(Protocol):
         """Poll broker for current order/position status."""
         ...
 
+    async def cancel_order(self, order_id: str) -> None:
+        """Cancel a pending order by ID."""
+        ...
+
     async def close_position(self, ticker: str) -> dict:
         """Close an open position by ticker. Returns close details."""
         ...

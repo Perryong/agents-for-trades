@@ -280,26 +280,46 @@ async def list_positions(session: SessionDep):
 
 @recommendation_router.get("/positions/stats", response_model=QuickStatsResponse)
 async def get_quick_stats(session: SessionDep):
-    """Quick stats for the side panel."""
+    """Quick stats for the side panel — uses SQL aggregation, not full table scan."""
     from datetime import timedelta
+    from sqlalchemy import func, case
 
-    result = await session.execute(select(Trade))
-    all_trades = result.scalars().all()
+    # Open positions count
+    open_result = await session.execute(
+        select(func.count()).select_from(Trade).where(
+            Trade.status.in_(["submitted", "filled"]),
+            Trade.outcome == None,  # noqa: E711
+        )
+    )
+    open_positions = open_result.scalar() or 0
 
-    open_positions = len([t for t in all_trades if t.status in ("submitted", "filled") and t.outcome is None])
-    closed = [t for t in all_trades if t.outcome is not None]
-    total_closed = len(closed)
-    wins = [t for t in closed if t.outcome == "WIN"]
-    losses = [t for t in closed if t.outcome == "LOSS"]
+    # Closed trade stats via SQL aggregation
+    stats_result = await session.execute(
+        select(
+            func.count().label("total"),
+            func.sum(case((Trade.outcome == "WIN", 1), else_=0)).label("wins"),
+            func.sum(case((Trade.outcome == "LOSS", 1), else_=0)).label("losses"),
+            func.avg(case((Trade.outcome == "WIN", Trade.pnl_pct), else_=None)).label("avg_winner"),
+            func.avg(case((Trade.outcome == "LOSS", Trade.pnl_pct), else_=None)).label("avg_loser"),
+        ).where(Trade.outcome != None)  # noqa: E711
+    )
+    stats = stats_result.one()
+    total_closed = stats.total or 0
+    win_count = stats.wins or 0
+    avg_winner = float(stats.avg_winner or 0)
+    avg_loser = float(stats.avg_loser or 0)
+    win_rate = win_count / total_closed * 100 if total_closed > 0 else 0.0
 
-    win_rate = len(wins) / total_closed * 100 if total_closed > 0 else 0.0
-
+    # Week P&L via SQL
     week_ago = datetime.utcnow() - timedelta(days=7)
-    week_closed = [t for t in closed if t.close_time and t.close_time > week_ago]
-    week_pnl = sum(t.pnl_pct for t in week_closed if t.pnl_pct is not None)
+    week_result = await session.execute(
+        select(func.coalesce(func.sum(Trade.pnl_pct), 0)).where(
+            Trade.outcome != None,  # noqa: E711
+            Trade.close_time > week_ago,
+        )
+    )
+    week_pnl = float(week_result.scalar() or 0)
 
-    avg_winner = sum(t.pnl_pct for t in wins if t.pnl_pct is not None) / len(wins) if wins else 0.0
-    avg_loser = sum(t.pnl_pct for t in losses if t.pnl_pct is not None) / len(losses) if losses else 0.0
     expectancy = (win_rate / 100 * avg_winner) + ((1 - win_rate / 100) * avg_loser)
 
     return QuickStatsResponse(
