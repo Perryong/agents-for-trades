@@ -123,7 +123,7 @@ class TradingAgentsGraph:
             config=self.config,
         )
 
-        self.propagator = Propagator()
+        self.propagator = Propagator(config=self.config)
         self.reflector = Reflector(self.quick_thinking_llm)
         self.signal_processor = SignalProcessor(self.quick_thinking_llm)
 

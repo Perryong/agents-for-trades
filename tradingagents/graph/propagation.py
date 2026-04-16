@@ -11,9 +11,10 @@ from tradingagents.agents.utils.agent_states import (
 class Propagator:
     """Handles state initialization and propagation through the graph."""
 
-    def __init__(self, max_recur_limit=100):
+    def __init__(self, max_recur_limit=100, config: Dict[str, Any] | None = None):
         """Initialize with configuration parameters."""
         self.max_recur_limit = max_recur_limit
+        self.config = config or {}
 
     def create_initial_state(
         self, company_name: str, trade_date: str
