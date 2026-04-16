@@ -130,7 +130,7 @@ async def get_chart_overlay(ticker: str):
     if structured:
         signal = structured.get("signal", _extract_signal(ftd))
         entry_price_val = structured.get("entry_price")
-        take_profit_val = structured.get("target_price")
+        take_profit_val = structured.get("target_price") or structured.get("profit_target")
         stop_loss_val = structured.get("stop_loss")
         strategy_val = structured.get("strategy") or _extract_strategy_name(options_strategy_text)
     else:

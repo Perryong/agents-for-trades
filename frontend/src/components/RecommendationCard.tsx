@@ -57,6 +57,15 @@ export function RecommendationCard({ recommendation: rec, focused, expanded, onT
       <div className="flex items-center gap-2 mb-2">
         <span className="text-[16px] font-mono font-medium text-text-primary">{rec.ticker}</span>
 
+        {/* Trade type badge */}
+        <span className={`px-1.5 py-0.5 rounded-sm text-[10px] font-medium uppercase ${
+          rec.trade_type === 'option'
+            ? 'bg-accent-amber/15 text-accent-amber'
+            : 'bg-accent-blue/15 text-accent-blue'
+        }`}>
+          {rec.trade_type === 'option' ? 'Options' : 'Equity'}
+        </span>
+
         {isNoTrade ? (
           <span className="text-[11px] font-medium text-text-tertiary uppercase">No Trade</span>
         ) : (
@@ -125,7 +134,17 @@ export function RecommendationCard({ recommendation: rec, focused, expanded, onT
           <p className="text-[13px] text-text-secondary">{rec.no_trade_reason}</p>
         )
       ) : rec.trade_spec ? (
-        <TradeSpecGrid spec={rec.trade_spec} direction={rec.direction} />
+        <>
+          <TradeSpecGrid spec={rec.trade_spec} direction={rec.direction} />
+          {/* Options-specific details */}
+          {rec.trade_type === 'option' && rec.trade_spec.strike && (
+            <div className="flex items-center gap-3 mt-1 text-[11px] font-mono text-text-secondary">
+              <span>{rec.trade_spec.contract_type?.toUpperCase()}</span>
+              <span>${rec.trade_spec.strike}</span>
+              <span>{rec.trade_spec.expiry}</span>
+            </div>
+          )}
+        </>
       ) : null}
 
       {/* Reasoning chain (expandable) */}

@@ -337,11 +337,15 @@ export interface AgentSignalSummary {
 }
 
 export interface RecommendationTradeSpec {
+  trade_type: string;         // "equity" | "option"
   entry_price: number | null;
   stop_loss: number | null;
   target_price: number | null;
   position_size: number | null;
   risk_reward: number | null;
+  strike: number | null;
+  expiry: string | null;
+  contract_type: string | null;  // "call" | "put"
 }
 
 export interface Position {
@@ -386,6 +390,7 @@ export interface Recommendation {
   ticker: string;
   direction: string | null;           // "BUY" | "SELL" | null (no-trade)
   confidence: number;
+  trade_type: string;                 // "equity" | "option"
   strategy: string | null;
   trade_spec: RecommendationTradeSpec | null;
   agent_signals: AgentSignalSummary[];

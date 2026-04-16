@@ -80,12 +80,19 @@ async def start_analysis(run_id: str, request: AnalyzeRequest):
                         run_rec.status = "completed"
                         run_rec.completed_at = datetime.utcnow()
 
-                    # Write Prediction record from analysis results
+                    # Write Prediction records — separate for equity and options
                     from .models import Prediction
                     trade_rec = final_state.get("trade_recommendation") or {}
                     trade_spec = trade_rec.get("trade_spec")
                     reasoning = trade_rec.get("reasoning_chain", [])
                     ftd = final_state.get("final_trade_decision", "")
+                    confidence = trade_rec.get("confidence", 50.0)
+                    if not isinstance(confidence, (int, float)):
+                        confidence = 50.0
+                    valid_until = trade_rec.get("valid_until")
+                    if hasattr(valid_until, "isoformat"):
+                        valid_until = valid_until.isoformat()
+
                     direction = None
                     if isinstance(trade_spec, dict):
                         direction = trade_spec.get("direction")
@@ -95,22 +102,84 @@ async def start_analysis(run_id: str, request: AnalyzeRequest):
                             direction = "BUY"
                         elif "SELL" in upper:
                             direction = "SELL"
-                    confidence = trade_rec.get("confidence", 50.0)
-                    if not isinstance(confidence, (int, float)):
-                        confidence = 50.0
-                    valid_until = trade_rec.get("valid_until")
-                    if hasattr(valid_until, "isoformat"):
-                        valid_until = valid_until.isoformat()
-                    pred = Prediction(
-                        ticker=request.ticker.upper(),
-                        direction=direction,
-                        confidence=float(confidence),
-                        trade_spec_json=json.dumps(trade_spec) if trade_spec else None,
-                        reasoning_chain_json=json.dumps(reasoning) if reasoning else "[]",
-                        no_trade_reason=trade_rec.get("no_trade_reason"),
-                        valid_until=str(valid_until) if valid_until else None,
+
+                    # 1. Equity prediction (from structured trade_spec or parsed prose)
+                    equity_spec = None
+                    if isinstance(trade_spec, dict) and trade_spec.get("trade_type") != "option":
+                        equity_spec = trade_spec
+                    elif not trade_spec:
+                        # Parse equity plan from prose if no structured spec
+                        import re
+                        entry_m = re.search(r'Entry.*?[\$]?([\d.]+)', ftd)
+                        stop_m = re.search(r'Stop.*?[\$]?([\d.]+)', ftd)
+                        target_m = re.search(r'(?:Target|T1).*?[\$]?([\d.]+)', ftd)
+                        if entry_m or stop_m or target_m:
+                            equity_spec = {
+                                "trade_type": "equity",
+                                "direction": direction,
+                                "entry_price": float(entry_m.group(1)) if entry_m else None,
+                                "stop_loss": float(stop_m.group(1)) if stop_m else None,
+                                "profit_target": float(target_m.group(1)) if target_m else None,
+                            }
+
+                    if equity_spec:
+                        pred_equity = Prediction(
+                            ticker=request.ticker.upper(),
+                            direction=direction,
+                            confidence=float(confidence),
+                            trade_spec_json=json.dumps(equity_spec),
+                            reasoning_chain_json=json.dumps(reasoning) if reasoning else "[]",
+                            no_trade_reason=trade_rec.get("no_trade_reason"),
+                            valid_until=str(valid_until) if valid_until else None,
+                        )
+                        run_session.add(pred_equity)
+
+                    # 2. Options prediction (if options legs are actionable)
+                    options_legs = final_state.get("options_legs", "")
+                    options_strategy = final_state.get("options_strategy", "")
+                    # Only create options prediction if there are actual legs (not LIQUIDITY FAIL)
+                    has_options = (
+                        options_legs
+                        and "LIQUIDITY FAIL" not in options_legs.upper()
+                        and "NO" not in options_legs[:20].upper()
+                        and len(options_legs) > 30
                     )
-                    run_session.add(pred)
+                    if has_options:
+                        options_spec = None
+                        if isinstance(trade_spec, dict) and trade_spec.get("trade_type") == "option":
+                            options_spec = trade_spec
+                        else:
+                            # Build options spec from pipeline fields
+                            options_spec = {
+                                "trade_type": "option",
+                                "direction": direction,
+                                "strategy_name": options_strategy[:100] if options_strategy else None,
+                                "options_legs": options_legs,
+                            }
+                        pred_options = Prediction(
+                            ticker=request.ticker.upper(),
+                            direction=direction,
+                            confidence=float(confidence) * 0.9,  # Slightly lower for options
+                            trade_spec_json=json.dumps(options_spec),
+                            reasoning_chain_json=json.dumps(reasoning) if reasoning else "[]",
+                            no_trade_reason=None,
+                            valid_until=str(valid_until) if valid_until else None,
+                        )
+                        run_session.add(pred_options)
+
+                    # Fallback: if neither equity nor options spec, write a generic prediction
+                    if not equity_spec and not has_options:
+                        pred_generic = Prediction(
+                            ticker=request.ticker.upper(),
+                            direction=direction,
+                            confidence=float(confidence),
+                            trade_spec_json=json.dumps(trade_spec) if trade_spec else None,
+                            reasoning_chain_json=json.dumps(reasoning) if reasoning else "[]",
+                            no_trade_reason=trade_rec.get("no_trade_reason") or "No actionable trade plan",
+                            valid_until=str(valid_until) if valid_until else None,
+                        )
+                        run_session.add(pred_generic)
+
                     await run_session.commit()
             except Exception:
                 pass

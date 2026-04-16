@@ -68,9 +68,17 @@ export function useRecommendations(): UseRecommendationsResult {
   const approve = useCallback(async (id: number) => {
     const res = await fetch(`/api/recommendations/${id}/approve`, { method: 'POST' });
     if (!res.ok) { console.error('Failed to approve recommendation', id, res.status); return; }
+    const data = await res.json();
+    const tradeInfo = data.trade;
     setRecommendations(prev =>
       prev.map(r => r.id === id ? { ...r, status: 'approved' as const } : r)
     );
+    // Log trade submission result
+    if (tradeInfo?.order_id) {
+      console.log(`Paper trade submitted: order ${tradeInfo.order_id}`);
+    } else if (tradeInfo?.error) {
+      console.warn(`Paper trade failed: ${tradeInfo.error}`);
+    }
   }, []);
 
   const skip = useCallback(async (id: number) => {

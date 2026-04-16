@@ -31,11 +31,15 @@ class AgentSignalResponse(BaseModel):
 
 
 class TradeSpecResponse(BaseModel):
+    trade_type: str = "equity"  # "equity" | "option"
     entry_price: Optional[float] = None
     stop_loss: Optional[float] = None
     target_price: Optional[float] = None
     position_size: Optional[int] = None
     risk_reward: Optional[float] = None
+    strike: Optional[float] = None
+    expiry: Optional[str] = None
+    contract_type: Optional[str] = None  # "call" | "put"
 
 
 class RecommendationResponse(BaseModel):
@@ -43,6 +47,7 @@ class RecommendationResponse(BaseModel):
     ticker: str
     direction: Optional[str]
     confidence: float
+    trade_type: str = "equity"  # "equity" | "option"
     strategy: Optional[str] = None
     trade_spec: Optional[TradeSpecResponse] = None
     agent_signals: List[AgentSignalResponse]
@@ -106,21 +111,29 @@ async def list_recommendations(session: SessionDep):
                 ))
 
         trade_spec = None
+        trade_type = "equity"
+        strategy_name = None
         if p.trade_spec_json:
             try:
                 spec = json.loads(p.trade_spec_json)
+                trade_type = spec.get("trade_type", "equity")
                 entry = spec.get("entry_price")
                 stop = spec.get("stop_loss")
                 target = spec.get("profit_target", spec.get("target_price"))
                 rr = None
                 if entry and stop and target and entry != stop:
                     rr = round(abs(target - entry) / abs(entry - stop), 2)
+                strategy_name = spec.get("strategy_name")
                 trade_spec = TradeSpecResponse(
+                    trade_type=trade_type,
                     entry_price=entry,
                     stop_loss=stop,
                     target_price=target,
                     position_size=spec.get("position_size"),
                     risk_reward=rr,
+                    strike=spec.get("strike"),
+                    expiry=spec.get("expiry"),
+                    contract_type=spec.get("contract_type"),
                 )
             except (json.JSONDecodeError, TypeError):
                 pass
@@ -146,7 +159,8 @@ async def list_recommendations(session: SessionDep):
             ticker=p.ticker,
             direction=p.direction,
             confidence=p.confidence,
-            strategy=None,
+            trade_type=trade_type,
+            strategy=strategy_name,
             trade_spec=trade_spec,
             agent_signals=agent_signals,
             no_trade_reason=p.no_trade_reason,
@@ -160,14 +174,69 @@ async def list_recommendations(session: SessionDep):
 
 @recommendation_router.post("/recommendations/{rec_id}/approve")
 async def approve_recommendation(rec_id: int, session: SessionDep):
-    """Mark a recommendation as approved (persisted to DB)."""
+    """Mark a recommendation as approved and auto-submit paper trade."""
     result = await session.execute(select(Prediction).where(Prediction.id == rec_id))
     pred = result.scalar_one_or_none()
     if pred is None:
         raise HTTPException(status_code=404, detail="Recommendation not found")
     pred.approval_status = "approved"
     await session.commit()
-    return {"id": rec_id, "status": "approved"}
+
+    # Auto-submit paper trade from the prediction's trade spec
+    trade_result = None
+    if pred.trade_spec_json:
+        try:
+            spec = json.loads(pred.trade_spec_json)
+            from .trade_routes import get_backend
+            from tradingagents.execution.types import OrderRequest
+            from .models import Trade
+
+            backend = get_backend()
+            trade_type = spec.get("trade_type", "equity")
+            direction = spec.get("direction", pred.direction or "BUY")
+            quantity = 1 if trade_type == "option" else spec.get("position_size", 100)
+
+            order_req = OrderRequest(
+                ticker=pred.ticker.upper(),
+                direction=direction,
+                trade_type=trade_type,
+                quantity=quantity,
+                entry_price=spec.get("entry_price"),
+                target_price=spec.get("profit_target", spec.get("target_price")),
+                stop_loss=spec.get("stop_loss"),
+                tif="GTC",
+                strike=spec.get("strike"),
+                expiry=spec.get("expiry"),
+                contract_type=spec.get("contract_type"),
+                strategy_name=spec.get("strategy_name"),
+                confidence=pred.confidence,
+            )
+
+            order_result = await backend.submit_bracket_order(order_req)
+
+            # Persist the trade record
+            trade = Trade(
+                ticker=pred.ticker.upper(),
+                direction=direction,
+                trade_type=trade_type,
+                strategy_name=spec.get("strategy_name"),
+                order_id=order_result.order_id,
+                status="submitted",
+                quantity=quantity,
+                entry_price=spec.get("entry_price"),
+                target_price=spec.get("profit_target", spec.get("target_price")),
+                stop_price=spec.get("stop_loss"),
+                prediction_id=pred.id,
+                confidence=pred.confidence,
+            )
+            session.add(trade)
+            await session.commit()
+            trade_result = {"trade_id": trade.id, "order_id": order_result.order_id, "status": "submitted"}
+        except Exception as e:
+            logger.error(f"Auto-submit paper trade failed for recommendation {rec_id}: {e}")
+            trade_result = {"error": str(e)}
+
+    return {"id": rec_id, "status": "approved", "trade": trade_result}
 
 
 @recommendation_router.post("/recommendations/{rec_id}/skip")
